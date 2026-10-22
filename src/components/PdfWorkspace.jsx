@@ -101,8 +101,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [dragged, setDragged] = useState(null);
   const [tab, setTab] = useState(mode === 'split-pdf' ? 'split' : 'organize');
   const [splitMode, setSplitMode] = useState('ranges');
-  const [ranges, setRanges] = useState('1-2, 3');
-  const [chunkSize, setChunkSize] = useState('1');
+  const [ranges, setRanges] = useState('');
+  const [chunkSize, setChunkSize] = useState('');
   const [exportSettingsOpen, setExportSettingsOpen] = useState(mode === 'watermark-pdf');
   const [watermarkEnabled, setWatermarkEnabled] = useState(false);
   const [watermarkText, setWatermarkText] = useState('');
@@ -112,8 +112,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const selectedCount = selected.size;
   const bytesInMemory = useMemo(() => sources.reduce((total, item) => total + item.inputSize, 0), [sources]);
   const sourceLookup = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources]);
+  const splitNeedsInput = splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim();
   const splitEstimate = useMemo(() => {
-    if (!pages.length) return null;
+    if (!pages.length || (splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim())) return null;
     try {
       return splitMode === 'ranges' ? parsePageRanges(ranges, pages.length).length : chunkPageRanges(pages.length, Number(chunkSize)).length;
     } catch (_error) { return null; }
@@ -178,8 +179,11 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         }
       }
       if (!pages.length) {
-        const count = nextPages.length;
-        setRanges(count <= 2 ? `1-${count}` : `1-2, 3-${count}`);
+        // Never auto-select an arbitrary split point. A new document needs
+        // an explicit range or pages-per-file choice before ZIP download.
+        setRanges('');
+        setChunkSize('');
+        setSplitMode('ranges');
       }
       if (replacingDeletedPages) {
         releasePreviewDocuments();
@@ -277,6 +281,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const clearAll = () => {
     setWatermarkEnabled(false); setWatermarkText(''); setExportSettingsOpen(mode === 'watermark-pdf');
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
+    setRanges(''); setChunkSize(''); setSplitMode('ranges');
     releasePreviewDocuments();
   };
 
@@ -396,8 +401,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <p className="input-note">{t.rangeHint}</p>
                   <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => setSplitMode('chunks')} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
-                  <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} onChange={(event) => setChunkSize(event.target.value)} disabled={splitMode !== 'chunks' || busy} />
-                  <div className="split-estimate" aria-live="polite">{splitEstimate === null ? t.invalidRange : interpolate(t.estimate, { files: splitEstimate })}</div>
+                  <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} placeholder="5" onChange={(event) => setChunkSize(event.target.value)} disabled={splitMode !== 'chunks' || busy} />
+                  <div className="split-estimate" aria-live="polite">{splitEstimate === null ? (splitNeedsInput ? (splitMode === 'ranges' ? t.enterSplitRanges : t.enterSplitSize) : t.invalidRange) : interpolate(t.estimate, { files: splitEstimate })}</div>
                    <p className="input-note" data-testid="split-output-budget">{t.splitOutputBudget}</p>
                    {splitProgress && <p className="utility-note" role="status" data-testid="split-progress" aria-live="polite">{splitProgress.phase === 'parts'
                      ? interpolate(t.splitPartsProgress, { done: splitProgress.done, total: splitProgress.total })

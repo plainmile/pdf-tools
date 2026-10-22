@@ -97,6 +97,7 @@ test('optional watermark is applied to selected extraction and every split PDF',
   expect(watermarkImageCounts(extracted)).toEqual([1]);
 
   await page.getByRole('tab', { name: 'Split' }).click();
+  await page.getByRole('textbox', { name: 'Page ranges', exact: true }).fill('1-2, 3');
   const pending = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download split PDFs (ZIP)' }).click();
   const downloaded = await pending;
@@ -143,6 +144,7 @@ test('rotate, delete, undo and extract selected pages', async ({ page }) => {
 test('split PDFs into ZIP ranges in the current workspace order', async ({ page }) => {
   await loadInput(page);
   await page.getByRole('tab', { name: 'Split' }).click();
+  await page.getByRole('textbox', { name: 'Page ranges', exact: true }).fill('1-2, 3');
   const downloadEvent = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download split PDFs (ZIP)' }).click();
   const download = await downloadEvent;
@@ -159,6 +161,8 @@ test('invalid split ranges disable download until corrected', async ({ page }) =
   await loadInput(page);
   await page.getByRole('tab', { name: 'Split' }).click();
   const button = page.getByRole('button', { name: 'Download split PDFs (ZIP)' });
+  await expect(button).toBeDisabled();
+  await expect(page.locator('.split-estimate')).toContainText('Enter page ranges');
   await page.getByRole('textbox', { name: 'Page ranges', exact: true }).fill('3-1');
   await expect(button).toBeDisabled();
   await expect(page.locator('.split-estimate')).toContainText('maximum 50 output PDFs');
@@ -251,6 +255,8 @@ test('batch-drag selected pages together across documents in the exported PDF', 
 test('Chinese split tool exports current pages without uploading the document', async ({ page }) => {
   await page.goto('/zh/split-pdf/');
   await page.getByTestId('file-input').setInputFiles(await inputDocuments());
+  await expect(page.getByRole('button', { name: '下载拆分文件（ZIP）' })).toBeDisabled();
+  await page.getByRole('textbox', { name: '页码范围' }).fill('1-2, 3');
   await expect(page.getByText('预计生成 2 个 PDF 文件。')).toBeVisible();
   const wait = page.waitForEvent('download');
   await page.getByRole('button', { name: '下载拆分文件（ZIP）' }).click();
@@ -291,6 +297,7 @@ test('split output count over 50 is explained before download', async ({ page })
   await expect(page.getByTestId('page-tile')).toHaveCount(51);
   await page.getByRole('tab', { name: 'Split' }).click();
   await page.getByRole('radio', { name: 'Split every N pages' }).check();
+  await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('1');
   const button = page.getByRole('button', { name: 'Download split PDFs (ZIP)' });
   await expect(button).toBeDisabled();
   await expect(page.locator('.split-estimate')).toContainText('maximum 50 output PDFs');
@@ -386,6 +393,7 @@ test('split ZIP supports 50 outputs with progress controls and valid downloaded 
   await page.getByRole('tab', { name: 'Split' }).click();
   await expect(page.getByTestId('split-output-budget')).toContainText('128 MB');
   await page.getByRole('radio', { name: 'Split every N pages' }).check();
+  await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('1');
   const waiting = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download split PDFs (ZIP)' }).click();
   const download = await waiting;
@@ -481,3 +489,60 @@ for (const dpr of [1, 2]) {
     });
   });
 }
+
+test('split requires deliberate input for a 320-page book and starts blank after clearing', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'book-320.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf(Array.from({ length: 320 }, (_, i) => 300 + i % 12)),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(320);
+  const download = page.getByRole('button', { name: 'Download split PDFs (ZIP)' });
+  const ranges = page.getByRole('textbox', { name: 'Page ranges', exact: true });
+  await expect(ranges).toHaveValue('');
+  await expect(download).toBeDisabled();
+  await expect(page.locator('.split-estimate')).toContainText('Enter page ranges');
+  await page.getByRole('radio', { name: 'Split every N pages' }).check();
+  const pagesPerPart = page.getByRole('spinbutton', { name: 'Pages per PDF' });
+  await expect(pagesPerPart).toHaveValue('');
+  await expect(download).toBeDisabled();
+  await expect(page.locator('.split-estimate')).toContainText('Enter how many pages');
+  await pagesPerPart.fill('16');
+  await expect(page.locator('.split-estimate')).toContainText('20 PDF file(s)');
+  await expect(download).toBeEnabled();
+  await page.getByRole('radio', { name: 'Split by page ranges' }).check();
+  await expect(download).toBeDisabled();
+  await ranges.fill('1-30,31-320');
+  await expect(page.locator('.split-estimate')).toContainText('2 PDF file(s)');
+  await expect(download).toBeEnabled();
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'new-document.pdf', mimeType: 'application/pdf', buffer: await makePdf([350, 351, 352, 353]),
+  });
+  await expect(ranges).toHaveValue('');
+  await expect(download).toBeDisabled();
+});
+
+test('Chinese mobile split requires a typed range and exports exactly the chosen pages', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'mobile.pdf', mimeType: 'application/pdf', buffer: await makePdf([300, 310, 320, 330]),
+  });
+  const action = page.getByRole('button', { name: '下载拆分文件（ZIP）' });
+  const rangeInput = page.getByRole('textbox', { name: '页码范围' });
+  await expect(rangeInput).toHaveValue('');
+  await expect(action).toBeDisabled();
+  await expect(page.locator('.split-estimate')).toContainText('请填写要拆分的页码范围');
+  await rangeInput.fill('1-2,3-4');
+  await expect(action).toBeEnabled();
+  const wait = page.waitForEvent('download');
+  await action.click();
+  const archive = await JSZip.loadAsync(await readFile(await (await wait).path()));
+  expect(Object.keys(archive.files).sort()).toEqual(['part-01-pages-1-2.pdf', 'part-02-pages-3-4.pdf']);
+  const first = await PDFDocument.load(await archive.files['part-01-pages-1-2.pdf'].async('uint8array'));
+  const second = await PDFDocument.load(await archive.files['part-02-pages-3-4.pdf'].async('uint8array'));
+  expect(first.getPages().map(p => p.getWidth())).toEqual([300, 310]);
+  expect(second.getPages().map(p => p.getWidth())).toEqual([320, 330]);
+});
