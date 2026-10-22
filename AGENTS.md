@@ -44,3 +44,9 @@
 - Page-specific useful answers must be true to current implementations, including page limits, rasterized/uncopyable Unicode PDF text and lossy PDF compression. Avoid overclaiming or duplicating generic copy.
 - Keep SEO canonical and reciprocal EN/zh-CN hreflang, sitemap/robots, unique titles and descriptions, one H1 and accurate visible JSON-LD (WebSite, WebApplication, BreadcrumbList) in both languages. Do not add Review/FAQPage rich-result markup unless genuine eligibility and content permit it.
 - Every feature or UI PR must pass unit, container-build and full Playwright E2E before merge; every production deploy runs actual public-site tests on the same Runner and cleans Docker resources. Don't add redundant scheduled QA workflows.
+
+## Transparent origin credit in redistributed images
+
+- The publicly distributed image must include a **visible and crawlable** bilingual footer link to `https://pdf.plainmile.com/` labeled Official site / 官方网站. Keep this useful to people and consistent across both locales and all static tool pages; no cloaking, hidden links, anchor keyword stuffing, review manipulation or guaranteed SEO-benefit claims.
+- The original website remains the canonical source of the shipped static content. Self-hosts seeking independent indexability should rebuild with their actual origin/canonical/hreflang/schema settings rather than blindly duplicating official URLs. The site is MIT-licensed; this on-page origin link is default attribution, **not an additional legal licensing condition**.
+- Verify footer origin attribution on every real public URL through the post-deploy Runner E2E, plus a JS-disabled pre-merge check of representative English/Chinese pages; never skip functional E2E.

@@ -135,8 +135,9 @@ main { flex: 1; }
 .footer-layout { display: flex; gap: 24px; justify-content: space-between; }
 .footer-brand { font-size: 16px; font-weight: 750; text-decoration: none; }
 .footer-layout p { font-size: 12px; color: var(--muted); margin: 11px 0 0; }
-.footer-links { display: flex; align-items: center; gap: 23px; }
+.footer-links { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 12px 20px; }
 .footer-links a { color: var(--muted); font-size: 12px; text-decoration: none; }
+.footer-links a[data-official-site] { color: var(--text); font-weight: 600; }
 .footer-bottom a { color: var(--muted); }
 .footer-bottom { color: var(--subtle); border-top: 1px solid var(--border); margin-top: 30px; padding-top: 19px; font-size: 11px; }
 /* Tool pages */
@@ -272,6 +273,7 @@ main { flex: 1; }
   .home-steps { grid-template-columns: 1fr; gap: 21px; }
   .bottom-cta { flex-direction: column; align-items: start; gap: 20px; padding: 45px 0 60px; }
   .footer-layout { flex-direction: column; }
+  .footer-links { justify-content: flex-start; }
   .tool-hero h1 { font-size: 34px; }
   .tool-explanation, .split-panel { grid-template-columns: 1fr; gap: 19px; }
   .workspace-controls, .workspace-subbar { flex-wrap: wrap; }

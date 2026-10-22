@@ -82,6 +82,8 @@ const pageTitle = title.includes('PlainMile') ? title : `${title} | PlainMile PD
           <div class="footer-links">
             <a href={href('/workspace/')}>{copy.nav.workspace}</a>
             <a href={href('/privacy/')}>{copy.nav.privacy}</a>
+            <!-- Visible source attribution appears on official and independently hosted instances. -->
+            <a data-official-site href="https://pdf.plainmile.com/" target="_blank" rel="noopener">{copy.footer.officialSite}: pdf.plainmile.com ↗</a>
             <a href="https://github.com/plainmile/pdf-tools" target="_blank" rel="noopener noreferrer">{copy.footer.github} ↗</a>
             <a href="https://plainmile.com/" rel="noopener noreferrer">{copy.footer.other}</a>
           </div>
