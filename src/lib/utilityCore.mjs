@@ -32,6 +32,21 @@ export function enforceImageBatchLimit(count, locale = 'en') {
   return true;
 }
 
+// Suggest finite batches rather than silently selecting hundreds of pages to rasterize.
+// A batch is only a convenience; users can still enter an arbitrary <=60-page range.
+export function imagePageBatch(count, batchIndex = 0) {
+  if (!Number.isSafeInteger(count) || count < 1 || count > UTILITY_LIMITS.maxPages) {
+    throw new Error('Invalid PDF page count.');
+  }
+  const total = Math.ceil(count / UTILITY_LIMITS.maxImagePagesPerRun);
+  if (!Number.isSafeInteger(batchIndex) || batchIndex < 0 || batchIndex >= total) {
+    throw new Error('Page batch is outside the document.');
+  }
+  const start = batchIndex * UTILITY_LIMITS.maxImagePagesPerRun + 1;
+  const end = Math.min(count, start + UTILITY_LIMITS.maxImagePagesPerRun - 1);
+  return { start, end, total, range: `${start}-${end}` };
+}
+
 export const utilitySlugs = Object.freeze([
   'pdf-to-images', 'compress-pdf', 'pdf-to-txt', 'pdf-to-markdown',
   'txt-to-pdf', 'markdown-to-pdf', 'add-page-numbers',

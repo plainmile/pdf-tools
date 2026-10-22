@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, parseTextBlocks,
   textContentToLines, linesToReadableText, sanitizeFilename,
-  UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit,
+  UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch,
 } from '../../src/lib/utilityCore.mjs';
 
 test('compression reports actual savings; a larger result must not count as savings', () => {
@@ -67,4 +67,16 @@ test('image conversion selects any 60 pages from a 500-page book, not only first
   assert.equal(selected.at(-1), 360);
   assert.equal(enforceImageBatchLimit(selected.length), true);
   assert.throws(() => enforceImageBatchLimit(requestedPages('1-61', 500).length), /60 pages/);
+});
+
+test('image batch suggestions cover the entire book without overlapping or exceeding 60 pages', () => {
+  assert.deepEqual(imagePageBatch(2), { start: 1, end: 2, total: 1, range: '1-2' });
+  assert.deepEqual(imagePageBatch(60), { start: 1, end: 60, total: 1, range: '1-60' });
+  assert.deepEqual(imagePageBatch(61), { start: 1, end: 60, total: 2, range: '1-60' });
+  assert.deepEqual(imagePageBatch(61, 1), { start: 61, end: 61, total: 2, range: '61-61' });
+  assert.deepEqual(imagePageBatch(320, 5), { start: 301, end: 320, total: 6, range: '301-320' });
+  assert.throws(() => imagePageBatch(0), /Invalid/);
+  assert.throws(() => imagePageBatch(1001), /Invalid/);
+  assert.throws(() => imagePageBatch(100, -1), /outside/);
+  assert.throws(() => imagePageBatch(100, 2), /outside/);
 });

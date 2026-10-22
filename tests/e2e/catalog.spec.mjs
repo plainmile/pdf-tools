@@ -111,3 +111,15 @@ test('both languages visibly credit the original website, including when JavaScr
     }
   } finally { await context.close(); }
 });
+
+test('every standalone converter has visible bilingual file-drop guidance', async ({ page }) => {
+  for (const locale of ['en','zh']) {
+    for (const slug of ['pdf-to-images','compress-pdf','pdf-to-txt','pdf-to-markdown','txt-to-pdf','markdown-to-pdf','add-page-numbers']) {
+      await page.goto((locale === 'zh' ? '/zh/' : '/') + slug + '/');
+      const zone = page.getByTestId('utility-dropzone');
+      await expect(zone).toBeVisible();
+      await expect(zone.locator('input[type="file"]')).toHaveCount(1);
+      await expect(zone).toContainText(locale === 'zh' ? '不会上传至服务器' : 'Nothing is uploaded');
+    }
+  }
+});

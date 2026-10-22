@@ -203,3 +203,9 @@ This project is licensed under **MIT**, and the website footer links to the open
 - Each tool page includes a real **How it works** section, two visible user questions with accurate limitations, and **contextual related-tool links**. Do not add fabricated customer reviews, fake star ratings, boilerplate keyword sections or FAQ rich-result markup.
 - Static structured data: home `WebSite`; tool pages `WebApplication` + `BreadcrumbList`. Both languages use real page-specific content, canonical URLs and reciprocal `hreflang` links. JSON-LD does **not** guarantee Google rich results, inclusion in AI search or rankings.
 - Desktop and mobile typography, text contrast, navigation, focus/keyboard usage, tool filters and dark/light/system themes are covered by unit, browser E2E and public-runner checks. Record actual deployed URL results rather than relying on local screenshots.
+
+## Faster conversion workflow (2026-10)
+
+- All seven standalone converters accept local files by **native file picker or drag-and-drop**. The UI makes the privacy behavior obvious: browser-local document bytes are never uploaded. TXT/Markdown imports show the imported file name and provide Clear.
+- Book-length **PDF to JPG/PNG** no longer starts with an impossible 300-page default. For PDFs longer than 60 pages, the page selector automatically suggests `1-60` and has keyboard-operable **Previous/Next pages** controls. For 125 pages, the batches are `1-60`, `61-120`, `121-125`. A custom range remains supported and batch ZIP names include the selected page range to avoid confusing downloads.
+- The per-run **60-image** and per-page **12 MP** safety limits are unchanged. Static bilingual tool landing content, canonical/hreflang, schema and search indexing remain unchanged.
