@@ -166,8 +166,8 @@ test('320-page book extracts its first and last text and preserves all pages whe
   await page.goto('/pdf-to-txt/');
   await upload(page, numberedFile.bytes);
   const numbers = (await getDownload(page, () => page.getByTestId('utility-run').click(), 90000)).bytes.toString('utf8');
-  expect(numbers).toMatch(/\\b201\\b/);
-  expect(numbers).toMatch(/\\b520\\b/);
+  expect(numbers).toMatch(/\b201\b/);
+  expect(numbers).toMatch(/\b520\b/);
 });
 
 test('long PDF image exporter accepts late page range and blocks 61 images per batch', async ({ page }) => {
