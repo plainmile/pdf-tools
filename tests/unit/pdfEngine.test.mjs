@@ -33,3 +33,60 @@ test('JPEG progressive and baseline dimensions can be read from SOF markers', ()
   }
   assert.throws(() => compressedImageDimensions('image/jpeg', new Uint8Array([0xff, 0xd8, 0xff])), /Invalid image header/);
 });
+
+
+function riffWebp(...chunks) {
+  const length = 12 + chunks.reduce((sum, chunk) => sum + 8 + chunk.data.length + (chunk.data.length & 1), 0);
+  const bytes = new Uint8Array(length);
+  const view = new DataView(bytes.buffer);
+  bytes.set([82, 73, 70, 70], 0); // RIFF
+  view.setUint32(4, length - 8, true);
+  bytes.set([87, 69, 66, 80], 8); // WEBP
+  let offset = 12;
+  for (const { tag, data } of chunks) {
+    for (let i = 0; i < 4; i++) bytes[offset + i] = tag.charCodeAt(i);
+    view.setUint32(offset + 4, data.length, true);
+    bytes.set(data, offset + 8);
+    offset += 8 + data.length + (data.length & 1);
+  }
+  return bytes;
+}
+
+test('WebP VP8X, VP8L and VP8 headers are bounded before browser image decoding', () => {
+  const vp8x = new Uint8Array(10);
+  const wide = 10000 - 1, tall = 8500 - 1;
+  vp8x.set([wide & 255, (wide >>> 8) & 255, wide >>> 16], 4);
+  vp8x.set([tall & 255, (tall >>> 8) & 255, tall >>> 16], 7);
+  const extension = riffWebp({ tag: 'VP8X', data: vp8x });
+  assert.deepEqual(compressedImageDimensions('image/webp', extension), { width: 10000, height: 8500 });
+
+  const bits = ((899 << 14) | 999) >>> 0;
+  const vp8l = new Uint8Array(5);
+  vp8l[0] = 0x2f;
+  new DataView(vp8l.buffer).setUint32(1, bits, true);
+  assert.deepEqual(compressedImageDimensions('image/webp',
+    riffWebp({ tag: 'VP8L', data: vp8l })), { width: 1000, height: 900 });
+
+  const vp8 = Uint8Array.from([0, 0, 0, 0x9d, 0x01, 0x2a, 0x40, 0x01, 0xf0, 0]);
+  assert.deepEqual(compressedImageDimensions('image/webp',
+    riffWebp({ tag: 'VP8 ', data: vp8 })), { width: 320, height: 240 });
+  assert.deepEqual(compressedImageDimensions('image/webp',
+    riffWebp({ tag: 'ICCP', data: Uint8Array.from([1, 2, 3]) }, { tag: 'VP8X', data: vp8x })),
+    { width: 10000, height: 8500 });
+});
+
+test('WebP preflight refuses malformed, truncated or unsized RIFF headers', () => {
+  const valid = riffWebp({ tag: 'VP8X', data: new Uint8Array(10) });
+  for (const item of [
+    new Uint8Array([1, 2, 3]),
+    valid.slice(0, valid.length - 1),
+    riffWebp({ tag: 'ZZZZ', data: Uint8Array.from([1, 2]) }),
+    riffWebp({ tag: 'VP8L', data: Uint8Array.from([0, 0, 0, 0, 0]) }),
+    riffWebp({ tag: 'VP8 ', data: Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]) }),
+  ]) {
+    assert.throws(() => compressedImageDimensions('image/webp', item), /Invalid image header/);
+  }
+  const spoof = new Uint8Array(valid);
+  new DataView(spoof.buffer).setUint32(16, 0xfffffffe, true);
+  assert.throws(() => compressedImageDimensions('image/webp', spoof), /Invalid image header/);
+});
