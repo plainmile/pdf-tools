@@ -3,14 +3,22 @@ on:
   push:
     branches:
       - 'feature/**'
+      - main
   pull_request:
     branches:
       - main
 permissions:
   contents: read
+
+# Feature push and PR events may coincide. Keep only the latest run per branch.
+concurrency:
+  group: pdf-tools-ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   test-build-e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4

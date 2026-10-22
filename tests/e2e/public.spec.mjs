@@ -17,7 +17,7 @@ test('live sitemap, robots, routes, PDF worker, 404', async ({ request }) => {
  expect(sitemapURLs.length).toBeGreaterThan(0);
  let allURLs = [];
  for (const url of sitemapURLs) {
-  const response = await request.get(url);
+  const response = await request.get(new URL(url).pathname);
   expect(response.status(),url).toBe(200);
   allURLs.push(...[...(await response.text()).matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]));
  }

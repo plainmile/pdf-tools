@@ -2,7 +2,7 @@
 
 A free, browser-local PDF workspace intended for `https://pdf.plainmile.com/`.
 
-**Status:** V0 feature-branch implementation for `plainmile/pdf-tools`. The user has created the repository and configured `pdf.plainmile.com` DNS and edge Nginx. Production is **not** considered deployed until the CI, publication, deployment and HTTPS checks have succeeded.
+**Status:** V0 deployed to `https://pdf.plainmile.com` on netcup; production release checks must keep passing after each change. Use the GH Actions deployment record to confirm current status.
 
 ## Features
 
@@ -128,3 +128,13 @@ With a previous reviewed GHCR image tag, change the server-local `IMAGE_TAG`, ru
 ## License
 
 Copyright PlainMile. No redistribution license has been granted yet.
+
+## Required CI and public release gates
+
+1. Every `feature/**` push, PR update, and `main` push triggers unit/build and browser E2E on the built production Docker image. CI uses per-branch concurrency to cancel obsolete runs and caps the runner duration.
+2. Successful CI of the **exact main commit** triggers `Publish Image` to GHCR. CI failures must never trigger publication.
+3. `Deploy PDF Tools to netcup` consumes the published SHA, copies Compose, deploys, and checks container health and public HTTPS.
+4. **Inside the same deployment GitHub-hosted Runner**, 20+ public Playwright scenarios run against `https://pdf.plainmile.com`, with PDF uploads and actual downloaded PDF content verification. A failing public test makes the deployment workflow red even if the container is healthy.
+5. E2E Docker containers use `--rm` and explicit `if: always()` cleanup. GitHub-hosted Runners are discarded after the job. Diagnostics are kept only on failure, for one day. The separate public QA workflow is **manual-only** to avoid duplicate Runner jobs.
+
+The repository is public; GitHub's **standard hosted Runners** are free for public repositories, but artifact/package storage can still be limited. No always-on QA Runner or daemon is configured on netcup.
