@@ -374,7 +374,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
               </select>
             </label>
             <label><span>{t.imageOrientation}</span>
-              <select aria-label={t.imageOrientation} data-testid="image-orientation" value={imageLayout.orientation} disabled={busy}
+              <select aria-label={t.imageOrientation} data-testid="image-orientation" value={imageLayout.orientation} disabled={busy || imageLayout.paper === 'fit'}
                 onChange={event => setImageLayout(value => ({ ...value, orientation: event.target.value }))}>
                 <option value="portrait">{t.imagePortrait}</option>
                 <option value="landscape">{t.imageLandscape}</option>
