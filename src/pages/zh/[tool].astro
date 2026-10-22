@@ -1,0 +1,9 @@
+---
+import ToolContent from '../../sections/ToolContent.astro';
+import { tools } from '../../lib/tools.mjs';
+export function getStaticPaths() {
+  return tools.map((tool) => ({ params: { tool: tool.slug }, props: { source: tool } }));
+}
+const { source } = Astro.props;
+---
+<ToolContent locale="zh" source={source} />

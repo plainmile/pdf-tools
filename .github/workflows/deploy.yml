@@ -1,0 +1,112 @@
+name: Deploy PDF Tools to netcup
+
+on:
+  workflow_run:
+    workflows:
+      - Publish Image
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pdf-tools-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.head_repository.full_name == 'plainmile/pdf-tools' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout published commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Verify deploy configuration and pin SSH host key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+        run: |
+          set -eu
+          for value in DEPLOY_SSH_KEY DEPLOY_HOST DEPLOY_USER DEPLOY_HOST_KEY; do
+            if [ -z "${!value}" ]; then
+              echo "Missing GitHub Actions secret $value for plainmile/pdf-tools" >&2
+              exit 1
+            fi
+          done
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          if [ "$DEPLOY_PORT" = 22 ]; then
+            host_pattern="$DEPLOY_HOST"
+          else
+            host_pattern="[$DEPLOY_HOST]:$DEPLOY_PORT"
+          fi
+          printf '%s %s\n' "$host_pattern" "$DEPLOY_HOST_KEY" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Copy isolated Compose configuration
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+        run: |
+          set -eu
+          ssh -p "$DEPLOY_PORT" -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
+            'mkdir -p /opt/data/compose/pdf-tools'
+          scp -P "$DEPLOY_PORT" -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes compose.prod.yaml \
+            "$DEPLOY_USER@$DEPLOY_HOST:/opt/data/compose/pdf-tools/compose.prod.yaml"
+
+      - name: Deploy the exact published image and check its health
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -eu
+          case "$IMAGE_TAG" in
+            *[!0-9a-f]*|'') echo 'Invalid image SHA' >&2; exit 1 ;;
+          esac
+          test "${#IMAGE_TAG}" = 40
+          ssh -p "$DEPLOY_PORT" -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
+            "IMAGE_TAG=$IMAGE_TAG /bin/sh -s" <<'REMOTE'
+          set -eu
+          cd /opt/data/compose/pdf-tools
+          docker network inspect edge >/dev/null
+          umask 077
+          printf 'IMAGE_TAG=%s\n' "$IMAGE_TAG" > .env
+          docker compose -f compose.prod.yaml pull
+          docker compose -f compose.prod.yaml up -d
+          for i in $(seq 1 24); do
+            status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' plainmile-pdf-tools 2>/dev/null || true)
+            if [ "$status" = healthy ]; then exit 0; fi
+            sleep 5
+          done
+          docker compose -f compose.prod.yaml ps
+          docker logs --tail 60 plainmile-pdf-tools || true
+          exit 1
+          REMOTE
+
+      - name: Verify public HTTPS and worker availability
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent --location --retry 4 \
+            -o /tmp/pdf-home.html https://pdf.plainmile.com/
+          grep -q 'Work with PDF pages' /tmp/pdf-home.html
+          curl --fail --show-error --silent --location --retry 4 \
+            -o /tmp/pdf-workspace.html https://pdf.plainmile.com/workspace/
+          grep -q 'Your documents' /tmp/pdf-workspace.html
+          curl -fsS https://pdf.plainmile.com/zh/workspace/ | grep -q '自由整理每一页'
+          curl -fsS -o /dev/null https://pdf.plainmile.com/pdfjs/pdf.worker.min.mjs

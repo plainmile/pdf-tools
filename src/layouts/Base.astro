@@ -1,0 +1,102 @@
+---
+import '../styles/site.css';
+import { langPath, siteCopy, unlocalize } from '../lib/i18n.mjs';
+const {
+  locale = 'en',
+  title = locale === 'zh' ? '免费 PDF 工具 - PlainMile' : 'Free PDF Tools - PlainMile',
+  description = locale === 'zh' ? '本地合并、拆分、排序 PDF。文件不上传服务器。' : 'Merge, split and organize PDF files locally in your browser.',
+  index = true,
+} = Astro.props;
+const copy = siteCopy[locale];
+const otherLocale = locale === 'zh' ? 'en' : 'zh';
+const path = unlocalize(Astro.url.pathname);
+const href = (route) => langPath(route, locale);
+const canonical = new URL(Astro.url.pathname, Astro.site).toString();
+const langAlternate = (language) => new URL(langPath(path, language), Astro.site).toString();
+const pageTitle = title.includes('PlainMile') ? title : `${title} | PlainMile PDF`;
+---
+<!doctype html>
+<html lang={locale === 'zh' ? 'zh-CN' : 'en'} data-theme="system">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content={description} />
+    <meta name="robots" content={index ? 'index, follow' : 'noindex, nofollow'} />
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" hreflang="en" href={langAlternate('en')} />
+    <link rel="alternate" hreflang="zh-CN" href={langAlternate('zh')} />
+    <link rel="alternate" hreflang="x-default" href={langAlternate('en')} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <title>{pageTitle}</title>
+    <script is:inline>
+      (() => {
+        try {
+          const saved = localStorage.getItem('plainmile-pdf-theme');
+          if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved;
+        } catch (_error) { /* Private browsing may deny localStorage. */ }
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="site-header">
+        <div class="site-container nav-layout">
+          <a class="brand" href={href('/')} aria-label="PlainMile PDF">
+            <span class="brand-symbol" aria-hidden="true">▤</span>
+            <span>plainmile<span class="brand-muted"> / pdf</span></span>
+          </a>
+          <nav aria-label={locale === 'zh' ? '主要导航' : 'Main navigation'} class="primary-nav">
+            <a href={href('/workspace/')}>{copy.nav.workspace}</a>
+            <a href={href('/merge-pdf/')}>{copy.nav.merge}</a>
+            <a href={href('/split-pdf/')}>{copy.nav.split}</a>
+            <a href={href('/#all-tools')}>{copy.nav.tools}</a>
+          </nav>
+          <div class="nav-settings">
+            <a class="language-link" href={langPath(path, otherLocale)} lang={otherLocale === 'zh' ? 'zh-CN' : 'en'} hreflang={otherLocale === 'zh' ? 'zh-CN' : 'en'} aria-label={copy.nav.language + ': ' + (otherLocale === 'zh' ? '中文' : 'English')}>{otherLocale === 'zh' ? '中文' : 'EN'}</a>
+            <label class="theme-switch">
+              <span class="visually-hidden">{copy.nav.theme}</span>
+              <select data-theme-select aria-label={copy.nav.theme}>
+                <option value="system">{copy.nav.system}</option>
+                <option value="light">{copy.nav.light}</option>
+                <option value="dark">{copy.nav.dark}</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </header>
+      <main id="main"><slot /></main>
+      <footer class="site-footer">
+        <div class="site-container footer-layout">
+          <div><a class="footer-brand" href={href('/')}>plainmile / pdf</a><p>{copy.footer.tagline}</p></div>
+          <div class="footer-links">
+            <a href={href('/workspace/')}>{copy.nav.workspace}</a>
+            <a href={href('/privacy/')}>{copy.nav.privacy}</a>
+            <a href="https://plainmile.com/" rel="noopener noreferrer">{copy.footer.other}</a>
+          </div>
+        </div>
+        <div class="site-container footer-bottom">{copy.footer.local}</div>
+      </footer>
+    </div>
+    <script is:inline>
+      (() => {
+        const selector = document.querySelector('[data-theme-select]');
+        if (!selector) return;
+        const current = document.documentElement.dataset.theme;
+        selector.value = current === 'dark' || current === 'light' ? current : 'system';
+        selector.addEventListener('change', () => {
+          const theme = selector.value;
+          document.documentElement.dataset.theme = theme;
+          try {
+            if (theme === 'system') localStorage.removeItem('plainmile-pdf-theme');
+            else localStorage.setItem('plainmile-pdf-theme', theme);
+          } catch (_error) { /* Storage may be unavailable. Theme still applies. */ }
+        });
+      })();
+    </script>
+  </body>
+</html>

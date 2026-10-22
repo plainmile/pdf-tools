@@ -1,0 +1,74 @@
+name: PDF Tools CI
+on:
+  push:
+    branches:
+      - 'feature/**'
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  test-build-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Unit tests and static build inside Node container
+        run: |
+          docker run --rm -v "$PWD:/app" -w /app node:22-bookworm-slim \
+            sh -lc 'if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi; npm run test:unit && npm run build'
+      - name: Verify canonical routes and PDF.js worker
+        run: |
+          set -euo pipefail
+          test -f dist/index.html
+          test -f dist/zh/index.html
+          grep -q 'hreflang="zh-CN"' dist/index.html
+          grep -q 'hreflang="en"' dist/zh/index.html
+          grep -q '整理 PDF 页面' dist/zh/index.html
+          for route in workspace merge-pdf split-pdf organize-pdf rotate-pdf extract-pages delete-pages image-to-pdf privacy; do
+            test -f "dist/$route/index.html"
+            grep -q "https://pdf.plainmile.com/$route/" "dist/$route/index.html"
+            test -f "dist/zh/$route/index.html"
+            grep -q "https://pdf.plainmile.com/zh/$route/" "dist/zh/$route/index.html"
+          done
+          test "$(wc -c < dist/pdfjs/pdf.worker.min.mjs)" -gt 100000
+          test -f dist/sitemap-index.xml
+      - name: Build release-style Docker image
+        run: docker build -t plainmile-pdf-tools:e2e .
+      - name: Run production container
+        run: |
+          docker run -d --name plainmile-pdf-tools-e2e -p 18081:80 plainmile-pdf-tools:e2e
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18081/healthz | grep -qx ok; then exit 0; fi
+            sleep 1
+          done
+          docker logs plainmile-pdf-tools-e2e
+          exit 1
+      - name: Smoke test routes and MIME types
+        run: |
+          set -euo pipefail
+          curl -fsS http://127.0.0.1:18081/ >/dev/null
+          curl -fsS http://127.0.0.1:18081/workspace/ >/dev/null
+          curl -fsS http://127.0.0.1:18081/zh/ >/dev/null
+          curl -fsS http://127.0.0.1:18081/zh/workspace/ >/dev/null
+          curl -fsS http://127.0.0.1:18081/merge-pdf/ >/dev/null
+          curl -fsSI http://127.0.0.1:18081/pdfjs/pdf.worker.min.mjs | grep -iq 'content-type: application/javascript'
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18081/unknown-route)" = "404"
+      - name: Browser E2E against production image (Playwright in Docker)
+        run: |
+          docker run --rm --network host -v "$PWD:/work:ro" \
+            mcr.microsoft.com/playwright:v1.55.0-noble \
+            bash -lc '
+              set -eu
+              mkdir -p /tmp/pdf-e2e/tests/e2e
+              cp /work/tests/e2e/*.spec.mjs /tmp/pdf-e2e/tests/e2e/
+              cp /work/playwright.config.mjs /tmp/pdf-e2e/
+              cd /tmp/pdf-e2e
+              npm init -y >/dev/null
+              npm install --no-audit --no-fund @playwright/test@1.55.0 pdf-lib@1.17.1 jszip@3.10.1
+              PDF_BASE_URL=http://127.0.0.1:18081 npx playwright test
+            '
+      - name: Cleanup
+        if: always()
+        run: docker rm -f plainmile-pdf-tools-e2e >/dev/null 2>&1 || true

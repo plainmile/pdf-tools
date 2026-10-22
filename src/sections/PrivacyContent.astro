@@ -1,0 +1,12 @@
+---
+import Base from '../layouts/Base.astro';
+import { siteCopy } from '../lib/i18n.mjs';
+const { locale = 'en' } = Astro.props;
+const p = siteCopy[locale].privacy;
+---
+<Base locale={locale} title={`${p.title} - PlainMile PDF`} description={locale === 'zh' ? '了解 PlainMile PDF 本地处理文件、网站请求和数据保护方式。' : 'How PlainMile PDF keeps your files in the browser and handles basic site requests.'}>
+  <article class="site-container legal-page">
+    <div class="eyebrow">PLAINMILE PDF</div><h1>{p.title}</h1><p class="legal-date">{p.date}</p>
+    {p.blocks.map(([title, body]) => <section><h2>{title}</h2><p>{body}</p></section>)}
+  </article>
+</Base>
