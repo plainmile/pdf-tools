@@ -6,6 +6,14 @@ COPY . .
 RUN npm run test:unit && npm run build
 
 FROM nginx:1.27-alpine
+# OCI metadata is shown on the GHCR package page and with docker image inspect.
+LABEL org.opencontainers.image.title="PlainMile PDF Tools" \
+      org.opencontainers.image.description="Free, private, browser-local PDF tools for merging, splitting, organizing and converting PDFs" \
+      org.opencontainers.image.url="https://pdf.plainmile.com/" \
+      org.opencontainers.image.source="https://github.com/plainmile/pdf-tools" \
+      org.opencontainers.image.documentation="https://github.com/plainmile/pdf-tools#self-host-the-public-image" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.vendor="PlainMile"
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist/ /usr/share/nginx/html/
 EXPOSE 80
