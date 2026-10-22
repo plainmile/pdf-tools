@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, parseTextBlocks,
   textContentToLines, linesToReadableText, sanitizeFilename,
-  UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, enforceImageBatchBytes, checkCancelled, translateUtilityError,
+  UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
 
 test('compression reports actual savings; a larger result must not count as savings', () => {
@@ -109,4 +109,15 @@ test('60 separate image pages are valid while 61 separate ranges still fail safe
   assert.deepEqual(requestedPages(sixty.join(', '), 200), sixty);
   const sixtyOne = Array.from({ length: 61 }, (_, index) => index * 2 + 1);
   assert.throws(() => requestedPages(sixtyOne.join(', '), 200), /maximum of 60 ranges/);
+});
+
+test('raster compression keeps a separate cumulative 96 MB JPEG safety budget', () => {
+  const max = UTILITY_LIMITS.maxCompressionImageBytes;
+  assert.equal(max, 96 * 1024 * 1024);
+  assert.equal(enforceCompressionImageBytes(24, 12), 36);
+  assert.equal(enforceCompressionImageBytes(max - 1, 1), max);
+  assert.throws(() => enforceCompressionImageBytes(max, 1), /96 MB/);
+  assert.throws(() => enforceCompressionImageBytes(-1, 1), /96 MB/);
+  assert.throws(() => enforceCompressionImageBytes(1, NaN, 'zh'), /96 MB/);
+  assert.match(translateUtilityError(new Error('Compressed image data exceeds the 96 MB safety limit.'), 'zh'), /96 MB/);
 });
