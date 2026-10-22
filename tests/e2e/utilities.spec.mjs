@@ -316,7 +316,7 @@ test('image conversion exposes cancel and a ZIP packaging stage', async ({ page 
   await upload(page, await fixturePdf('Batch example', 6));
   await page.getByRole('combobox', { name: 'Image format' }).selectOption('png');
   const download = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
-  expect(download.name).toMatch(/\\.zip$/);
+  expect(download.name).toMatch(/\.zip$/);
   await expect(page.getByTestId('utility-progress')).toContainText('Packaging ZIP');
   await expect(page.getByTestId('utility-next-step')).toContainText('Continue with another PDF tool');
 });
