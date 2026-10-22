@@ -371,3 +371,46 @@ test('English Markdown quotes, rules and numbered steps produce searchable PDF t
   expect(text).toContain('1. First step');
   expect(text).toContain('2. Second step');
 });
+
+test('page numbering on rotated cropped PDFs preserves page rotations and searchable digits', async ({ page }) => {
+  const { degrees } = await import('pdf-lib');
+  const input = await PDFDocument.create();
+  for (const angle of [0, 90, 180, 270]) {
+    const p = input.addPage([595.28, 841.89]);
+    p.setCropBox(21, 37, 510, 700);
+    p.setRotation(degrees(angle));
+  }
+  const original = Buffer.from(await input.save());
+  for (const position of ['bottom-center', 'bottom-right', 'top-right']) {
+    await page.goto('/add-page-numbers/');
+    await upload(page, original);
+    await page.getByTestId('number-start').fill('41');
+    await page.getByRole('combobox', { name: 'Position' }).selectOption(position);
+    const output = await getDownload(page, () => page.getByTestId('utility-run').click(), 15000);
+    const numbered = await PDFDocument.load(output.bytes);
+    expect(numbered.getPages().map(p => p.getRotation().angle)).toEqual([0, 90, 180, 270]);
+    for (const p of numbered.getPages()) {
+      expect(p.getCropBox()).toMatchObject({ x: 21, y: 37, width: 510, height: 700 });
+    }
+    await page.goto('/pdf-to-txt/');
+    await upload(page, output.bytes);
+    const extracted = await getDownload(page, () => page.getByTestId('utility-run').click(), 15000);
+    expect(extracted.bytes.toString('utf8')).toMatch(/\b41\b/);
+    expect(extracted.bytes.toString('utf8')).toMatch(/\b44\b/);
+  }
+});
+
+test('numbering rejects too-small pages and page labels over 99999 in Chinese', async ({ page }) => {
+  await page.goto('/zh/add-page-numbers/');
+  const tiny = await PDFDocument.create();
+  tiny.addPage([70, 65]);
+  await upload(page, Buffer.from(await tiny.save()));
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByRole('alert')).toContainText('页面尺寸太小');
+  const longer = await PDFDocument.create();
+  longer.addPage([595, 842]); longer.addPage([595, 842]);
+  await upload(page, Buffer.from(await longer.save()));
+  await page.getByTestId('number-start').fill('99999');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByRole('alert')).toContainText('不能超过 99999');
+});

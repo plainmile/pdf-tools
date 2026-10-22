@@ -58,6 +58,8 @@ export function translateUtilityError(error, locale = 'en') {
     [/too large to rasterize/i, '页面尺寸过大，无法安全转换为图片。请降低分辨率。'],
     [/No selectable text/i, '未找到可提取的文字。扫描版 PDF 需要 OCR，本工具不提供 OCR。'],
     [/Starting page number/i, '起始页码必须是 1 至 99999 之间的整数。'],
+    [/Page numbers cannot exceed 99999/i, '末页页码不能超过 99999，请减小起始页码。'],
+    [/Page is too small for page numbers/i, '页面尺寸太小，无法放下该字号的页码。请调小字号或使用较大的页面。'],
     [/Image encoding failed/i, '图片编码失败，请降低分辨率或改用 JPG。'],
     [/Image batch exceeds/i, '本批图片超过 64 MB 安全上限，请减少选定页数。'],
     [/reversed|outside|range|invalid page/i, '页码范围无效，请检查起始页、结束页和 PDF 总页数。'],

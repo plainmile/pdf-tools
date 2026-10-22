@@ -1,5 +1,6 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
 import JSZip from 'jszip';
+import { pageNumberPlacement } from './pageNumberGeometry.mjs';
 import {
   UTILITY_LIMITS, requestedPages, parseTextBlocks, textContentToLines,
   linesToReadableText, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
@@ -151,6 +152,7 @@ export async function addPageNumbers(pdf, opts = {}, reportProgress = () => {}) 
   const size = opts.fontSize === 16 ? 16 : opts.fontSize === 10 ? 10 : 12;
   const start = Number(opts.start ?? 1);
   if (!Number.isSafeInteger(start) || start < 1 || start > 99999) throw new Error('Starting page number must be from 1 to 99999.');
+  if (start + doc.getPageCount() - 1 > 99999) throw new Error('Page numbers cannot exceed 99999. Lower the starting number.');
   const position = ['bottom-center', 'bottom-right', 'top-right'].includes(opts.position) ? opts.position : 'bottom-center';
   for (let i = 0; i < doc.getPageCount(); i++) {
     checkCancelled(opts.signal);
@@ -158,9 +160,9 @@ export async function addPageNumbers(pdf, opts = {}, reportProgress = () => {}) 
     const box = page.getCropBox();
     const text = String(start + i);
     const textWidth = font.widthOfTextAtSize(text, size);
-    const x = position.endsWith('right') ? box.x + box.width - 28 - textWidth : box.x + (box.width - textWidth) / 2;
-    const y = position.startsWith('top') ? box.y + box.height - size - 22 : box.y + 24;
-    page.drawText(text, { x, y, font, size, color: rgb(.28, .33, .39) });
+    // Use visible page coordinates, compensating PDF /Rotate and CropBox origin.
+    const placement = pageNumberPlacement(box, page.getRotation().angle, textWidth, size, position);
+    page.drawText(text, { x: placement.x, y: placement.y, rotate: degrees(placement.rotation), font, size, color: rgb(.28, .33, .39) });
     reportProgress(i + 1, doc.getPageCount());
   }
   return new Uint8Array(await doc.save({ useObjectStreams: true }));
