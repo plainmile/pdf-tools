@@ -32,7 +32,9 @@ function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPre
     if (!visible || !source) return;
     let cancelled = false;
     let renderTask;
-    let canvas;
+    // Capture the mounted node before awaiting a PDF.js worker. A quick scroll
+    // can unmount the canvas while getPreviewDoc() is still loading.
+    const canvas = canvasRef.current;
     setFailed(false); // Retry on re-enter and after a rotation changes the page.
     (async () => {
       const documentProxy = await getPreviewDoc(source);
@@ -44,7 +46,6 @@ function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPre
         const original = pdfPage.getViewport({ scale: 1, rotation });
         const scale = Math.min(154 / original.width, 190 / original.height, 1);
         const viewport = pdfPage.getViewport({ scale, rotation });
-        canvas = canvasRef.current;
         if (!canvas || cancelled) return;
         const context = canvas.getContext('2d');
         if (!context) throw new Error('Canvas unavailable.');
@@ -58,7 +59,10 @@ function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPre
         await renderTask.promise;
       } finally { pdfPage.cleanup(); }
     })().catch((error) => {
-      if (!cancelled && error?.name !== 'RenderingCancelledException') setFailed(true);
+      if (!cancelled && error?.name !== 'RenderingCancelledException') {
+        if (canvas) { canvas.width = 0; canvas.height = 0; }
+        setFailed(true);
+      }
     });
     return () => {
       cancelled = true;
@@ -76,7 +80,7 @@ function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPre
 
   return (
     <div className="page-preview" ref={targetRef}>
-      {visible && <canvas ref={canvasRef} style={failed ? { display: 'none' } : undefined} role="img" aria-label={locale === 'zh' ? `${source?.name ?? 'PDF'} 第 ${pageRef.pageIndex + 1} 页预览` : `${source?.name ?? 'PDF'} page ${pageRef.pageIndex + 1} preview`} />}
+      {visible && <canvas ref={canvasRef} width={0} height={0} style={failed ? { display: 'none' } : undefined} role="img" aria-label={locale === 'zh' ? `${source?.name ?? 'PDF'} 第 ${pageRef.pageIndex + 1} 页预览` : `${source?.name ?? 'PDF'} page ${pageRef.pageIndex + 1} preview`} />}
       {visible && failed && <div className="preview-fallback" aria-label={t.previewFail}>{t.previewFail}</div>}
       {!visible && <div className="preview-loading" aria-hidden="true" />}
       {watermarkPreview && <span className="page-watermark-preview" aria-hidden="true">{watermarkPreview}</span>}

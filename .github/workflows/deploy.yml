@@ -178,4 +178,6 @@ jobs:
         if: always()
         run: |
           docker rm -f plainmile-pdf-public-e2e >/dev/null 2>&1 || true
-          rm -rf /tmp/plainmile-public-e2e
+          # The Playwright container creates root-owned diagnostics on failures.
+          # The ephemeral GitHub-hosted runner has sudo; remove all artifacts reliably.
+          sudo rm -rf -- /tmp/plainmile-public-e2e
