@@ -208,7 +208,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const clearAll = () => {
     setWatermarkEnabled(false); setWatermarkText(''); setExportSettingsOpen(mode === 'watermark-pdf');
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
-    for (const promise of previewDocuments.current.values()) promise.then((doc) => doc.destroy()).catch(() => {});
+    for (const promise of previewDocuments.current.values()) promise.then((doc) => doc.loadingTask?.destroy?.() ?? doc.cleanup?.()).catch(() => {});
     previewDocuments.current.clear();
   };
 

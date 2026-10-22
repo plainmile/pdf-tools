@@ -32,7 +32,7 @@ test('live sitemap, robots, routes, PDF worker, 404', async ({ request }) => {
  expect((await request.get('/__qa_missing_20261022_9485')).status()).toBe(404);
 });
 
-test('SEO and AI answer-readiness audit of 22 live URLs', async ({ page }) => {
+test('SEO and AI answer-readiness audit of 36 live URLs', async ({ page }) => {
  const seenTitles = new Set(), audit = [];
  for (const locale of ['en', 'zh']) {
   for (const slug of slugs) {

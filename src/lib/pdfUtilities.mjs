@@ -19,7 +19,10 @@ async function openPdfJs(bytes) {
   const pdfjs = await import('pdfjs-dist');
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs';
   // Pass a copy: PDF.js transfers its buffer to its worker.
-  return pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true }).promise;
+  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true });
+  const proxy = await loadingTask.promise;
+  // PDF.js 6 removed PDFDocumentProxy.destroy(); the loading task owns worker teardown.
+  return { getPage: (number) => proxy.getPage(number), destroy: () => loadingTask.destroy() };
 }
 
 function freeCanvas(canvas) { if (canvas) { canvas.width = 1; canvas.height = 1; } }
