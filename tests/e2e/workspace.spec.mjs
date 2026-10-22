@@ -497,7 +497,7 @@ test('split requires deliberate input for a 320-page book and starts blank after
     name: 'book-320.pdf', mimeType: 'application/pdf',
     buffer: await makePdf(Array.from({ length: 320 }, (_, i) => 300 + i % 12)),
   });
-  await expect(page.getByTestId('page-tile')).toHaveCount(320);
+  await expect(page.locator('.file-count')).toContainText('320 pages');
   const download = page.getByRole('button', { name: 'Download split PDFs (ZIP)' });
   const ranges = page.getByRole('textbox', { name: 'Page ranges', exact: true });
   await expect(ranges).toHaveValue('');
