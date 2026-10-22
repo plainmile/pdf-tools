@@ -1,16 +1,12 @@
 name: Public Site Browser E2E and Technical SEO
 
+# Manual-only auditing; production E2E automatically runs inside deploy.yml.
 on:
-  push:
-    branches:
-      - feature/public-domain-e2e
-  pull_request:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/public-qa.yml'
-      - 'tests/e2e/public.spec.mjs'
   workflow_dispatch:
+
+concurrency:
+  group: pdf-public-manual
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -18,7 +14,7 @@ permissions:
 jobs:
   test-public-site:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Probe actual public HTTPS, not staging
@@ -32,7 +28,7 @@ jobs:
         run: |
           set -eu
           mkdir -p /tmp/pdf-live-qa
-          docker run --rm --network host \
+          docker run --rm --name plainmile-pdf-public-e2e-manual --network host \
             -v "$PWD:/work:ro" \
             -v /tmp/pdf-live-qa:/artifacts \
             -e PDF_BASE_URL=https://pdf.plainmile.com \
@@ -46,13 +42,22 @@ jobs:
               cd /tmp/live-tests
               npm init -y >/dev/null
               npm install --no-audit --no-fund @playwright/test@1.55.0 pdf-lib@1.17.1 jszip@3.10.1
-              npx playwright test --reporter=list
+              npx playwright test --reporter=list || {
+                cp -r test-results /artifacts/ || true
+                exit 1
+              }
             '
       - name: Upload screenshots and SEO audit artifact
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: public-qa-screenshots-seo
           path: /tmp/pdf-live-qa/
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 1
+
+      - name: Release manual public E2E Runner resources
+        if: always()
+        run: |
+          docker rm -f plainmile-pdf-public-e2e-manual >/dev/null 2>&1 || true
+          rm -rf /tmp/pdf-live-qa

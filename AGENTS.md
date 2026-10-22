@@ -15,3 +15,11 @@
 - The remote repository and DNS/Nginx have been created by the user. Never present a branch/PR or published image as proof of a deployed and browser-tested production site.
 
 - Text watermarks must be opt-in and off by default, including after clearing the workspace. Never insert a branded watermark automatically. Treat them as visual marks, not redactions. All operations remain browser-local and must work for CJK text where system fonts are present.
+
+## CI, release and resource budget
+
+- Every update to a feature branch, every PR update and every main commit must pass unit/build and full Playwright E2E against the built production Docker image. Do not merge failed CI.
+- Publish GHCR images **only after the matching main SHA's CI succeeds**; deployments remain pinned to a tested SHA. Never deploy by bypassing tests.
+- After each successful netcup deployment, run the complete Playwright suite again against **https://pdf.plainmile.com** inside the SAME ephemeral GitHub-hosted deployment runner. Download actual exported PDFs and inspect them; route/health-only checks are insufficient.
+- GitHub public standard hosted runners are ephemeral. Use `docker run --rm`, `if: always()` cleanup, finite job timeouts, concurrency to cancel superseded feature branch CI, and avoid duplicate public QA workflows. Retain screenshots/traces only when tests fail (one day).
+- The manual Public Site Browser E2E workflow is for requested audits, not a second automatic runner job after deployment. Never leave a persistent VPS QA container or send customer files to CI; synthetic PDFs only.

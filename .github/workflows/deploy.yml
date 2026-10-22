@@ -19,8 +19,10 @@ jobs:
     if: >-
       ${{ github.event.workflow_run.conclusion == 'success' &&
           github.event.workflow_run.head_branch == 'main' &&
-          github.event.workflow_run.head_repository.full_name == 'plainmile/pdf-tools' }}
+          github.event.workflow_run.head_repository.full_name == 'plainmile/pdf-tools' &&
+          github.sha == github.event.workflow_run.head_sha }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout published commit
         uses: actions/checkout@v4
@@ -134,3 +136,45 @@ jobs:
           grep -q 'Your documents' /tmp/pdf-workspace.html
           curl -fsS https://pdf.plainmile.com/zh/workspace/ | grep -q '自由整理每一页'
           curl -fsS -o /dev/null https://pdf.plainmile.com/pdfjs/pdf.worker.min.mjs
+
+      # Reuse the SAME GitHub-hosted Runner after a successful netcup deployment,
+      # so a separate public E2E workflow does not consume another Runner job.
+      - name: Public browser E2E and SEO against deployed site
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/plainmile-public-e2e
+          docker run --rm --name plainmile-pdf-public-e2e --network host \
+            -v "$PWD:/work:ro" \
+            -v /tmp/plainmile-public-e2e:/artifacts \
+            -e PDF_BASE_URL=https://pdf.plainmile.com \
+            -e LIVE_SCREENSHOT_DIR=/artifacts \
+            mcr.microsoft.com/playwright:v1.55.0-noble \
+            bash -lc '
+              set -eu
+              mkdir -p /tmp/live-tests/tests/e2e
+              cp /work/tests/e2e/*.spec.mjs /tmp/live-tests/tests/e2e/
+              cp /work/playwright.config.mjs /tmp/live-tests/
+              cd /tmp/live-tests
+              npm init -y >/dev/null
+              npm install --no-audit --no-fund @playwright/test@1.55.0 pdf-lib@1.17.1 jszip@3.10.1
+              npx playwright test --reporter=list || {
+                cp -r test-results /artifacts/ || true
+                exit 1
+              }
+            '
+
+      - name: Retain public E2E diagnostics only on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-production-qa-failure
+          path: /tmp/plainmile-public-e2e/
+          if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Release public E2E Docker and temporary resources
+        if: always()
+        run: |
+          docker rm -f plainmile-pdf-public-e2e >/dev/null 2>&1 || true
+          rm -rf /tmp/plainmile-public-e2e
