@@ -380,6 +380,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                 <option value="landscape">{t.imageLandscape}</option>
                 <option value="auto">{t.imageAuto}</option>
               </select>
+              {imageLayout.paper === 'fit' && <span className="input-note" data-testid="image-fit-orientation-hint">{t.imageFitAutoHint}</span>}
             </label>
             <label><span>{t.imageMargin}</span>
               <select aria-label={t.imageMargin} data-testid="image-margin" value={String(imageLayout.margin)} disabled={busy}
