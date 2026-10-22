@@ -31,10 +31,15 @@ test('fit-to-picture preserves exact proportions and leaves chosen borders', () 
   near(p.image.width, p.width); near(p.image.height, p.height);
   near(p.image.x, 0); near(p.image.y, 0);
 
-  const portrait = imagePdfPageLayout(1600, 900, { paper: 'fit', orientation: 'portrait', margin: 48 });
-  assert.ok(portrait.width < portrait.height);
-  assert.ok(portrait.image.x >= 48);
-  assert.ok(portrait.image.y >= 48);
+  const forcedPortrait = imagePdfPageLayout(1600, 900, { paper: 'fit', orientation: 'portrait', margin: 48 });
+  // Fit is an image-shaped page even when a caller tries to force Portrait.
+  assert.ok(forcedPortrait.width > forcedPortrait.height);
+  near(forcedPortrait.image.x, 48);
+  near(forcedPortrait.image.y, 48);
+  const forcedLandscape = imagePdfPageLayout(900, 1600, { paper: 'fit', orientation: 'landscape', margin: 12 });
+  assert.ok(forcedLandscape.width < forcedLandscape.height);
+  near(forcedLandscape.image.x, 12);
+  near(forcedLandscape.image.y, 12);
   const huge = imagePdfPageLayout(33000, 25000, { paper: 'fit', orientation: 'auto', margin: 12 });
   assert.ok(Math.max(huge.width, huge.height) <= 14400);
 });

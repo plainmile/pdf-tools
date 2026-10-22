@@ -37,8 +37,11 @@ export function imagePdfPageLayout(imageWidth, imageHeight, options = {}) {
     [width, height] = PAPER_SIZES[paper];
   }
 
-  const wantLandscape = orientation === 'landscape' ||
-    (orientation === 'auto' && imageWidth > imageHeight);
+  // Fit-to-image means the physical page follows the picture itself.
+  // A forced Portrait/Landscape option must never change a Fit page's aspect.
+  const wantLandscape = paper === 'fit'
+    ? imageWidth > imageHeight
+    : orientation === 'landscape' || (orientation === 'auto' && imageWidth > imageHeight);
   if (wantLandscape && width < height || !wantLandscape && width > height) {
     [width, height] = [height, width];
   }
