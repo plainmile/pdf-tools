@@ -801,3 +801,46 @@ test('image layout before import, mixed PDF inputs and Chinese text labels are c
   const revised = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
   expect(revised.getPage(0).getWidth()).toBeCloseTo(841.89, 1);
 });
+
+
+test('oversized WebP header is rejected before canvas decode, while ordinary WebP still converts', async ({ page }) => {
+  await page.goto('/image-to-pdf/');
+  // RIFF WEBP VP8X announces 10000x9000 pixels (90 MP) in just 30 bytes.
+  const massive = Buffer.alloc(30);
+  massive.write('RIFF', 0, 'ascii');
+  massive.writeUInt32LE(22, 4);
+  massive.write('WEBPVP8X', 8, 'ascii');
+  massive.writeUInt32LE(10, 16);
+  const widthMinusOne = 9999;
+  const heightMinusOne = 8999;
+  massive[24] = widthMinusOne & 255;
+  massive[25] = (widthMinusOne >>> 8) & 255;
+  massive[26] = (widthMinusOne >>> 16) & 255;
+  massive[27] = heightMinusOne & 255;
+  massive[28] = (heightMinusOne >>> 8) & 255;
+  massive[29] = (heightMinusOne >>> 16) & 255;
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'oversized.webp', mimeType: 'image/webp', buffer: massive,
+  });
+  await expect(page.getByRole('alert')).toContainText('Image dimensions are too large.');
+  await expect(page.getByTestId('page-tile')).toHaveCount(0);
+
+  // Test a REAL WebP produced by Chromium, not only fake headers.
+  const webpBase64 = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 32;
+    const context = canvas.getContext('2d');
+    context.fillStyle = 'purple';
+    context.fillRect(0, 0, 64, 32);
+    return canvas.toDataURL('image/webp', .87).split(',')[1];
+  });
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'legitimate.webp', mimeType: 'image/webp',
+    buffer: Buffer.from(webpBase64, 'base64'),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(output.getPageCount()).toBe(1);
+  expect(output.getPage(0).getWidth()).toBeCloseTo(595.28, 1);
+});
