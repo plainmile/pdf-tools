@@ -44,6 +44,15 @@ jobs:
           test -f dist/sitemap-index.xml
       - name: Build release-style Docker image
         run: docker build -t plainmile-pdf-tools:e2e .
+      - name: Verify public image metadata and standalone self-host config
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect plainmile-pdf-tools:e2e --format '{{ index .Config.Labels "org.opencontainers.image.url" }}')" = "https://pdf.plainmile.com/"
+          test "$(docker image inspect plainmile-pdf-tools:e2e --format '{{ index .Config.Labels "org.opencontainers.image.source" }}')" = "https://github.com/plainmile/pdf-tools"
+          test "$(docker image inspect plainmile-pdf-tools:e2e --format '{{ index .Config.Labels "org.opencontainers.image.licenses" }}')" = "MIT"
+          docker compose -f compose.selfhost.yaml config --quiet
+          docker compose -f compose.selfhost.yaml config | grep -q 'ghcr.io/plainmile/pdf-tools:latest'
+          ! grep -E 'edge:|container_name:|external: true' compose.selfhost.yaml
       - name: Run production container
         run: |
           docker run -d --name plainmile-pdf-tools-e2e -p 18081:80 plainmile-pdf-tools:e2e

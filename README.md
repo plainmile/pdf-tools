@@ -4,6 +4,46 @@ A free, browser-local PDF workspace intended for `https://pdf.plainmile.com/`.
 
 **Status:** V0 deployed to `https://pdf.plainmile.com` on netcup; production release checks must keep passing after each change. Use the GH Actions deployment record to confirm current status.
 
+## Self-host the public image
+
+**Official website:** https://pdf.plainmile.com/  
+**Open-source repository:** https://github.com/plainmile/pdf-tools  
+**GHCR image:** `ghcr.io/plainmile/pdf-tools:latest` (Linux, current release)
+
+Once the package visibility is set to **Public** in [GitHub Packages](https://github.com/orgs/plainmile/packages), no GHCR account, login, source build, API key or GPU is needed. A browser does all PDF processing locally.
+
+**Option A — run a ready-made Docker image:**
+
+```sh
+docker pull ghcr.io/plainmile/pdf-tools:latest
+docker run -d --name pdf-tools --restart unless-stopped \
+  -p 8080:80 ghcr.io/plainmile/pdf-tools:latest
+# Open http://localhost:8080
+```
+
+**Option B — use Docker Compose (recommended for easy upgrades):**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/plainmile/pdf-tools/main/compose.selfhost.yaml -o compose.yaml
+docker compose -f compose.yaml up -d
+# Open http://localhost:8080
+# Upgrade: docker compose -f compose.yaml pull && docker compose -f compose.yaml up -d
+```
+
+The self-host Compose example is **standalone**: it does not require PlainMile's private `edge` network, netcup SSH secrets, a database, any volumes, or a fixed container name. You may select a different host port with `PDF_TOOLS_PORT=8081 docker compose -f compose.yaml up -d`.
+
+**Hosting on a public server?** The example binds the HTTP port on all network interfaces; use a HTTPS reverse proxy and restrict direct port exposure in production. To allow *local-only* access, replace `8080:80` with `127.0.0.1:8080:80` or run `docker run -p 127.0.0.1:8080:80 ...`. The original documents never leave visitors' browsers.
+
+For reproducibility, pin a reviewed image digest or immutable commit-SHA tag instead of `latest`. The [GitHub Actions releases](https://github.com/plainmile/pdf-tools/actions/workflows/publish.yml) publish SHA-tagged images after CI succeeds.
+
+**Image labels** expose the official site (`org.opencontainers.image.url`), source repository, MIT license and documentation. Check with:
+
+```sh
+docker image inspect ghcr.io/plainmile/pdf-tools:latest \
+  --format '{{index .Config.Labels "org.opencontainers.image.url"}}'
+# Expected: https://pdf.plainmile.com/
+```
+
 ## Features
 
 - Merge PDFs at the page level, including interleaving pages from different files.
