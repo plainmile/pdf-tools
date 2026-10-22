@@ -117,7 +117,7 @@ test('PDF to TXT and Markdown extract actual text, reject empty scanned pages', 
   await expect(page.getByRole('alert')).toContainText('No selectable text');
 });
 
-test('TXT to PDF yields selectable text; Markdown to PDF supports Chinese via local raster pages', async ({ page }) => {
+test('TXT to PDF yields selectable text after real download and re-import', async ({ page }) => {
   await page.goto('/txt-to-pdf/');
   await page.getByTestId('utility-text').fill('Hello selectable world');
   const latin = await generateTextPdfAndDownload(page);
@@ -127,6 +127,12 @@ test('TXT to PDF yields selectable text; Markdown to PDF supports Chinese via lo
   await upload(page, latin.bytes);
   const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
   expect(extracted.bytes.toString('utf8')).toContain('Hello selectable world');
+});
+
+test('Chinese Markdown to PDF produces a real local raster image page', async ({ page }) => {
+  // CJK page rendering runs browser fonts, canvas and PDF.js preview before
+  // download. Give this heavier workflow its own budget on public CI runners.
+  test.setTimeout(60000);
   await page.goto('/zh/markdown-to-pdf/');
   await page.getByTestId('utility-text').fill('# 中文标题\n\n- 第一项\n- 第二项');
   const cjk = await generateTextPdfAndDownload(page);
