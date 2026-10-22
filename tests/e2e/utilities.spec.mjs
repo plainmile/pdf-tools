@@ -19,7 +19,11 @@ async function upload(page, bytes) {
 }
 
 async function getDownload(page, action) {
-  const event = page.waitForEvent('download');
+  const event = page.waitForEvent('download', { timeout: 6000 }).catch(async () => {
+    const errors = await page.getByRole('alert').allTextContents();
+    const messages = await page.getByRole('status').allTextContents();
+    throw new Error('No PDF utility download. Alerts: ' + JSON.stringify(errors) + '; Status: ' + JSON.stringify(messages));
+  });
   await action();
   const download = await event;
   return { name: download.suggestedFilename(), bytes: await readFile(await download.path()) };
@@ -48,7 +52,9 @@ test('compression never auto-downloads, blocks a larger PDF, and shows actual by
   await page.goto('/compress-pdf/');
   await upload(page, small);
   await page.getByTestId('utility-run').click();
-  await expect(page.getByTestId('compression-result')).toBeVisible();
+  await expect(page.getByTestId('compression-result')).toBeVisible({ timeout: 3000 }).catch(async () => {
+    throw new Error('Compression output missing. Alerts: ' + JSON.stringify(await page.getByRole('alert').allTextContents()));
+  });
   await expect(page.getByTestId('compression-download')).toBeDisabled();
   await expect(page.getByRole('status')).toContainText('No size reduction');
 
