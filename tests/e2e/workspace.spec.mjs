@@ -678,3 +678,34 @@ function jpegTestSegment(marker, payload) {
   const size = payload.length + 2;
   return Buffer.concat([Buffer.from([0xff, marker, size >>> 8, size & 255]), payload]);
 }
+
+test('deleting one entire source frees an active file slot without discarding Undo', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/workspace/');
+  const base = await makePdf([301]);
+  await page.getByTestId('file-input').setInputFiles(Array.from({ length: 20 }, (_, i) => ({
+    name: 'doc-' + i + '.pdf', mimeType: 'application/pdf', buffer: base,
+  })));
+  await expect(page.getByTestId('page-tile')).toHaveCount(20);
+  await expect(page.getByText('from 20 files')).toBeVisible();
+
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  await page.getByRole('button', { name: 'Delete selected pages' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(19);
+  await expect(page.getByText('from 19 files')).toBeVisible();
+
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'replacement.pdf', mimeType: 'application/pdf', buffer: await makePdf([511]),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(20);
+  await expect(page.getByText('from 20 files')).toBeVisible();
+  const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(output.getPages().map(p => p.getWidth())).toEqual([...Array(19).fill(301), 511]);
+
+  // Undo must still be able to restore the previously deleted original pages.
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(19);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(20);
+  await expect(page.getByText('from 20 files')).toBeVisible();
+});

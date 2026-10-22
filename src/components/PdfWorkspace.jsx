@@ -5,7 +5,7 @@ import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, shiftPage, rotatePages, deletePages, parsePageRanges, chunkPageRanges,
-  getRangePages, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget,
+  getRangePages, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources,
 } from '../lib/pageOperations.mjs';
 
 function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview }) {
@@ -116,6 +116,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const selectedCount = selected.size;
   const bytesInMemory = useMemo(() => sources.reduce((total, item) => total + item.inputSize, 0), [sources]);
   const sourceLookup = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources]);
+  const activeSourceCount = useMemo(() => countActiveSources(pages), [pages]);
   const splitNeedsInput = splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim();
   const splitEstimate = useMemo(() => {
     if (!pages.length || (splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim())) return null;
@@ -168,7 +169,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     // workspace. Keep the old undo history intact until that import succeeds.
     const replacingDeletedPages = pages.length === 0 && sources.length > 0;
     try {
-      if ((replacingDeletedPages ? 0 : sources.length) + items.length > LIMITS.maxFiles) throw new Error(interpolate(t.errorFiles, { n: LIMITS.maxFiles }));
+      if (activeSourceCount + items.length > LIMITS.maxFiles) throw new Error(interpolate(t.errorFiles, { n: LIMITS.maxFiles }));
       if (items.some((file) => !isSupportedFile(file))) throw new Error(t.errorTypes);
       const incomingBytes = items.reduce((total, file) => total + file.size, 0);
       if ((replacingDeletedPages ? 0 : bytesInMemory) + incomingBytes > LIMITS.maxCombinedBytes) throw new Error(t.errorCombined);
@@ -354,7 +355,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         ) : (
           <>
             <div className="workspace-subbar">
-              <div className="file-count"><strong>{locale === 'zh' ? `${pages.length} 页` : `${pages.length} ${pages.length === 1 ? 'page' : 'pages'}`}</strong><span>{locale === 'zh' ? ` · 来自 ${sources.length} 个文件` : ` from ${sources.length} ${sources.length === 1 ? 'file' : 'files'}`}</span></div>
+              <div className="file-count"><strong>{locale === 'zh' ? `${pages.length} 页` : `${pages.length} ${pages.length === 1 ? 'page' : 'pages'}`}</strong><span>{locale === 'zh' ? ` · 来自 ${activeSourceCount} 个文件` : ` from ${activeSourceCount} ${activeSourceCount === 1 ? 'file' : 'files'}`}</span></div>
               <div className="history-buttons">
                 <button type="button" disabled={!history.past.length || busy} onClick={() => { setHistory(undoHistory); resetSelection(); }} aria-label={t.undo} title={t.undo}>↶ {t.undo}</button>
                 <button type="button" disabled={!history.future.length || busy} onClick={() => { setHistory(redoHistory); resetSelection(); }} aria-label={t.redo} title={t.redo}>↷ {t.redo}</button>

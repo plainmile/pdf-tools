@@ -414,3 +414,33 @@ test('numbering rejects too-small pages and page labels over 99999 in Chinese', 
   await page.getByTestId('utility-run').click();
   await expect(page.getByRole('alert')).toContainText('不能超过 99999');
 });
+
+test('changing any page numbering setting removes stale finished-result messaging', async ({ page }) => {
+  await page.goto('/add-page-numbers/');
+  await upload(page, await fixturePdf('New page number workflow', 2));
+  const run = () => page.getByTestId('utility-run').click();
+  await getDownload(page, run);
+  await expect(page.getByRole('status')).toContainText('Ready to download');
+  await expect(page.getByTestId('utility-next-step')).toBeVisible();
+
+  await page.getByTestId('number-start').fill('41');
+  await expect(page.getByRole('status')).toHaveCount(0);
+  await expect(page.getByTestId('utility-next-step')).toHaveCount(0);
+
+  await getDownload(page, run);
+  await expect(page.getByRole('status')).toContainText('Ready to download');
+  await page.getByRole('combobox', { name: 'Position' }).selectOption('top-right');
+  await expect(page.getByRole('status')).toHaveCount(0);
+
+  await getDownload(page, run);
+  await expect(page.getByRole('status')).toContainText('Ready to download');
+  await page.getByRole('combobox', { name: 'Font size' }).selectOption('16');
+  await expect(page.getByRole('status')).toHaveCount(0);
+
+  const numbered = await getDownload(page, run);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, numbered.bytes);
+  const text = await getDownload(page, run);
+  expect(text.bytes.toString('utf8')).toMatch(/\b41\b/);
+  expect(text.bytes.toString('utf8')).toMatch(/\b42\b/);
+});

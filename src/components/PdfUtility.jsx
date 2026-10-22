@@ -230,9 +230,9 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         </div>}
         {isCompress && <div className="utility-options"><label><span>{t.compressionMethod}</span><select aria-label={t.compressionMethod} value={compressMode} onChange={e => { setCompressMode(e.target.value); clearOutput(); }}><option value="compact">{t.compressionLow}</option><option value="balanced">{t.compressionMid}</option><option value="clearer">{t.compressionHigh}</option></select></label></div>}
         {mode === 'add-page-numbers' && <div className="utility-options">
-          <label><span>{t.pageStart}</span><input data-testid="number-start" type="number" min="1" max="99999" value={start} onChange={e => setStart(e.target.value)} /></label>
-          <label><span>{t.pagePosition}</span><select aria-label={t.pagePosition} value={position} onChange={e => setPosition(e.target.value)}><option value="bottom-center">{t.bottomCenter}</option><option value="bottom-right">{t.bottomRight}</option><option value="top-right">{t.topRight}</option></select></label>
-          <label><span>{t.pageSize}</span><select aria-label={t.pageSize} value={fontSize} onChange={e => setFontSize(e.target.value)}><option value="10">10</option><option value="12">12</option><option value="16">16</option></select></label>
+          <label><span>{t.pageStart}</span><input data-testid="number-start" type="number" min="1" max="99999" value={start} onChange={e => { setStart(e.target.value); clearOutput(); }} /></label>
+          <label><span>{t.pagePosition}</span><select aria-label={t.pagePosition} value={position} onChange={e => { setPosition(e.target.value); clearOutput(); }}><option value="bottom-center">{t.bottomCenter}</option><option value="bottom-right">{t.bottomRight}</option><option value="top-right">{t.topRight}</option></select></label>
+          <label><span>{t.pageSize}</span><select aria-label={t.pageSize} value={fontSize} onChange={e => { setFontSize(e.target.value); clearOutput(); }}><option value="10">10</option><option value="12">12</option><option value="16">16</option></select></label>
         </div>}
         <p className="utility-note">{description}</p>
         {mode === 'add-page-numbers' && <p className="utility-note" data-testid="page-overlap-warning">{t.overlap}</p>}
