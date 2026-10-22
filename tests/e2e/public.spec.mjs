@@ -52,6 +52,9 @@ test('SEO and AI answer-readiness audit of 36 live URLs', async ({ page }) => {
     mainChars: (document.querySelector('main')?.textContent || '').trim().length,
     jsonLdCount: document.querySelectorAll('script[type="application/ld+json"]').length,
     ogTitle: document.querySelector('meta[property="og:title"]')?.content || '',
+    officialSiteHref: document.querySelector('footer a[data-official-site]')?.href || '',
+    officialSiteRel: document.querySelector('footer a[data-official-site]')?.rel || '',
+    officialSiteText: document.querySelector('footer a[data-official-site]')?.textContent?.trim() || '',
    }));
    expect(meta.lang,path).toBe(locale==='en'?'en':'zh-CN');
    expect(meta.title.length,path).toBeGreaterThan(15);
@@ -64,6 +67,9 @@ test('SEO and AI answer-readiness audit of 36 live URLs', async ({ page }) => {
    expect(meta.h1,path).toBe(1);
    expect(meta.mainChars,path).toBeGreaterThan(150);
    expect(meta.ogTitle,path).not.toBe('');
+   expect(meta.officialSiteHref,path+' official project link').toBe(domain+'/');
+   expect(meta.officialSiteText,path+' visible credit').toContain('pdf.plainmile.com');
+   expect(meta.officialSiteRel,path+' template outbound link').toMatch(/\bnofollow\b/);
    if (slug !== 'privacy/') expect(meta.jsonLdCount, path + ': structured data').toBeGreaterThan(0);
    expect(seenTitles.has(meta.title), 'Duplicate: '+meta.title).toBe(false);
    seenTitles.add(meta.title);

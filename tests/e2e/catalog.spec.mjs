@@ -88,3 +88,26 @@ test('tool landing page contains contextual related links and indexable FAQ when
     await ctx.close();
   }
 });
+
+test('both languages visibly credit the original website, including when JavaScript is off', async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  try {
+    for (const [path, label] of [
+      ['/', 'Official site'],
+      ['/zh/', '官方网站'],
+      ['/compress-pdf/', 'Official site'],
+      ['/zh/merge-pdf/', '官方网站'],
+    ]) {
+      await page.goto(path);
+      const source = page.locator('footer a[data-official-site]');
+      await expect(source, path).toHaveCount(1);
+      await expect(source).toBeVisible();
+      await expect(source).toHaveAttribute('href', 'https://pdf.plainmile.com/');
+      await expect(source).toContainText(label);
+      await expect(source).toContainText('pdf.plainmile.com');
+      const rel = await source.getAttribute('rel');
+      expect(rel).toMatch(/\bnofollow\b/);
+    }
+  } finally { await context.close(); }
+});

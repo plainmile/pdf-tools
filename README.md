@@ -10,6 +10,8 @@ A free, browser-local PDF workspace intended for `https://pdf.plainmile.com/`.
 **Open-source repository:** https://github.com/plainmile/pdf-tools  
 **GHCR image:** `ghcr.io/plainmile/pdf-tools:latest` (Linux, current release)
 
+The unmodified self-hosted image includes a **visible, localized 'Official site: pdf.plainmile.com' link in every page footer**. This gives visitors a visible source attribution without a tracking pixel or hidden link. The distributed footer uses `rel="nofollow"`: Google's spam guidance specifically warns against building ranking credit through links widely repeated in third-party website templates or footers. This credit is for people to identify and reach the original project, **not** a scheme for automatic backlinks or a promise of ranking improvement. The site also ships canonical and hreflang URLs for the official domain, so unchanged copies may be recognized as duplicate content. Forks that want their own URLs indexed should rebuild the site with their own `Astro.site`/canonical, language-alternate and structured-data origins rather than relying on those official metadata defaults.
+
 Once the package visibility is set to **Public** in [GitHub Packages](https://github.com/orgs/plainmile/packages), no GHCR account, login, source build, API key or GPU is needed. A browser does all PDF processing locally.
 
 **Option A — run a ready-made Docker image:**
