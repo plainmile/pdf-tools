@@ -16,7 +16,7 @@ export async function loadPdf(file) {
 }
 
 async function openPdfJs(bytes) {
-  const pdfjs = await import('pdfjs-dist');
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs';
   // Pass a copy: PDF.js transfers its buffer to its worker.
   const loadingTask = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true });

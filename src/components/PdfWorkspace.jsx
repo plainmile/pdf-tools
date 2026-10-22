@@ -102,7 +102,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const getPreviewDoc = useCallback((source) => {
     let promise = previewDocuments.current.get(source.id);
     if (!promise) {
-      promise = import('pdfjs-dist').then((pdfjs) => {
+      promise = import('pdfjs-dist/legacy/build/pdf.mjs').then((pdfjs) => {
         pdfjs.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs';
         // PDF.js transfers the buffer to the worker. Always pass a copy.
         return pdfjs.getDocument({ data: new Uint8Array(source.bytes), useSystemFonts: true }).promise;
