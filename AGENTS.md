@@ -47,6 +47,6 @@
 
 ## Transparent origin credit in redistributed images
 
-- The publicly distributed image must include a **visible and crawlable** bilingual footer link to `https://pdf.plainmile.com/` labeled Official site / 官方网站. Keep this useful to people and consistent across both locales and all static tool pages; no cloaking, hidden links, anchor keyword stuffing, review manipulation or guaranteed SEO-benefit claims.
+- The publicly distributed image must include a **visible and crawlable** bilingual footer link to `https://pdf.plainmile.com/` labeled Official site / 官方网站. Keep this useful to people and consistent across both locales and all static tool pages; use `rel="nofollow"` on the distributed template link to avoid a mass-produced backlink scheme. No cloaking, hidden links, anchor keyword stuffing, review manipulation or guaranteed SEO-benefit claims.
 - The original website remains the canonical source of the shipped static content. Self-hosts seeking independent indexability should rebuild with their actual origin/canonical/hreflang/schema settings rather than blindly duplicating official URLs. The site is MIT-licensed; this on-page origin link is default attribution, **not an additional legal licensing condition**.
 - Verify footer origin attribution on every real public URL through the post-deploy Runner E2E, plus a JS-disabled pre-merge check of representative English/Chinese pages; never skip functional E2E.

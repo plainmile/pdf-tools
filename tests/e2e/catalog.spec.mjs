@@ -107,7 +107,7 @@ test('both languages visibly credit the original website, including when JavaScr
       await expect(source).toContainText(label);
       await expect(source).toContainText('pdf.plainmile.com');
       const rel = await source.getAttribute('rel');
-      expect(rel).not.toMatch(/nofollow|sponsored/);
+      expect(rel).toMatch(/\bnofollow\b/);
     }
   } finally { await context.close(); }
 });
