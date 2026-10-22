@@ -99,6 +99,30 @@ jobs:
           exit 1
           REMOTE
 
+      - name: Diagnose origin certificate and local proxy (public metadata only)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+        run: |
+          set -eu
+          ssh -p "$DEPLOY_PORT" -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
+            '/bin/sh -s' <<'REMOTE'
+          echo '=== Public metadata of origin certificate served with SNI pdf.plainmile.com ==='
+          if command -v openssl >/dev/null 2>&1; then
+            openssl s_client -connect 127.0.0.1:443 -servername pdf.plainmile.com </dev/null 2>/dev/null |
+              openssl x509 -noout -subject -issuer -dates -ext subjectAltName || true
+          else
+            echo 'openssl not found on VPS'
+          fi
+          echo '=== Local origin HTTPS status; -k used only for diagnostic ==='
+          curl --connect-timeout 5 --max-time 12 -k -sS -o /dev/null \
+            -w 'origin_https_http_code=%{http_code}\n' \
+            --resolve pdf.plainmile.com:443:127.0.0.1 \
+            https://pdf.plainmile.com/ || true
+          REMOTE
+
       - name: Verify public HTTPS and worker availability
         run: |
           set -euo pipefail
