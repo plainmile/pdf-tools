@@ -11,8 +11,56 @@ export const LIMITS = Object.freeze({
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
+// File drag-and-drop often supplies an empty or generic MIME type. Validate actual
+// bytes in the parsers rather than rejecting otherwise valid .jpg/.png/.webp files.
+export function imageTypeFor(file) {
+  const type = (file.type || '').toLowerCase();
+  if (IMAGE_TYPES.has(type)) return type;
+  if (/\.jpe?g$/i.test(file.name || '')) return 'image/jpeg';
+  if (/\.png$/i.test(file.name || '')) return 'image/png';
+  if (/\.webp$/i.test(file.name || '')) return 'image/webp';
+  return null;
+}
+
 export function isSupportedFile(file) {
-  return file.type === 'application/pdf' || IMAGE_TYPES.has(file.type) || /\.pdf$/i.test(file.name);
+  return file.type === 'application/pdf' || Boolean(imageTypeFor(file)) || /\.pdf$/i.test(file.name);
+}
+
+// Inspect dimensions in compressed headers before asking pdf-lib to allocate large
+// decoded image buffers. WebP is checked via createImageBitmap below.
+export function compressedImageDimensions(type, bytes) {
+  if (type === 'image/png') {
+    if (bytes.length < 24 || [137, 80, 78, 71, 13, 10, 26, 10].some((b, i) => bytes[i] !== b) ||
+        bytes[12] !== 73 || bytes[13] !== 72 || bytes[14] !== 68 || bytes[15] !== 82) {
+      throw new Error('Invalid image header.');
+    }
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return { width: view.getUint32(16), height: view.getUint32(20) };
+  }
+  if (type === 'image/jpeg') {
+    if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) throw new Error('Invalid image header.');
+    const frames = new Set([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf]);
+    let index = 2;
+    while (index + 4 < bytes.length) {
+      if (bytes[index++] !== 0xff) continue;
+      while (bytes[index] === 0xff) index++;
+      const marker = bytes[index++];
+      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+      if (marker === 0xd9 || marker === 0xda) break;
+      if (index + 1 >= bytes.length) break;
+      const segmentSize = bytes[index] * 256 + bytes[index + 1];
+      if (segmentSize < 2 || index + segmentSize > bytes.length) break;
+      if (frames.has(marker) && segmentSize >= 7) {
+        return {
+          height: bytes[index + 3] * 256 + bytes[index + 4],
+          width: bytes[index + 5] * 256 + bytes[index + 6],
+        };
+      }
+      index += segmentSize;
+    }
+    throw new Error('Invalid image header.');
+  }
+  return null;
 }
 
 export async function readSourceFile(file) {
@@ -20,9 +68,10 @@ export async function readSourceFile(file) {
   if (!file.size || file.size > LIMITS.maxFileBytes) {
     throw new Error(`${file.name}: files must be between 1 byte and 100 MB.`);
   }
-  const isImage = IMAGE_TYPES.has(file.type);
+  const imageType = imageTypeFor(file);
+  const isImage = Boolean(imageType);
   let bytes = new Uint8Array(await file.arrayBuffer());
-  if (isImage) bytes = await imageToPdfBytes(file, bytes);
+  if (isImage) bytes = await imageToPdfBytes(file, bytes, imageType);
 
   let doc;
   try {
@@ -38,13 +87,17 @@ export async function readSourceFile(file) {
   return { id: crypto.randomUUID(), name: file.name, bytes, pageCount, isImage, inputSize: file.size };
 }
 
-async function imageToPdfBytes(file, originalBytes) {
+async function imageToPdfBytes(file, originalBytes, imageType) {
   const doc = await PDFDocument.create();
   let embedded;
   let bitmap;
   try {
-    if (file.type === 'image/jpeg') embedded = await doc.embedJpg(originalBytes);
-    else if (file.type === 'image/png') embedded = await doc.embedPng(originalBytes);
+    const header = compressedImageDimensions(imageType, originalBytes);
+    if (header && (!header.width || !header.height || header.width * header.height > LIMITS.maxImagePixels)) {
+      throw new Error('Image dimensions are too large.');
+    }
+    if (imageType === 'image/jpeg') embedded = await doc.embedJpg(originalBytes);
+    else if (imageType === 'image/png') embedded = await doc.embedPng(originalBytes);
     else {
       bitmap = await createImageBitmap(file);
       if (bitmap.width * bitmap.height > LIMITS.maxImagePixels) throw new Error('Image dimensions are too large.');
