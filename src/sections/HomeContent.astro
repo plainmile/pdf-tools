@@ -2,13 +2,28 @@
 import Base from '../layouts/Base.astro';
 import { tools, getTool } from '../lib/tools.mjs';
 import { siteCopy, langPath } from '../lib/i18n.mjs';
+import { featuredToolSlugs, toolGroups, toolSymbols } from '../lib/toolGroups.mjs';
+import { websiteJsonLd } from '../lib/seo.mjs';
 const { locale = 'en' } = Astro.props;
 const p = siteCopy[locale].home;
 const href = (path) => langPath(path, locale);
-const title = locale === 'zh' ? '免费 PDF 合并、拆分与页面排序工具 - PlainMile' : 'Free PDF Merge, Split & Page Organizer - PlainMile';
-const desc = locale === 'zh' ? '无需登录、无需上传文件。在浏览器中合并 PDF、拆分、拖拽排序、旋转、删除和提取页面；支持 JPG、PNG、WebP 图片转 PDF，可选添加文字水印。' : 'Merge, split, reorder, rotate, delete and extract PDF pages in your browser. No file uploads or accounts. No automatic watermarks; custom watermarks are optional.';
+const bySlug = Object.fromEntries(tools.map((tool) => [tool.slug, tool]));
+const zh = locale === 'zh';
+const labels = zh ? {
+  frequent: '常用工具', search: '搜索工具', placeholder: '搜索：合并、压缩、水印、图片…',
+  clear: '清除', noResults: '没有匹配的工具，请换一个关键词。',
+  categories: '工具分类', open: '打开工具', count: '个工具',
+} : {
+  frequent: 'Popular tools', search: 'Find a PDF tool', placeholder: 'Search merge, compress, watermark, image…',
+  clear: 'Clear', noResults: 'No tools match that search. Try a different term.',
+  categories: 'Tool categories', open: 'Open tool', count: 'tools',
+};
+const title = zh ? '免费 PDF 合并、拆分、转换及页面整理工具 - PlainMile' : 'Free PDF Merge, Split, Convert and Page Organizer - PlainMile';
+const desc = zh
+  ? '免费的 PDF 合并、拆分、页面排序、压缩、水印、页码、图片及文字转换工具。中英双语，在浏览器本地处理，不上传 PDF。'
+  : 'Free PDF merge, split, organize, compress, page numbers and image or text converters. Process your documents in your browser, without uploads or signup.';
 ---
-<Base locale={locale} title={title} description={desc}>
+<Base locale={locale} title={title} description={desc} structuredData={websiteJsonLd(locale)}>
   <section class="hero site-container">
     <div class="hero-copy">
       <div class="eyebrow">{p.eyebrow}</div>
@@ -20,30 +35,87 @@ const desc = locale === 'zh' ? '无需登录、无需上传文件。在浏览器
       </div>
       <ul class="home-assurances"><li>{p.local}</li><li>{p.noaccount}</li><li>{p.ordered}</li></ul>
     </div>
-    <div class="workspace-illustration" aria-label={p.visualTitle} role="img">
-      <div class="illustration-head"><span class="brand-mini">▤ plainmile / pdf</span><span class="illustration-title">{p.visualTitle}</span></div>
-      <div class="illustration-files"><span>contract.pdf</span><span>attachment.pdf</span></div>
-      <div class="illustration-pages">
-        {[
-          { name: p.file1, chart: false },
-          { name: p.file2, chart: true },
-          { name: p.file3, chart: false },
-        ].map((item, i) => (
-          <div class="illustration-tile"><div class="illustration-sheet"><span class="illustration-line heading"></span><span class="illustration-line"></span><span class="illustration-line half"></span>{item.chart ? <span class="illustration-chart"></span> : <span class="illustration-lines"><i></i><i></i><i></i></span>}</div><span class="illustration-caption">{i + 1}. {item.name}</span></div>
-        ))}
+    <aside class="quick-panel" aria-label={labels.frequent}>
+      <div class="quick-panel-heading"><h2>{labels.frequent}</h2><span>PDF</span></div>
+      <div class="quick-links">
+        {featuredToolSlugs.map((slug) => {
+          const tool = getTool(bySlug[slug], locale);
+          return <a href={href('/' + slug + '/')} class="quick-link">
+            <span class="catalog-icon" aria-hidden="true">{toolSymbols[slug]}</span>
+            <span>{tool.title}</span><span class="quick-arrow" aria-hidden="true">→</span>
+          </a>;
+        })}
       </div>
-      <div class="illustration-foot"><span>↔</span><span>{locale === 'zh' ? '页面顺序可自由调整' : 'Arrange pages in any order'}</span><span class="illustration-action">PDF ↓</span></div>
-    </div>
+      <p class="quick-note">{zh ? '选择工具后直接处理文件，原始 PDF 不会上传。' : 'Choose a task and work directly on your device. PDFs are not uploaded.'}</p>
+    </aside>
   </section>
-  <section class="tools-section site-container" id="all-tools">
-    <div class="section-heading"><div><div class="eyebrow">{p.toolsEyebrow}</div><h2>{p.toolsTitle}</h2></div><p>{p.toolsLead}</p></div>
-    <div class="tool-cards">
-      {tools.map((source, i) => {
-        const tool = getTool(source, locale);
-        return <a class="tool-card" href={href(`/${tool.slug}/`)}><span class="tool-card-number">{String(i + 1).padStart(2, '0')}</span><h3>{tool.title}</h3><p>{tool.short}</p><span class="tool-arrow" aria-hidden="true">→</span></a>;
-      })}
+  <section class="tools-section site-container" id="all-tools" aria-labelledby="all-tools-title">
+    <div class="section-heading">
+      <div><h2 id="all-tools-title">{p.toolsTitle}</h2></div>
+      <p>{p.toolsLead}</p>
+    </div>
+    <div class="tool-finder" data-tool-finder>
+      <label for="tool-search">{labels.search}</label>
+      <div class="tool-search-row">
+        <input id="tool-search" type="search" data-tool-search autocomplete="off" placeholder={labels.placeholder} />
+        <button type="button" data-tool-clear>{labels.clear}</button>
+      </div>
+      <p class="tool-empty" data-tool-empty role="status" hidden>{labels.noResults}</p>
+    </div>
+    <nav class="category-jump" aria-label={labels.categories}>
+      {toolGroups.map((group) => <a href={'#group-' + group.id}>{zh ? group.zh : group.en}</a>)}
+    </nav>
+    <div class="catalog-groups" data-tool-catalog>
+      {toolGroups.map((group) => (
+        <section class="tool-group" id={'group-' + group.id} data-tool-group aria-labelledby={'heading-' + group.id}>
+          <div class="catalog-group-heading">
+            <h3 id={'heading-' + group.id}>{zh ? group.zh : group.en}</h3>
+            <span>{group.slugs.length} {labels.count}</span>
+          </div>
+          <div class="tool-cards">
+            {group.slugs.map((slug) => {
+              const tool = getTool(bySlug[slug], locale);
+              return <a class="tool-card" data-tool-card="true"
+                data-search-text={[tool.title, tool.short, tool.description, slug].join(' ').toLocaleLowerCase()}
+                href={href('/' + slug + '/')}
+                aria-label={tool.title + ' — ' + labels.open}>
+                <span class="catalog-icon" aria-hidden="true">{toolSymbols[slug]}</span>
+                <h4>{tool.title}</h4>
+                <p>{tool.short}</p>
+                <span class="tool-arrow" aria-hidden="true">→</span>
+              </a>;
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   </section>
   <section class="steps-band"><div class="site-container"><h2>{p.howTitle}</h2><ol class="home-steps">{p.howSteps.map((step, i) => <li><span>{String(i + 1).padStart(2, '0')}</span>{step}</li>)}</ol></div></section>
   <section class="bottom-cta site-container"><div><h2>{p.closing}</h2><p>{p.closingText}</p></div><a class="button button-primary" href={href('/workspace/')}>{p.start} <span aria-hidden="true">→</span></a></section>
+  <script is:inline>
+    (() => {
+      const search = document.querySelector('[data-tool-search]');
+      const catalog = document.querySelector('[data-tool-catalog]');
+      const clear = document.querySelector('[data-tool-clear]');
+      const empty = document.querySelector('[data-tool-empty]');
+      if (!search || !catalog || !clear || !empty) return;
+      const cards = [...catalog.querySelectorAll('[data-tool-card]')];
+      const groups = [...catalog.querySelectorAll('[data-tool-group]')];
+      const update = () => {
+        const query = search.value.trim().toLocaleLowerCase();
+        let matches = 0;
+        for (const card of cards) {
+          const visible = !query || card.dataset.searchText.includes(query);
+          card.hidden = !visible;
+          if (visible) matches++;
+        }
+        for (const group of groups) group.hidden = ![...group.querySelectorAll('[data-tool-card]')].some(card => !card.hidden);
+        empty.hidden = matches !== 0;
+        clear.disabled = !query;
+      };
+      search.addEventListener('input', update);
+      clear.addEventListener('click', () => { search.value = ''; update(); search.focus(); });
+      update();
+    })();
+  </script>
 </Base>

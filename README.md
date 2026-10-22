@@ -153,3 +153,11 @@ The repository is public; GitHub's **standard hosted Runners** are free for publ
 - Limits are browser-side safety ceilings, **not** a promise that every device can handle the maximum. No file bytes are transmitted to the server. Long operations show page progress, and batch rendering releases each page's canvas and PDF.js worker memory.
 
 This project is licensed under **MIT**, and the website footer links to the open-source repository: https://github.com/plainmile/pdf-tools.
+
+
+## Navigation and helpful-content SEO (2026-10)
+
+- The home page follows a straightforward document-utility pattern rather than a promotional SaaS landing page: four **popular tasks**, four descriptive categories, keyboard-operable client-side tool search and 16 **server-rendered** tool links. Search is an enhancement; tools stay visible and crawlable with JavaScript disabled.
+- Each tool page includes a real **How it works** section, two visible user questions with accurate limitations, and **contextual related-tool links**. Do not add fabricated customer reviews, fake star ratings, boilerplate keyword sections or FAQ rich-result markup.
+- Static structured data: home `WebSite`; tool pages `WebApplication` + `BreadcrumbList`. Both languages use real page-specific content, canonical URLs and reciprocal `hreflang` links. JSON-LD does **not** guarantee Google rich results, inclusion in AI search or rankings.
+- Desktop and mobile typography, text contrast, navigation, focus/keyboard usage, tool filters and dark/light/system themes are covered by unit, browser E2E and public-runner checks. Record actual deployed URL results rather than relying on local screenshots.

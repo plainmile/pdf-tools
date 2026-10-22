@@ -4,23 +4,53 @@ import PdfWorkspace from '../components/PdfWorkspace.jsx';
 import PdfUtility from '../components/PdfUtility.jsx';
 import { utilitySlugs } from '../lib/utilityCore.mjs';
 import { tools, getTool } from '../lib/tools.mjs';
+import { toolHelpFor } from '../lib/toolHelp.mjs';
+import { relatedToolSlugs } from '../lib/toolGroups.mjs';
+import { toolJsonLd } from '../lib/seo.mjs';
 import { siteCopy, langPath } from '../lib/i18n.mjs';
 const { source, locale = 'en' } = Astro.props;
 const tool = getTool(source, locale);
 const page = siteCopy[locale].toolsPage;
+const help = toolHelpFor(tool.slug, locale);
+const toolsBySlug = Object.fromEntries(tools.map(item => [item.slug, item]));
+const relatedTools = relatedToolSlugs(tool.slug);
 const href = (path) => langPath(path, locale);
 ---
-<Base locale={locale} title={`${tool.title} - ${locale === 'zh' ? '免费本地 PDF 工具' : 'Free & Private'}`} description={tool.description}>
+<Base locale={locale} title={tool.title + ' - ' + (locale === 'zh' ? '免费本地 PDF 工具' : 'Free & Private')}
+  description={tool.description} structuredData={toolJsonLd(tool, locale)}>
   <section class="tool-hero site-container">
     <div class="breadcrumbs"><a href={href('/')}>{page.home}</a><span aria-hidden="true">/</span><span>{tool.title}</span></div>
     <div class="eyebrow">{page.private}</div>
     <h1>{tool.headline}</h1>
     <p>{tool.description}</p>
   </section>
-  <section class="site-container workspace-outer">{utilitySlugs.includes(tool.slug) ? <PdfUtility client:only="react" locale={locale} mode={tool.slug} /> : <PdfWorkspace client:only="react" locale={locale} mode={tool.slug} />}</section>
-  <section class="site-container tool-explanation">
-    <div class="explanation-intro"><div class="eyebrow">{page.how}</div><h2>{tool.title}</h2><p>{tool.details}</p></div>
-    <ol class="steps-list">{tool.steps.map((step, index) => <li><span class="step-index">{String(index + 1).padStart(2, '0')}</span><span>{step}</span></li>)}</ol>
+  <section class="site-container workspace-outer">
+    {utilitySlugs.includes(tool.slug)
+      ? <PdfUtility client:only="react" locale={locale} mode={tool.slug} />
+      : <PdfWorkspace client:only="react" locale={locale} mode={tool.slug} />}
   </section>
-  <section class="site-container below-tools"><h2>{page.other}</h2><div>{tools.filter((other) => other.slug !== tool.slug).slice(0, 5).map((item) => <a href={href(`/${item.slug}/`)}>{getTool(item, locale).title} <span aria-hidden="true">→</span></a>)}</div></section>
+  <section class="site-container tool-explanation">
+    <div class="explanation-intro">
+      <h2>{page.how}</h2>
+      <p>{tool.details}</p>
+    </div>
+    <ol class="steps-list">{tool.steps.map((step, index) =>
+      <li><span class="step-index">{String(index + 1).padStart(2, '0')}</span><span>{step}</span></li>)}
+    </ol>
+  </section>
+  {help.length > 0 && <section class="site-container tool-faq" aria-labelledby="tool-faq-heading">
+    <h2 id="tool-faq-heading">{locale === 'zh' ? '常见问题' : 'Questions about this tool'}</h2>
+    <div class="tool-faq-items">
+      {help.map(([question, answer]) => <details class="faq-item">
+        <summary>{question}</summary>
+        <p>{answer}</p>
+      </details>)}
+    </div>
+  </section>}
+  <section class="site-container below-tools">
+    <h2>{page.other}</h2>
+    <div>{relatedTools.map((slug) =>
+      <a href={href('/' + slug + '/')}>{getTool(toolsBySlug[slug], locale).title} <span aria-hidden="true">→</span></a>)}
+    </div>
+  </section>
 </Base>
