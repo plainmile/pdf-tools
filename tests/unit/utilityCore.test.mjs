@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, parseTextBlocks,
   textContentToLines, linesToReadableText, sanitizeFilename,
-  UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch,
+  UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, enforceImageBatchBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
 
 test('compression reports actual savings; a larger result must not count as savings', () => {
@@ -79,4 +79,16 @@ test('image batch suggestions cover the entire book without overlapping or excee
   assert.throws(() => imagePageBatch(1001), /Invalid/);
   assert.throws(() => imagePageBatch(100, -1), /outside/);
   assert.throws(() => imagePageBatch(100, 2), /outside/);
+});
+
+test('batch output budget and cancellation prevent oversized downloads', () => {
+  assert.equal(enforceImageBatchBytes(1024, 2048), 3072);
+  assert.throws(() => enforceImageBatchBytes(64 * 1024 * 1024, 1), /64 MB/);
+  assert.throws(() => enforceImageBatchBytes(64 * 1024 * 1024, 1, 'zh'), /64 MB/);
+  const c = new AbortController();
+  checkCancelled(c.signal);
+  c.abort();
+  assert.throws(() => checkCancelled(c.signal), /cancelled/);
+  assert.match(translateUtilityError(new Error('This page is too large to rasterize safely.'), 'zh'), /页面尺寸/);
+  assert.match(translateUtilityError(new Error('Processing cancelled.'), 'zh'), /取消/);
 });
