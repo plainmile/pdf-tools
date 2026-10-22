@@ -8,6 +8,8 @@ export const UTILITY_LIMITS = Object.freeze({
   maxOutputPages: 1000,
   maxRasterTextPages: 300,
   maxImagePagesPerRun: 60,
+  // ZIP generation temporarily duplicates buffers. Keep the accumulated images modest.
+  maxImageBatchBytes: 64 * MiB,
   maxCompressionPages: 120,
   maxPixelCount: 12_000_000,
 });
@@ -34,6 +36,37 @@ export function enforceImageBatchLimit(count, locale = 'en') {
 
 // Suggest finite batches rather than silently selecting hundreds of pages to rasterize.
 // A batch is only a convenience; users can still enter an arbitrary <=60-page range.
+export function checkCancelled(signal) {
+  if (signal?.aborted) throw new Error('Processing cancelled.');
+}
+
+export function enforceImageBatchBytes(accumulated, next, locale = 'en') {
+  if (!Number.isFinite(accumulated) || !Number.isFinite(next) || next < 0 || accumulated < 0 ||
+      accumulated + next > UTILITY_LIMITS.maxImageBatchBytes) {
+    throw new Error(locale === 'zh'
+      ? '本批图片超过 64 MB 内存安全上限。请降低清晰度、改用 JPG 或减少每批页数。'
+      : 'Image batch exceeds the 64 MB safety limit. Lower resolution, use JPG, or select fewer pages.');
+  }
+  return accumulated + next;
+}
+
+export function translateUtilityError(error, locale = 'en') {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  if (locale !== 'zh') return message || 'Processing failed. Please try another file.';
+  const translations = [
+    [/Processing cancelled/i, '处理已取消，没有下载未完成的文件。'],
+    [/too large to rasterize/i, '页面尺寸过大，无法安全转换为图片。请降低分辨率。'],
+    [/No selectable text/i, '未找到可提取的文字。扫描版 PDF 需要 OCR，本工具不提供 OCR。'],
+    [/Starting page number/i, '起始页码必须是 1 至 99999 之间的整数。'],
+    [/Image encoding failed/i, '图片编码失败，请降低分辨率或改用 JPG。'],
+    [/Image batch exceeds/i, '本批图片超过 64 MB 安全上限，请减少选定页数。'],
+    [/reversed|outside|range|invalid page/i, '页码范围无效，请检查起始页、结束页和 PDF 总页数。'],
+    [/canvas|memory|allocation/i, '设备内存不足或无法创建图片画布，请减少页数或降低清晰度。'],
+  ];
+  return translations.find(([pattern]) => pattern.test(message))?.[1] ??
+    '处理失败，请检查文件内容或尝试更小的文件。';
+}
+
 export function imagePageBatch(count, batchIndex = 0) {
   if (!Number.isSafeInteger(count) || count < 1 || count > UTILITY_LIMITS.maxPages) {
     throw new Error('Invalid PDF page count.');
