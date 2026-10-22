@@ -1,0 +1,100 @@
+import { parsePageRanges } from './pageOperations.mjs';
+
+export const UTILITY_LIMITS = Object.freeze({ maxPdfBytes: 25 * 1024 * 1024, maxPages: 50, maxTextBytes: 1_000_000, maxOutputPages: 50, maxPixelCount: 12_000_000 });
+export const utilitySlugs = Object.freeze([
+  'pdf-to-images', 'compress-pdf', 'pdf-to-txt', 'pdf-to-markdown',
+  'txt-to-pdf', 'markdown-to-pdf', 'add-page-numbers',
+]);
+export function formatBytes(value) {
+  if (!Number.isFinite(value) || value < 0) throw new Error('Invalid byte count.');
+  return value < 1024 ? `${value} B` : value < 1024 ** 2 ? `${(value / 1024).toFixed(1)} KB` : `${(value / 1024 ** 2).toFixed(2)} MB`;
+}
+export function compressionStats(original, candidate) {
+  if (!Number.isFinite(original) || original <= 0 || !Number.isFinite(candidate) || candidate <= 0) throw new Error('Invalid file sizes.');
+  return { original, candidate, bytesSaved: Math.max(original - candidate, 0), percent: Math.round((1 - candidate / original) * 1000) / 10, smaller: candidate < original };
+}
+export function requestedPages(input, count) {
+  if (!input || !input.trim()) return Array.from({ length: count }, (_, i) => i + 1);
+  const output = [];
+  const seen = new Set();
+  for (const { start, end } of parsePageRanges(input, count)) {
+    for (let page = start; page <= end; page++) {
+      if (seen.has(page)) continue;
+      seen.add(page);
+      output.push(page);
+    }
+  }
+  return output;
+}
+export function normalizeText(source) {
+  return source.replace(/\r\n?/g, '\n').replace(/\0/g, '').replace(/\t/g, '    ');
+}
+export function parseTextBlocks(source, markdown = false) {
+  const value = normalizeText(source);
+  const blocks = [];
+  let fenced = false;
+  for (const raw of value.split('\n')) {
+    const line = raw.trimEnd();
+    if (markdown && /^\s*```/.test(line)) { fenced = !fenced; continue; }
+    if (!line.trim()) { blocks.push({ text: '', size: 12, kind: 'gap' }); continue; }
+    if (markdown && fenced) { blocks.push({ text: line, size: 10, kind: 'code' }); continue; }
+    if (markdown && /^\s{0,3}#{1,3} /.test(line)) {
+      const match = /^\s{0,3}(#{1,3})\s+(.*)$/.exec(line);
+      blocks.push({ text: stripMarkdownInline(match[2]), size: [0, 21, 17, 14][match[1].length], kind: 'heading' });
+    } else if (markdown && /^\s*(?:[-*+] |\d+[.)] )/.test(line)) {
+      blocks.push({ text: '• ' + stripMarkdownInline(line.replace(/^\s*(?:[-*+] |\d+[.)] )/, '')), size: 11, kind: 'list' });
+    } else if (markdown && /^\s*>\s*/.test(line)) {
+      blocks.push({ text: '│ ' + stripMarkdownInline(line.replace(/^\s*>\s*/, '')), size: 11, kind: 'quote' });
+    } else if (markdown && /^\s*(?:---+|\*\*\*+)\s*$/.test(line)) {
+      blocks.push({ text: '─────────────', size: 11, kind: 'rule' });
+    } else {
+      blocks.push({ text: markdown ? stripMarkdownInline(line) : line, size: 11, kind: 'paragraph' });
+    }
+  }
+  return blocks;
+}
+// Intentionally a minimal CommonMark subset: never execute HTML, remote images or scripts.
+export function stripMarkdownInline(source) {
+  return source.replace(/!?\[([^\]]+)\]\([^\n)]+\)/g, '$1')
+    .replace(/(?:\*\*|__|\*|_|~~|`)/g, '').replace(/<[^>]+>/g, '');
+}
+export function textContentToLines(content) {
+  // PDF is positioned text, not a logical document. Sort approximately by baseline and X.
+  const items = content.items.filter(item => typeof item.str === 'string' && item.str.trim());
+  const lines = [];
+  for (const item of items) {
+    const x = Number(item.transform?.[4] ?? 0);
+    const y = Number(item.transform?.[5] ?? 0);
+    const fontSize = Math.max(6, Number(item.height) || Math.abs(Number(item.transform?.[3])) || 11);
+    let found = lines.find(line => Math.abs(line.y - y) <= Math.max(2, Math.min(line.fontSize, fontSize) * .25));
+    if (!found) { found = { y, fontSize, items: [] }; lines.push(found); }
+    found.items.push({ x, width: Number(item.width) || 0, str: item.str, fontSize });
+    found.fontSize = Math.max(found.fontSize, fontSize);
+  }
+  return lines.sort((a, b) => b.y - a.y).map(line => {
+    const sorted = line.items.sort((a, b) => a.x - b.x);
+    let text = '';
+    let previousEnd = null;
+    for (const item of sorted) {
+      if (previousEnd !== null && item.x - previousEnd > Math.max(2, item.fontSize * .2) && !/\s$/.test(text)) text += ' ';
+      text += item.str;
+      previousEnd = Math.max(previousEnd ?? item.x, item.x + item.width);
+    }
+    return { text: text.trim(), fontSize: line.fontSize };
+  }).filter(line => line.text);
+}
+export function linesToReadableText(pages, markdown = false) {
+  const heights = pages.flat().map(x => x.fontSize).filter(x => x > 0);
+  const normal = heights.length ? heights.sort((a, b) => a - b)[Math.floor((heights.length - 1) / 2)] : 12;
+  return pages.map((page, index) => {
+    const lines = page.map(line => {
+      if (markdown && line.fontSize > normal * 1.35 && line.text.length < 125) return `## ${line.text}`;
+      return line.text;
+    });
+    const body = lines.join('\n');
+    return markdown && pages.length > 1 ? `<!-- Page ${index + 1} -->\n${body}` : body;
+  }).join('\n\n');
+}
+export function sanitizeFilename(filename) {
+  return (filename || 'document').replace(/\.[^.]+$/, '').replace(/[^\p{L}\p{N}._-]+/gu, '-').slice(0, 70) || 'document';
+}

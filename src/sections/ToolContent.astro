@@ -1,6 +1,8 @@
 ---
 import Base from '../layouts/Base.astro';
 import PdfWorkspace from '../components/PdfWorkspace.jsx';
+import PdfUtility from '../components/PdfUtility.jsx';
+import { utilitySlugs } from '../lib/utilityCore.mjs';
 import { tools, getTool } from '../lib/tools.mjs';
 import { siteCopy, langPath } from '../lib/i18n.mjs';
 const { source, locale = 'en' } = Astro.props;
@@ -15,7 +17,7 @@ const href = (path) => langPath(path, locale);
     <h1>{tool.headline}</h1>
     <p>{tool.description}</p>
   </section>
-  <section class="site-container workspace-outer"><PdfWorkspace client:only="react" locale={locale} mode={tool.slug} /></section>
+  <section class="site-container workspace-outer">{utilitySlugs.includes(tool.slug) ? <PdfUtility client:only="react" locale={locale} mode={tool.slug} /> : <PdfWorkspace client:only="react" locale={locale} mode={tool.slug} />}</section>
   <section class="site-container tool-explanation">
     <div class="explanation-intro"><div class="eyebrow">{page.how}</div><h2>{tool.title}</h2><p>{tool.details}</p></div>
     <ol class="steps-list">{tool.steps.map((step, index) => <li><span class="step-index">{String(index + 1).padStart(2, '0')}</span><span>{step}</span></li>)}</ol>
