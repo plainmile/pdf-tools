@@ -1,0 +1,49 @@
+---
+import Base from '../layouts/Base.astro';
+import { tools, getTool } from '../lib/tools.mjs';
+import { siteCopy, langPath } from '../lib/i18n.mjs';
+const { locale = 'en' } = Astro.props;
+const p = siteCopy[locale].home;
+const href = (path) => langPath(path, locale);
+const title = locale === 'zh' ? '免费 PDF 合并、拆分与页面排序工具 - PlainMile' : 'Free PDF Merge, Split & Page Organizer - PlainMile';
+const desc = locale === 'zh' ? '无需登录、无需上传文件。在浏览器中合并 PDF、拆分、拖拽排序、旋转、删除和提取页面；支持 JPG、PNG、WebP 图片转 PDF，可选添加文字水印。' : 'Merge, split, reorder, rotate, delete and extract PDF pages in your browser. No file uploads or accounts. No automatic watermarks; custom watermarks are optional.';
+---
+<Base locale={locale} title={title} description={desc}>
+  <section class="hero site-container">
+    <div class="hero-copy">
+      <div class="eyebrow">{p.eyebrow}</div>
+      <h1>{p.title}</h1>
+      <p class="hero-lead">{p.lead}</p>
+      <div class="hero-actions">
+        <a class="button button-primary" href={href('/workspace/')}>{p.start} <span aria-hidden="true">→</span></a>
+        <a class="button button-secondary" href="#all-tools">{p.explore}</a>
+      </div>
+      <ul class="home-assurances"><li>{p.local}</li><li>{p.noaccount}</li><li>{p.ordered}</li></ul>
+    </div>
+    <div class="workspace-illustration" aria-label={p.visualTitle} role="img">
+      <div class="illustration-head"><span class="brand-mini">▤ plainmile / pdf</span><span class="illustration-title">{p.visualTitle}</span></div>
+      <div class="illustration-files"><span>contract.pdf</span><span>attachment.pdf</span></div>
+      <div class="illustration-pages">
+        {[
+          { name: p.file1, chart: false },
+          { name: p.file2, chart: true },
+          { name: p.file3, chart: false },
+        ].map((item, i) => (
+          <div class="illustration-tile"><div class="illustration-sheet"><span class="illustration-line heading"></span><span class="illustration-line"></span><span class="illustration-line half"></span>{item.chart ? <span class="illustration-chart"></span> : <span class="illustration-lines"><i></i><i></i><i></i></span>}</div><span class="illustration-caption">{i + 1}. {item.name}</span></div>
+        ))}
+      </div>
+      <div class="illustration-foot"><span>↔</span><span>{locale === 'zh' ? '页面顺序可自由调整' : 'Arrange pages in any order'}</span><span class="illustration-action">PDF ↓</span></div>
+    </div>
+  </section>
+  <section class="tools-section site-container" id="all-tools">
+    <div class="section-heading"><div><div class="eyebrow">{p.toolsEyebrow}</div><h2>{p.toolsTitle}</h2></div><p>{p.toolsLead}</p></div>
+    <div class="tool-cards">
+      {tools.map((source, i) => {
+        const tool = getTool(source, locale);
+        return <a class="tool-card" href={href(`/${tool.slug}/`)}><span class="tool-card-number">{String(i + 1).padStart(2, '0')}</span><h3>{tool.title}</h3><p>{tool.short}</p><span class="tool-arrow" aria-hidden="true">→</span></a>;
+      })}
+    </div>
+  </section>
+  <section class="steps-band"><div class="site-container"><h2>{p.howTitle}</h2><ol class="home-steps">{p.howSteps.map((step, i) => <li><span>{String(i + 1).padStart(2, '0')}</span>{step}</li>)}</ol></div></section>
+  <section class="bottom-cta site-container"><div><h2>{p.closing}</h2><p>{p.closingText}</p></div><a class="button button-primary" href={href('/workspace/')}>{p.start} <span aria-hidden="true">→</span></a></section>
+</Base>

@@ -1,0 +1,17 @@
+services:
+  pdf-tools:
+    image: ghcr.io/plainmile/pdf-tools:${IMAGE_TAG:-latest}
+    container_name: plainmile-pdf-tools
+    restart: unless-stopped
+    networks:
+      - edge
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -qx ok"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+networks:
+  edge:
+    external: true

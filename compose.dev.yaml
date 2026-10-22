@@ -1,0 +1,13 @@
+services:
+  dev:
+    image: node:22-bookworm-slim
+    working_dir: /app
+    command: sh -lc "npm install --no-audit --no-fund && npm run dev"
+    volumes:
+      - ./:/app
+      - node_modules:/app/node_modules
+    ports:
+      - "127.0.0.1:4321:4321"
+    restart: unless-stopped
+volumes:
+  node_modules:

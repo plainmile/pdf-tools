@@ -1,0 +1,24 @@
+---
+import Base from '../layouts/Base.astro';
+import PdfWorkspace from '../components/PdfWorkspace.jsx';
+import { tools, getTool } from '../lib/tools.mjs';
+import { siteCopy, langPath } from '../lib/i18n.mjs';
+const { source, locale = 'en' } = Astro.props;
+const tool = getTool(source, locale);
+const page = siteCopy[locale].toolsPage;
+const href = (path) => langPath(path, locale);
+---
+<Base locale={locale} title={`${tool.title} - ${locale === 'zh' ? '免费本地 PDF 工具' : 'Free & Private'}`} description={tool.description}>
+  <section class="tool-hero site-container">
+    <div class="breadcrumbs"><a href={href('/')}>{page.home}</a><span aria-hidden="true">/</span><span>{tool.title}</span></div>
+    <div class="eyebrow">{page.private}</div>
+    <h1>{tool.headline}</h1>
+    <p>{tool.description}</p>
+  </section>
+  <section class="site-container workspace-outer"><PdfWorkspace client:only="react" locale={locale} mode={tool.slug} /></section>
+  <section class="site-container tool-explanation">
+    <div class="explanation-intro"><div class="eyebrow">{page.how}</div><h2>{tool.title}</h2><p>{tool.details}</p></div>
+    <ol class="steps-list">{tool.steps.map((step, index) => <li><span class="step-index">{String(index + 1).padStart(2, '0')}</span><span>{step}</span></li>)}</ol>
+  </section>
+  <section class="site-container below-tools"><h2>{page.other}</h2><div>{tools.filter((other) => other.slug !== tool.slug).slice(0, 5).map((item) => <a href={href(`/${item.slug}/`)}>{getTool(item, locale).title} <span aria-hidden="true">→</span></a>)}</div></section>
+</Base>
