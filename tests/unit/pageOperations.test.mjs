@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   movePage, movePageGroup, shiftPage, rotatePages, deletePages, parsePageRanges,
   chunkPageRanges, getRangePages, commitHistory, makeHistoryState, undoHistory, redoHistory,
-  MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget,
+  MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources,
 } from '../../src/lib/pageOperations.mjs';
 
 const pages = Object.freeze([
@@ -92,4 +92,11 @@ test('workspace preserves actionable Chinese input and resource limit messages',
   }
   assert.equal(translateProcessingError('一次最多处理 20 个文件。', 'zh'), '一次最多处理 20 个文件。');
   assert.equal(translateProcessingError('unknown internal error', 'zh'), workspaceCopy.zh.errorGeneric);
+});
+
+test('the active file count ignores hidden sources retained only for Undo', () => {
+  assert.equal(countActiveSources(pages), 2);
+  assert.equal(countActiveSources(deletePages(pages, ['b'])), 1);
+  assert.equal(countActiveSources(deletePages(pages, ['a', 'b', 'c'])), 0);
+  assert.equal(countActiveSources([...pages, { ...pages[0], id: 'd' }]), 2);
 });

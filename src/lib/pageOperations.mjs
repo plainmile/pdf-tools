@@ -10,6 +10,14 @@ export function enforceSplitZipBudget(totalBytes, nextBytes) {
   return totalBytes + nextBytes;
 }
 
+/** Count only source files still represented in the current page workspace.
+ * Sources held exclusively for Undo must not consume the 20 ACTIVE-file slots.
+ * Their buffers remain part of the separate real 200 MiB memory budget.
+ */
+export function countActiveSources(pages) {
+  return new Set(pages.map((page) => page.sourceId)).size;
+}
+
 export function movePage(pages, draggedId, targetId) {
   const from = pages.findIndex((page) => page.id === draggedId);
   const to = pages.findIndex((page) => page.id === targetId);
