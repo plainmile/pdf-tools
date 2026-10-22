@@ -120,7 +120,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const selectedCount = selected.size;
   const bytesInMemory = useMemo(() => sources.reduce((total, item) => total + item.inputSize, 0), [sources]);
   const sourceLookup = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources]);
-  const imageSourcesLoaded = sources.some(source => source.isImage);
+  // Hidden source bytes are intentionally retained for Undo, but should not
+  // force new-paper reflow when every corresponding image page was deleted.
+  const imageSourcesLoaded = pages.some(page => sourceLookup.get(page.sourceId)?.isImage);
   const imageLayoutDirty = mode === 'image-to-pdf' && imageSourcesLoaded &&
     (imageLayout.paper !== appliedImageLayout.paper ||
       imageLayout.orientation !== appliedImageLayout.orientation ||
