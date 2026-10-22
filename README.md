@@ -127,7 +127,7 @@ With a previous reviewed GHCR image tag, change the server-local `IMAGE_TAG`, ru
 
 ## License
 
-Copyright PlainMile. No redistribution license has been granted yet.
+MIT License. See [LICENSE](LICENSE). Source: https://github.com/plainmile/pdf-tools.
 
 ## Required CI and public release gates
 
@@ -138,3 +138,14 @@ Copyright PlainMile. No redistribution license has been granted yet.
 5. E2E Docker containers use `--rm` and explicit `if: always()` cleanup. GitHub-hosted Runners are discarded after the job. Diagnostics are kept only on failure, for one day. The separate public QA workflow is **manual-only** to avoid duplicate Runner jobs.
 
 The repository is public; GitHub's **standard hosted Runners** are free for public repositories, but artifact/package storage can still be limited. No always-on QA Runner or daemon is configured on netcup.
+
+## V1 browser-local utility tools
+
+- **PDF to PNG/JPG:** Render selected pages to images; multiple pages download as ZIP. Supports resolution and page-range controls.
+- **PDF compression:** Optional *lossy image-based* recompression with actual original and result sizes. If output is larger, download is disabled. Lossy compression **removes searchable/selectable text and may lose links, interactive forms, signatures and annotations**. Keep your original.
+- **PDF to TXT/Markdown:** Extract pre-existing selectable text using PDF.js. No OCR; multi-column/tables may reorder or flatten. Markdown headings are heuristic.
+- **TXT/Markdown to PDF:** Simple local A4 output, limited Markdown syntax (headings/lists/quotes/code). Latin text is selectable; Unicode/CJK text is drawn using local browser fonts as **image-only** pages (no search/copy). No remote resources or HTML execution.
+- **Add page numbers:** Select starting number, position and font size; actual numbers are drawn into each PDF page.
+- All conversion files stay on the device. PDF inputs <=25 MB and <=50 pages; TXT/MD inputs <=1 MB. Browser memory limits apply.
+
+This project is licensed under **MIT**, and the website footer links to the open-source repository: https://github.com/plainmile/pdf-tools.

@@ -34,7 +34,7 @@ jobs:
           grep -q 'hreflang="zh-CN"' dist/index.html
           grep -q 'hreflang="en"' dist/zh/index.html
           grep -q '整理 PDF 页面' dist/zh/index.html
-          for route in workspace merge-pdf split-pdf organize-pdf rotate-pdf extract-pages delete-pages image-to-pdf watermark-pdf privacy; do
+          for route in workspace merge-pdf split-pdf organize-pdf rotate-pdf extract-pages delete-pages image-to-pdf watermark-pdf pdf-to-images compress-pdf pdf-to-txt pdf-to-markdown txt-to-pdf markdown-to-pdf add-page-numbers privacy; do
             test -f "dist/$route/index.html"
             grep -q "https://pdf.plainmile.com/$route/" "dist/$route/index.html"
             test -f "dist/zh/$route/index.html"

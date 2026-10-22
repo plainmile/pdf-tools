@@ -5,7 +5,7 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 const domain = 'https://pdf.plainmile.com';
 const screenshotDir = process.env.LIVE_SCREENSHOT_DIR || '';
 const slugs = ['', 'workspace/', 'merge-pdf/', 'split-pdf/', 'organize-pdf/',
- 'rotate-pdf/', 'extract-pages/', 'delete-pages/', 'image-to-pdf/', 'watermark-pdf/', 'privacy/'];
+ 'rotate-pdf/', 'extract-pages/', 'delete-pages/', 'image-to-pdf/', 'watermark-pdf/', 'pdf-to-images/', 'compress-pdf/', 'pdf-to-txt/', 'pdf-to-markdown/', 'txt-to-pdf/', 'markdown-to-pdf/', 'add-page-numbers/', 'privacy/'];
 
 test('live sitemap, robots, routes, PDF worker, 404', async ({ request }) => {
  const robots = await request.get('/robots.txt');

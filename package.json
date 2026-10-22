@@ -1,6 +1,8 @@
 {
   "name": "@plainmile/pdf-tools",
   "private": true,
+  "license": "MIT",
+  "repository": "https://github.com/plainmile/pdf-tools",
   "type": "module",
   "version": "0.1.0",
   "engines": { "node": ">=22.12.0" },

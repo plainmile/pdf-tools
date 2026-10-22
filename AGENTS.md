@@ -23,3 +23,10 @@
 - After each successful netcup deployment, run the complete Playwright suite again against **https://pdf.plainmile.com** inside the SAME ephemeral GitHub-hosted deployment runner. Download actual exported PDFs and inspect them; route/health-only checks are insufficient.
 - GitHub public standard hosted runners are ephemeral. Use `docker run --rm`, `if: always()` cleanup, finite job timeouts, concurrency to cancel superseded feature branch CI, and avoid duplicate public QA workflows. Retain screenshots/traces only when tests fail (one day).
 - The manual Public Site Browser E2E workflow is for requested audits, not a second automatic runner job after deployment. Never leave a persistent VPS QA container or send customer files to CI; synthetic PDFs only.
+
+## New browser-local conversion tools and open-source license
+
+- MIT License: keep `LICENSE` and public GitHub link visible in the bilingual footer; do not add proprietary or incompatible assets.
+- PDF to JPG/PNG must verify image signatures and page selection; multi-page exports are a ZIP. PDF compression uses optional rasterization and must show measured input/output bytes; do not claim lossless compression or download files that grow larger. Warn users about text, links, annotations, forms and signatures being rasterized/lost.
+- PDF-to-TXT/Markdown extracts only existing selectable text, never claim OCR or precise original layout. Markdown heading conversion is heuristic. TXT/Markdown-to-PDF supports a limited Markdown subset; non-Latin scripts rendered using local browser fonts yield image-based, not searchable, PDF pages.
+- Keep input/resource limits, no upload network calls, bilingual SEO routes and end-to-end checks of exported files for every new tool. E2E gate before each publish and public GitHub Runner E2E after each netcup deployment. Clean QA containers even on failure.
