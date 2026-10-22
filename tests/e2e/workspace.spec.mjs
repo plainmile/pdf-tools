@@ -255,3 +255,17 @@ test('Chinese split tool exports current pages without uploading the document', 
   const zip = await JSZip.loadAsync(await readFile(await download.path()));
   expect(Object.keys(zip.files).sort()).toEqual(['part-01-pages-1-2.pdf', 'part-02-pages-3-3.pdf']);
 });
+
+test('workbench imports 320-page book with lazy previews and extracts one page', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'book-320-pages.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf(Array.from({length:320},()=>420)),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(320, { timeout: 30000 });
+  await expect(page.getByTestId('workspace-large-warning')).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Select page 1', exact: true }).check();
+  const one = await downloadPdf(page, () => page.getByRole('button', { name: 'Extract selected pages' }).click());
+  expect(one.getPageCount()).toBe(1);
+});

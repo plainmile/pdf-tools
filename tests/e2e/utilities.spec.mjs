@@ -15,11 +15,11 @@ async function fixturePdf(label = 'Hello PDF world', count = 2) {
 
 async function upload(page, bytes) {
   await page.getByTestId('utility-file-input').setInputFiles({ name: 'fixture.pdf', mimeType: 'application/pdf', buffer: bytes });
-  await expect(page.getByTestId('utility-file-summary')).toBeVisible();
+  await expect(page.getByTestId('utility-file-summary')).toBeVisible({ timeout: 20000 });
 }
 
-async function getDownload(page, action) {
-  const event = page.waitForEvent('download', { timeout: 6000 }).catch(async () => {
+async function getDownload(page, action, timeout = 6000) {
+  const event = page.waitForEvent('download', { timeout }).catch(async () => {
     const errors = await page.getByRole('alert').allTextContents();
     const messages = await page.getByRole('status').allTextContents();
     throw new Error('No PDF utility download. Alerts: ' + JSON.stringify(errors) + '; Status: ' + JSON.stringify(messages));
@@ -143,4 +143,72 @@ test('all new Chinese/English landing routes and footer open-source attribution'
       await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://pdf.plainmile.com' + prefix + path + '/');
     }
   }
+});
+
+test('320-page book extracts its first and last text and preserves all pages when numbering', async ({ page }) => {
+  test.setTimeout(120000);
+  const book = await fixturePdf('Book chapter', 320);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, book);
+  await expect(page.getByTestId('utility-file-summary')).toContainText('320');
+  await expect(page.getByTestId('large-document-note')).toBeVisible();
+  const textFile = await getDownload(page, () => page.getByTestId('utility-run').click(), 90000);
+  const plain = textFile.bytes.toString('utf8');
+  expect(plain).toContain('Book chapter 1');
+  expect(plain).toContain('Book chapter 320');
+
+  await page.goto('/add-page-numbers/');
+  await upload(page, book);
+  await page.getByTestId('number-start').fill('201');
+  const numberedFile = await getDownload(page, () => page.getByTestId('utility-run').click(), 90000);
+  const numberedPdf = await PDFDocument.load(numberedFile.bytes);
+  expect(numberedPdf.getPageCount()).toBe(320);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, numberedFile.bytes);
+  const numbers = (await getDownload(page, () => page.getByTestId('utility-run').click(), 90000)).bytes.toString('utf8');
+  expect(numbers).toMatch(/\b201\b/);
+  expect(numbers).toMatch(/\b520\b/);
+});
+
+test('long PDF image exporter accepts late page range and blocks 61 images per batch', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/pdf-to-images/');
+  await upload(page, await fixturePdf('Page selection book', 320));
+  await page.getByRole('combobox', { name: 'Image format' }).selectOption('png');
+  await page.getByTestId('utility-page-ranges').fill('301-302');
+  const downloaded = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+  const zip = await JSZip.loadAsync(downloaded.bytes);
+  expect(Object.keys(zip.files).sort()).toEqual(['page-301.png','page-302.png']);
+  await page.getByTestId('utility-page-ranges').fill('1-61');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByRole('alert')).toContainText('up to 60 pages');
+});
+
+test('text import accepts more than 1 MB, rejects files larger than 5 MiB', async ({ page }) => {
+  await page.goto('/txt-to-pdf/');
+  const text = Buffer.alloc(1024 * 1024 + 1024, 65);
+  await page.getByTestId('utility-file-input').setInputFiles({ name: 'book.txt', mimeType: 'text/plain', buffer: text });
+  await expect.poll(async () => (await page.getByTestId('utility-text').inputValue()).length).toBe(text.length);
+  const tooBig = Buffer.alloc(5 * 1024 * 1024 + 1, 65);
+  await page.getByTestId('utility-file-input').setInputFiles({ name: 'huge.txt', mimeType: 'text/plain', buffer: tooBig });
+  await expect(page.getByRole('alert')).toContainText('supported file');
+});
+
+test('rasterizer refuses a giant page before allocating a large canvas', async ({ page }) => {
+  const huge = await PDFDocument.create();
+  huge.addPage([16000,16000]);
+  await page.goto('/pdf-to-images/');
+  await upload(page, Buffer.from(await huge.save()));
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByRole('alert')).toContainText('too large to rasterize');
+});
+
+test('compression has its own 120-page limit rather than blocking all PDF tools at 50', async ({ page }) => {
+  await page.goto('/compress-pdf/');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'long-compression.pdf', mimeType: 'application/pdf',
+    buffer: await fixturePdf('large scanner', 121),
+  });
+  await expect(page.getByRole('alert')).toContainText('120 pages');
+  await expect(page.getByTestId('utility-file-summary')).toHaveCount(0);
 });

@@ -3,9 +3,9 @@ import { renderWatermarkPng, watermarkTextFromOptions, WATERMARK_OPACITY } from 
 
 export const LIMITS = Object.freeze({
   maxFiles: 20,
-  maxFileBytes: 25 * 1024 * 1024,
-  maxCombinedBytes: 100 * 1024 * 1024,
-  maxPages: 200,
+  maxFileBytes: 100 * 1024 * 1024,
+  maxCombinedBytes: 200 * 1024 * 1024,
+  maxPages: 600,
   maxImagePixels: 36_000_000,
 });
 
@@ -18,7 +18,7 @@ export function isSupportedFile(file) {
 export async function readSourceFile(file) {
   if (!isSupportedFile(file)) throw new Error(`${file.name}: choose PDF, JPG, PNG or WebP files.`);
   if (!file.size || file.size > LIMITS.maxFileBytes) {
-    throw new Error(`${file.name}: files must be between 1 byte and 25 MB.`);
+    throw new Error(`${file.name}: files must be between 1 byte and 100 MB.`);
   }
   const isImage = IMAGE_TYPES.has(file.type);
   let bytes = new Uint8Array(await file.arrayBuffer());
