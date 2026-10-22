@@ -100,7 +100,7 @@ export const workspaceCopy = {
     invalidRange: 'Check the page ranges or pages per file (maximum 50 output PDFs).', estimate: '{files} PDF file(s) will be generated.',
   },
   zh: {
-    imageSettings: '图片页面设置', imageSettingsHint: '可在导入前设置；导入后更改时，需点击下方按钮重新应用到已有照片。', imagePaper: '纸张尺寸', imageFit: '适合图片', imageOrientation: '页面方向', imagePortrait: '纵向', imageLandscape: '横向', imageAuto: '自动匹配图片方向', imageMargin: '页面边距', imageMarginNone: '无边距（0 pt）', imageMarginNarrow: '窄（12 pt）', imageMarginNormal: '标准（30 pt）', imageMarginWide: '宽（48 pt）', imageLayoutDirty: '新设置尚未应用到已导入的照片。请先应用设置，再导出 PDF。', imageApply: '应用到已导入照片', imageApplied: '已更新照片页面设置，原有页面顺序和选择不变。', imageMustApply: '请先应用修改后的页面设置，再添加文件或导出。', outputName: '下载文件名',
+    imageSettings: '图片页面设置', imageSettingsHint: '可在导入前设置；导入后更改时，需点击下方按钮重新应用到已有照片。', imagePaper: '纸张尺寸', imageFit: '适合图片', imageFitAutoHint: '适合图片时自动匹配每张照片方向，无法手动强制横竖版。', imageOrientation: '页面方向', imagePortrait: '纵向', imageLandscape: '横向', imageAuto: '自动匹配图片方向', imageMargin: '页面边距', imageMarginNone: '无边距（0 pt）', imageMarginNarrow: '窄（12 pt）', imageMarginNormal: '标准（30 pt）', imageMarginWide: '宽（48 pt）', imageLayoutDirty: '新设置尚未应用到已导入的照片。请先应用设置，再导出 PDF。', imageApply: '应用到已导入照片', imageApplied: '已更新照片页面设置，原有页面顺序和选择不变。', imageMustApply: '请先应用修改后的页面设置，再添加文件或导出。', outputName: '下载文件名',
     exportOptions: '导出选项', exportOptionsHint: '默认无水印，只有主动开启后才会添加。', watermarkOn: '水印已开启',
     watermarkLabel: '添加文字水印（可选）', watermarkTextLabel: '水印文字', watermarkPlaceholder: '例如：内部资料',
     watermarkHelp: '导出时在每页添加居中斜向的浅色水印，缩略图为近似预览。',
