@@ -22,7 +22,7 @@ const COPY = {
     numbersHint: 'Adds selectable numbers to every page and preserves page size. Review annotations and digital signatures before using this modified file.',
     ready: 'Ready to download', noPdf: 'Select a PDF first.', noText: 'Enter text to convert.', sizeLimit: 'PDF up to 100 MB / 1,000 pages; TXT / Markdown up to 5 MB.', limitText: 'TXT / Markdown up to 5 MB; PDF output: up to 1,000 pages (300 image-based pages for CJK).', limitImages: 'PDF up to 100 MB / 1,000 pages; up to 60 selected image pages per batch.', limitCompression: 'PDF up to 100 MB; image-based compression supports up to 120 pages.', limitGeneral: 'PDF up to 100 MB / 1,000 pages.', heavyWarning: 'Large document: processing hundreds of pages may take time and require substantial device memory. Close other heavy tabs if necessary.', progressLabel: 'Processed {done} of {total} pages', tooMuchText: 'Text exceeds 5 MB.',
     noteUnicode: 'This PDF uses rasterized pages for non-Latin characters. Text in the result cannot be selected.', noteSearch: 'Output text is selectable.',
-    invalidFile: 'Please select a supported file and retry.', resultPreview: 'Extracted text preview', dropHint: 'Or drag a file here. Nothing is uploaded.', imported: 'Imported', batchLabel: 'Image batch {current} of {total}', batchPrev: 'Previous pages', batchNext: 'Next pages', batchCustom: 'Custom page selection', cancel: 'Cancel', cancelled: 'Cancelled', packaging: 'Packaging ZIP: {percent}%', replacedFailed: 'Import failed. Previous file remains: {name}.', modified: 'Edited after import', nextStep: 'Continue with another PDF tool', overlap: 'Page numbers are drawn over existing content. Check footers, stamps and existing numbers before using the result.',
+    invalidFile: 'Please select a supported file and retry.', resultPreview: 'Extracted text preview', dropHint: 'Or drag a file here. Nothing is uploaded.', imported: 'Imported', batchLabel: 'Image batch {current} of {total}', batchPrev: 'Previous pages', batchNext: 'Next pages', batchCustom: 'Custom page selection', cancel: 'Cancel', cancelling: 'Cancelling…', cancelled: 'Cancelled', packaging: 'Packaging ZIP: {percent}%', replacedFailed: 'Import failed. Previous file remains: {name}.', modified: 'Edited after import', nextStep: 'Continue with another PDF tool', overlap: 'Page numbers are drawn over existing content. Check footers, stamps and existing numbers before using the result.',
   },
   zh: {
     label: '仅在浏览器本地处理', file: '选择 PDF 文件', textFile: '导入 TXT / Markdown', uploaded: '已读取', pages: '页', choose: '选择文件', start: '开始处理', run: '转换并下载', busy: '正在本机处理…',
@@ -42,7 +42,7 @@ const COPY = {
     numbersHint: '在每页添加可选择的数字，保持纸张尺寸。重要文件请检查注释、数字签名等内容。',
     ready: '文件已经生成', noPdf: '请先选择 PDF 文件。', noText: '请输入待转换的文字。', sizeLimit: 'PDF 最多 100 MB / 1000 页；TXT / Markdown 最多 5 MB。', limitText: 'TXT / Markdown 最多 5 MB；输出最多 1000 页（中文等图片化内容最多 300 页）。', limitImages: 'PDF 最多 100 MB / 1000 页；每批最多导出选定的 60 页图片。', limitCompression: 'PDF 最多 100 MB；图片化压缩每次最多 120 页。', limitGeneral: 'PDF 最多 100 MB / 1000 页。', heavyWarning: '大文档提示：处理数百页时可能占用较多设备内存，并需要更长时间。建议关闭其他高负载标签页。', progressLabel: '已处理 {done} / {total} 页', tooMuchText: '文本内容超过 5 MB。',
     noteUnicode: '由于含有非拉丁文字，此 PDF 输出为图片页，无法选择和搜索文字。', noteSearch: '输出文字可选择和搜索。',
-    invalidFile: '请选择受支持的文件后重试。', resultPreview: '提取文字预览', dropHint: '也可以将文件拖到这里，不会上传至服务器。', imported: '已导入', batchLabel: '图片批次 {current} / {total}', batchPrev: '上一批', batchNext: '下一批', batchCustom: '自定义页码范围', cancel: '取消处理', cancelled: '已取消', packaging: '正在打包 ZIP：{percent}%', replacedFailed: '导入失败，当前仍是旧文件：{name}。', modified: '导入后已修改', nextStep: '继续使用其他 PDF 工具', overlap: '页码会直接叠加在原页面上，可能遮挡页脚、印章或已有页码，使用前请核对。',
+    invalidFile: '请选择受支持的文件后重试。', resultPreview: '提取文字预览', dropHint: '也可以将文件拖到这里，不会上传至服务器。', imported: '已导入', batchLabel: '图片批次 {current} / {total}', batchPrev: '上一批', batchNext: '下一批', batchCustom: '自定义页码范围', cancel: '取消处理', cancelling: '正在取消…', cancelled: '已取消', packaging: '正在打包 ZIP：{percent}%', replacedFailed: '导入失败，当前仍是旧文件：{name}。', modified: '导入后已修改', nextStep: '继续使用其他 PDF 工具', overlap: '页码会直接叠加在原页面上，可能遮挡页脚、印章或已有页码，使用前请核对。',
   },
 };
 
@@ -66,6 +66,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const [position, setPosition] = useState('bottom-center');
   const [fontSize, setFontSize] = useState('12');
   const [busy, setBusy] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [output, setOutput] = useState(null);
@@ -114,9 +116,10 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   }
   async function processFile() {
     if (busy) return;
-    clearOutput(); setBusy(true);
+    clearOutput(); setBusy(true); setProcessing(true); setCancelling(false);
     const controller = new AbortController();
     taskRef.current = controller;
+    const ensureNotCancelled = () => { if (controller.signal.aborted) throw new Error('Processing cancelled.'); };
     // Throttle UI re-renders for book-length documents.
     const report = (done, total) => {
       if (!controller.signal.aborted && (done === total || done === 1 || done % 10 === 0)) setProgress({ done, total });
@@ -127,6 +130,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
       let result;
       if (mode === 'pdf-to-images') {
         result = await convertPdfToImages(pdf, { format, scale: Number(scale), pages, locale, signal: controller.signal, onPackagingProgress: percent => setProgress({ packaging: percent }) }, report);
+        ensureNotCancelled();
         const selectedRange = pages.trim().replace(/[^0-9,\-]/g, '').replace(/,/g, '_').slice(0, 45);
         result.name = result.count === 1 ? `${pdfName}-${result.name}` : selectedRange ? `${pdfName}-pages-${selectedRange}.zip` : `${pdfName}-images.zip`;
         save(result);
@@ -136,12 +140,14 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           compact: { scale: .75, quality: .55 }, balanced: { scale: 1, quality: .7 }, clearer: { scale: 1.5, quality: .8 },
         }[compressMode];
         const candidate = await compressPdfRaster(pdf, { ...options, locale, signal: controller.signal }, report);
+        ensureNotCancelled();
         const next = { bytes: candidate.bytes, mime: 'application/pdf', name: `${pdfName}-compressed.pdf`, stats: candidate.stats };
         setOutput(next);
         setNotice(candidate.stats.smaller ? t.compressionReady : t.noSaving);
       } else if (isTextOutput) {
         const markdown = mode === 'pdf-to-markdown';
         const value = await extractPdfText(pdf, markdown, report, controller.signal);
+        ensureNotCancelled();
         setPreview(value.slice(0, 1600));
         result = { bytes: new TextEncoder().encode(value), mime: 'text/plain;charset=utf-8', name: `${pdfName}.${markdown ? 'md' : 'txt'}` };
         save(result);
@@ -150,17 +156,19 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         const encoded = new TextEncoder().encode(sourceText);
         if (!sourceText.trim()) throw new Error(t.noText);
         if (encoded.length > UTILITY_LIMITS.maxTextBytes) throw new Error(t.tooMuchText);
-        const created = await textToPdf(sourceText, mode === 'markdown-to-pdf');
+        const created = await textToPdf(sourceText, mode === 'markdown-to-pdf', { signal: controller.signal });
+        ensureNotCancelled();
         result = { bytes: created.bytes, name: `text-${mode === 'markdown-to-pdf' ? 'markdown' : 'plain'}.pdf` };
         save(result);
         setNotice(`${t.ready}: ${created.pageCount} ${t.pages} · ${formatBytes(created.bytes.length)} · ${created.searchable ? t.noteSearch : t.noteUnicode}`);
       } else if (mode === 'add-page-numbers') {
         result = { bytes: await addPageNumbers(pdf, { start: Number(start), position, fontSize: Number(fontSize), signal: controller.signal }, report), name: `${pdfName}-numbered.pdf` };
+        ensureNotCancelled();
         save(result);
         setNotice(`${t.ready}: ${pdf.count} ${t.pages}`);
       }
     } catch (e) { setError(translateUtilityError(e, locale)); }
-    finally { taskRef.current = null; setBusy(false); }
+    finally { taskRef.current = null; setBusy(false); setProcessing(false); setCancelling(false); }
   }
 
   const isImages = mode === 'pdf-to-images';
@@ -224,7 +232,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         <p className="utility-note">{description}</p>
         {mode === 'add-page-numbers' && <p className="utility-note" data-testid="page-overlap-warning">{t.overlap}</p>}
         <div className="utility-actions"><button type="button" className="button button-primary" data-testid="utility-run" onClick={processFile} disabled={busy || (isTextInput ? !sourceText.trim() : !pdf)}>{busy ? t.busy : isCompress ? t.start : t.run} ↓</button><span>{limitHint}</span></div>
-        {busy && <button type="button" className="button button-secondary" data-testid="utility-cancel" onClick={() => taskRef.current?.abort()}>{t.cancel}</button>}
+        {busy && processing && <button type="button" className="button button-secondary" data-testid="utility-cancel" disabled={cancelling} onClick={() => { setCancelling(true); taskRef.current?.abort(); }}>{cancelling ? t.cancelling : t.cancel}</button>}
         {busy && progress && <p className="utility-note" data-testid="utility-progress" aria-live="polite">{'packaging' in progress ? t.packaging.replace('{percent}', progress.packaging) : t.progressLabel.replace('{done}', progress.done).replace('{total}', progress.total)}</p>}
         {isCompress && output && <div className="utility-result" data-testid="compression-result">
           <div className="utility-comparison"><div><span>{t.original}</span><strong>{formatBytes(output.stats.original)}</strong></div><div><span>{t.result}</span><strong>{formatBytes(output.stats.candidate)}</strong></div><div><span>{t.saved}</span><strong className={output.stats.smaller ? 'utility-smaller' : 'utility-not-smaller'}>{output.stats.percent}%</strong></div></div>
