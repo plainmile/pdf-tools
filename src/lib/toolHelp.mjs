@@ -65,6 +65,7 @@ export const toolHelp = {
     'image-to-pdf': [
       ['Can I combine JPG, PNG and WebP images?', 'Yes. Add images together and reorder them; you can also mix them with existing PDF pages in the visual workspace.'],
       ['Will the images be stretched?', 'Images are fitted within an A4 portrait page without intentionally changing their aspect ratio.'],
+      ['Will my phone photo location be included?', 'For imported JPGs, common EXIF, XMP, IPTC and comment metadata is removed before PDF embedding. GPS may be in those fields. This is not a general metadata-removal tool for existing PDFs.'],
     ],
   },
   zh: {
@@ -131,6 +132,7 @@ export const toolHelp = {
     'image-to-pdf': [
       ['JPG、PNG、WebP 能混合生成 PDF 吗？', '可以。选择多张图片，调整顺序，也可以与已有 PDF 页面放在同一个工作台中。'],
       ['图片会被强行拉伸吗？', '不会故意改变图片比例，图片会按比例放入 A4 竖向页面中。'],
+      ['手机照片的定位信息会留在 PDF 中吗？', '导入 JPG 时，会移除常见 EXIF、XMP、IPTC 和 JPEG 注释元数据，其中可能有 GPS 位置信息。这并不是对已有 PDF 的通用元数据清除工具。'],
     ],
   },
 };

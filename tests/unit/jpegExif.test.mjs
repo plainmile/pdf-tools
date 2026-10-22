@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement } from '../../src/lib/jpegExif.mjs';
+import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement, stripJpegPrivateMetadata } from '../../src/lib/jpegExif.mjs';
 
 function exifSegment(orientation, endian = 'II') {
   const payload = new Uint8Array(32);
@@ -75,4 +75,26 @@ test('EXIF Orientation transforms original corner colors into the specified visu
       ? { width: 160, height: 240 } : { width: 240, height: 160 });
   }
   assert.throws(() => jpegPdfPlacement(rect, 0), /Invalid JPEG/);
+});
+
+test('strip JPEG EXIF/XMP, IPTC and comments without changing compressed scan bytes', () => {
+  const app0 = Uint8Array.from([0xff, 0xe0, 0, 4, 0x4a, 0x46]);
+  const app2 = Uint8Array.from([0xff, 0xe2, 0, 5, 0x49, 0x43, 0x43]);
+  const app14 = Uint8Array.from([0xff, 0xee, 0, 5, 0x41, 0x44, 0x4f]);
+  const exif = exifSegment(6);
+  const app13 = Uint8Array.from([0xff, 0xed, 0, 7, 0x50, 0x52, 0x49, 0x56, 0x31]);
+  const comment = Uint8Array.from([0xff, 0xfe, 0, 7, 0x47, 0x50, 0x53, 0x21, 0x21]);
+  const scan = Uint8Array.from([0xff, 0xda, 0, 8, 1, 1, 0, 0, 63, 0, 0xf0, 0xff, 0, 0x00, 0xff, 0xd9]);
+  const withPrivateHeaders = Uint8Array.from([0xff, 0xd8, ...app0, ...exif, ...app2, ...app13, ...comment, ...app14, ...scan]);
+  const cleaned = stripJpegPrivateMetadata(withPrivateHeaders);
+  assert.equal(jpegExifOrientation(withPrivateHeaders), 6);
+  assert.deepEqual(cleaned, Uint8Array.from([0xff, 0xd8, ...app0, ...app2, ...app14, ...scan]));
+  assert.equal(jpegExifOrientation(cleaned), 1);
+  assert.equal(stripJpegPrivateMetadata(cleaned), cleaned);
+});
+
+test('reject malformed headers rather than embedding uninspected private EXIF metadata', () => {
+  assert.throws(() => stripJpegPrivateMetadata(Uint8Array.from([1, 2, 3])), /safely removed/);
+  assert.throws(() => stripJpegPrivateMetadata(Uint8Array.from([0xff, 0xd8, 0xff, 0xe1, 0xff, 0xff, 0x47, 0x50, 0x53])), /safely removed/);
+  assert.throws(() => stripJpegPrivateMetadata(Uint8Array.from([0xff, 0xd8, 0xff, 0xe1, 0, 5, 0x45, 0x58, 0x49])), /safely removed/);
 });
