@@ -140,11 +140,14 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     const items = [...(incoming ?? [])];
     if (!items.length || busy) return;
     setError(''); setNotice(''); setBusy(true);
+    // Once every page has been deleted, a successful new import starts a fresh
+    // workspace. Keep the old undo history intact until that import succeeds.
+    const replacingDeletedPages = pages.length === 0 && sources.length > 0;
     try {
-      if (sources.length + items.length > LIMITS.maxFiles) throw new Error(interpolate(t.errorFiles, { n: LIMITS.maxFiles }));
+      if ((replacingDeletedPages ? 0 : sources.length) + items.length > LIMITS.maxFiles) throw new Error(interpolate(t.errorFiles, { n: LIMITS.maxFiles }));
       if (items.some((file) => !isSupportedFile(file))) throw new Error(t.errorTypes);
       const incomingBytes = items.reduce((total, file) => total + file.size, 0);
-      if (bytesInMemory + incomingBytes > LIMITS.maxCombinedBytes) throw new Error(t.errorCombined);
+      if ((replacingDeletedPages ? 0 : bytesInMemory) + incomingBytes > LIMITS.maxCombinedBytes) throw new Error(t.errorCombined);
       const nextSources = [];
       const nextPages = [];
       for (const file of items) {
@@ -159,8 +162,14 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         const count = nextPages.length;
         setRanges(count <= 2 ? `1-${count}` : `1-2, 3-${count}`);
       }
-      setSources((previous) => [...previous, ...nextSources]);
-      setHistory((previous) => commitHistory(previous, [...previous.present, ...nextPages]));
+      if (replacingDeletedPages) {
+        releasePreviewDocuments();
+        setSources(nextSources);
+        setHistory(makeHistoryState(nextPages));
+      } else {
+        setSources((previous) => [...previous, ...nextSources]);
+        setHistory((previous) => commitHistory(previous, [...previous.present, ...nextPages]));
+      }
       resetSelection();
       setNotice(locale === 'en'
         ? `Added ${nextSources.length} ${nextSources.length === 1 ? 'file' : 'files'} and ${nextPages.length} ${nextPages.length === 1 ? 'page' : 'pages'}.`
@@ -234,7 +243,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     if (group.length) commit((previous) => group.length === 1 ? movePage(previous, group[0], targetId) : movePageGroup(previous, group, targetId));
     setDragged(null);
   };
-  const largeWorkspace = pages.length >= 250 || bytesInMemory >= 100 * 1024 * 1024;
+  const largeWorkspace = pages.length > 0 && (pages.length >= 250 || bytesInMemory >= 100 * 1024 * 1024);
   const selectedText = locale === 'zh' ? `${selectedCount} ${t.selected}` : `${selectedCount} ${selectedCount === 1 ? 'page' : 'pages'} selected`;
   const pageName = (number) => locale === 'zh' ? `第 ${number} 页` : `Page ${number}`;
 
@@ -282,6 +291,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
             <h2>{t.dropTitle}</h2><p>{t.dropSub}</p>
             <button type="button" className="button button-primary" disabled={busy} onClick={() => inputRef.current?.click()}>{busy ? t.opening : t.choose}</button>
             <p className="drop-limits">{t.limits}</p><div className="empty-privacy">✓ {t.private}</div>
+            {sources.length > 0 && <p className="utility-note" data-testid="empty-history-hint">{t.emptyHistoryHint}</p>}
+            {history.past.length > 0 && <button type="button" className="button button-secondary button-small" data-testid="undo-all-deleted" disabled={busy} onClick={() => { setHistory(undoHistory); resetSelection(); setError(''); setNotice(''); }}>{t.undo}</button>}
             {sources.length > 0 && <button type="button" className="button button-secondary button-small" onClick={clearAll} disabled={busy}>{t.reset}</button>}
           </div>
         ) : (
