@@ -18,6 +18,19 @@ async function upload(page, bytes) {
   await expect(page.getByTestId('utility-file-summary')).toBeVisible({ timeout: 20000 });
 }
 
+async function generateTextPdfAndDownload(page, timeout = 18000) {
+  const downloads = [];
+  const track = item => downloads.push(item.suggestedFilename());
+  page.on('download', track);
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible({ timeout });
+  await expect.poll(() => page.getByTestId('utility-pdf-preview').locator('canvas')
+    .evaluate(canvas => canvas.width), { timeout }).toBeGreaterThan(0);
+  expect(downloads).toEqual([]);
+  page.off('download', track);
+  return getDownload(page, () => page.getByTestId('utility-pdf-download').click());
+}
+
 async function getDownload(page, action, timeout = 6000) {
   const event = page.waitForEvent('download', { timeout }).catch(async () => {
     const errors = await page.getByRole('alert').allTextContents();
@@ -56,8 +69,9 @@ test('compression never auto-downloads, blocks a larger PDF, and shows actual by
     throw new Error('Compression output missing. Alerts: ' + JSON.stringify(await page.getByRole('alert').allTextContents()));
   });
   await expect(page.getByTestId('compression-download')).toBeDisabled();
-  await expect(page.getByRole('status')).toContainText('No size reduction');
+  await expect(page.getByRole('status')).toContainText('Stopped early');
   await expect(page.getByTestId('compression-change-label')).toHaveText('Size increase');
+  await expect(page.getByTestId('compression-result')).toContainText('At least');
   await expect(page.getByTestId('compression-change-value')).not.toContainText('-');
 
   const rawPng = await page.evaluate(() => {
@@ -106,7 +120,7 @@ test('PDF to TXT and Markdown extract actual text, reject empty scanned pages', 
 test('TXT to PDF yields selectable text; Markdown to PDF supports Chinese via local raster pages', async ({ page }) => {
   await page.goto('/txt-to-pdf/');
   await page.getByTestId('utility-text').fill('Hello selectable world');
-  const latin = await getDownload(page, () => page.getByTestId('utility-run').click());
+  const latin = await generateTextPdfAndDownload(page);
   const pdf = await PDFDocument.load(latin.bytes);
   expect(pdf.getPageCount()).toBe(1);
   await page.goto('/pdf-to-txt/');
@@ -115,7 +129,7 @@ test('TXT to PDF yields selectable text; Markdown to PDF supports Chinese via lo
   expect(extracted.bytes.toString('utf8')).toContain('Hello selectable world');
   await page.goto('/zh/markdown-to-pdf/');
   await page.getByTestId('utility-text').fill('# 中文标题\n\n- 第一项\n- 第二项');
-  const cjk = await getDownload(page, () => page.getByTestId('utility-run').click());
+  const cjk = await generateTextPdfAndDownload(page);
   const result = await PDFDocument.load(cjk.bytes);
   expect(result.getPageCount()).toBe(1);
   const resources = result.context.lookup(result.getPage(0).node.Resources(), PDFDict);
@@ -249,7 +263,7 @@ test('TXT drag and drop opens editable text, and Clear empties imported source',
   });
   await expect(page.getByTestId('utility-text')).toHaveValue('Local book text input');
   await expect(page.getByTestId('text-file-summary')).toContainText('chapter.txt');
-  const pdf = await getDownload(page, () => page.getByTestId('utility-run').click());
+  const pdf = await generateTextPdfAndDownload(page);
   expect((await PDFDocument.load(pdf.bytes)).getPageCount()).toBe(1);
   await page.getByTestId('text-file-summary').getByRole('button', { name: 'Clear' }).click();
   await expect(page.getByTestId('utility-text')).toHaveValue('');
@@ -365,7 +379,7 @@ test('dragging multiple PDFs into a single-file converter explains rejection, pr
 test('English Markdown quotes, rules and numbered steps produce searchable PDF text', async ({ page }) => {
   await page.goto('/markdown-to-pdf/');
   await page.getByTestId('utility-text').fill('# Weekly report\n\n> Important notice\n\n---\n\n1. First step\n2) Second step');
-  const result = await getDownload(page, () => page.getByTestId('utility-run').click());
+  const result = await generateTextPdfAndDownload(page);
   await expect(page.getByRole('status')).toContainText('Output text is selectable');
   await page.goto('/pdf-to-txt/');
   await upload(page, result.bytes);
@@ -456,5 +470,49 @@ test('Chinese compression honestly calls larger raster PDFs an increase, never a
   await expect(page.getByTestId('compression-result')).toBeVisible();
   await expect(page.getByTestId('compression-download')).toBeDisabled();
   await expect(page.getByTestId('compression-change-label')).toHaveText('体积增加');
+  await expect(page.getByRole('status')).toContainText('提前停止');
   await expect(page.getByTestId('compression-change-value')).not.toContainText('-');
+});
+
+
+test('text conversion previews PDF before download, clears stale preview on edits', async ({ page }) => {
+  await page.goto('/txt-to-pdf/');
+  const downloads = [];
+  page.on('download', d => downloads.push(d.suggestedFilename()));
+  await page.getByTestId('utility-text').fill('First version for preview');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible();
+  await expect.poll(() => page.getByTestId('utility-pdf-preview').locator('canvas')
+    .evaluate(canvas => canvas.width)).toBeGreaterThan(0);
+  expect(downloads).toEqual([]);
+  await page.getByTestId('utility-text').fill('Second version');
+  await expect(page.getByTestId('text-pdf-result')).toHaveCount(0);
+  const updated = await generateTextPdfAndDownload(page);
+  expect(updated.name).toBe('plainmile-text-plain.pdf');
+  const generated = await PDFDocument.load(updated.bytes);
+  expect(generated.getPageCount()).toBe(1);
+});
+
+test('imported TXT filenames are retained; Chinese text PDF offers preview and explicit download', async ({ page }) => {
+  await page.goto('/zh/txt-to-pdf/');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'report 2026.txt', mimeType: 'text/plain', buffer: Buffer.from('Simple text preview'),
+  });
+  const pdf = await generateTextPdfAndDownload(page);
+  expect(pdf.name).toBe('report-2026-plain.pdf');
+  await expect(page.getByTestId('utility-pdf-preview')).toContainText('第 1 页预览');
+});
+
+test('changing Markdown after rendering invalidates the old PDF and download', async ({ page }) => {
+  await page.goto('/markdown-to-pdf/');
+  await page.getByTestId('utility-text').fill('# Original document');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('utility-pdf-download')).toBeVisible();
+  await page.getByTestId('utility-text').fill('# Changed document');
+  await expect(page.getByTestId('utility-pdf-download')).toHaveCount(0);
+  const result = await generateTextPdfAndDownload(page);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, result.bytes);
+  const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
+  expect(extracted.bytes.toString('utf8')).toContain('Changed document');
 });
