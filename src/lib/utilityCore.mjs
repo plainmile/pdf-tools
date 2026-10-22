@@ -99,7 +99,7 @@ export function requestedPages(input, count) {
   if (!input || !input.trim()) return Array.from({ length: count }, (_, i) => i + 1);
   const output = [];
   const seen = new Set();
-  for (const { start, end } of parsePageRanges(input, count)) {
+  for (const { start, end } of parsePageRanges(input, count, UTILITY_LIMITS.maxImagePagesPerRun)) {
     for (let page = start; page <= end; page++) {
       if (seen.has(page)) continue;
       seen.add(page);

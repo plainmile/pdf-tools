@@ -103,3 +103,10 @@ test('English Markdown quotes, rules and numbered lists preserve searchable ASCI
   assert.equal(blocks[3].text, '1. First');
   assert.equal(blocks[4].text, '2. Second');
 });
+
+test('60 separate image pages are valid while 61 separate ranges still fail safely', () => {
+  const sixty = Array.from({ length: 60 }, (_, index) => index * 2 + 1);
+  assert.deepEqual(requestedPages(sixty.join(', '), 200), sixty);
+  const sixtyOne = Array.from({ length: 61 }, (_, index) => index * 2 + 1);
+  assert.throws(() => requestedPages(sixtyOne.join(', '), 200), /maximum of 60 ranges/);
+});
