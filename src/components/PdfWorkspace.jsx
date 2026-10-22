@@ -19,7 +19,10 @@ function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPre
     if (!target) return;
     if (!('IntersectionObserver' in window)) { setVisible(true); return; }
     const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) setVisible(true);
+      // Load only thumbnails near the viewport, and release them after scrolling away.
+      // The page-preview container has a fixed height, so unloading cannot move the scrollbar.
+      const entry = entries.find((item) => item.target === target);
+      if (entry) setVisible(entry.isIntersecting);
     }, { rootMargin: '240px' });
     observer.observe(target);
     return () => observer.disconnect();
@@ -29,39 +32,52 @@ function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPre
     if (!visible || !source) return;
     let cancelled = false;
     let renderTask;
+    let canvas;
+    setFailed(false); // Retry on re-enter and after a rotation changes the page.
     (async () => {
       const documentProxy = await getPreviewDoc(source);
       if (cancelled) return;
       const pdfPage = await documentProxy.getPage(pageRef.pageIndex + 1);
-      if (cancelled) return;
-      const rotation = (pdfPage.rotate + pageRef.rotation) % 360;
-      const original = pdfPage.getViewport({ scale: 1, rotation });
-      const scale = Math.min(154 / original.width, 190 / original.height, 1);
-      const viewport = pdfPage.getViewport({ scale, rotation });
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const context = canvas.getContext('2d');
-      if (!context) return;
-      const density = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.ceil(viewport.width * density);
-      canvas.height = Math.ceil(viewport.height * density);
-      canvas.style.width = `${viewport.width}px`;
-      canvas.style.height = `${viewport.height}px`;
-      context.setTransform(density, 0, 0, density, 0, 0);
-      renderTask = pdfPage.render({ canvasContext: context, canvas, viewport });
-      try { await renderTask.promise; }
-      finally { pdfPage.cleanup(); }
+      if (cancelled) { pdfPage.cleanup(); return; }
+      try {
+        const rotation = (pdfPage.rotate + pageRef.rotation) % 360;
+        const original = pdfPage.getViewport({ scale: 1, rotation });
+        const scale = Math.min(154 / original.width, 190 / original.height, 1);
+        const viewport = pdfPage.getViewport({ scale, rotation });
+        canvas = canvasRef.current;
+        if (!canvas || cancelled) return;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Canvas unavailable.');
+        const density = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.ceil(viewport.width * density);
+        canvas.height = Math.ceil(viewport.height * density);
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
+        context.setTransform(density, 0, 0, density, 0, 0);
+        renderTask = pdfPage.render({ canvasContext: context, canvas, viewport });
+        await renderTask.promise;
+      } finally { pdfPage.cleanup(); }
     })().catch((error) => {
       if (!cancelled && error?.name !== 'RenderingCancelledException') setFailed(true);
     });
-    return () => { cancelled = true; renderTask?.cancel(); };
+    return () => {
+      cancelled = true;
+      renderTask?.cancel();
+      // Releasing the backing store is intentional: hiding the canvas with CSS
+      // alone retains its bitmap, which adds up when a user scrolls 320+ pages.
+      if (canvas) {
+        canvas.width = 0;
+        canvas.height = 0;
+        canvas.style.width = '';
+        canvas.style.height = '';
+      }
+    };
   }, [getPreviewDoc, pageRef.pageIndex, pageRef.rotation, source, visible]);
 
   return (
     <div className="page-preview" ref={targetRef}>
-      {failed ? <div className="preview-fallback" aria-label={t.previewFail}>{t.previewFail}</div> : (
-        <canvas ref={canvasRef} role="img" aria-label={locale === 'zh' ? `${source?.name ?? 'PDF'} 第 ${pageRef.pageIndex + 1} 页预览` : `${source?.name ?? 'PDF'} page ${pageRef.pageIndex + 1} preview`} />
-      )}
+      {visible && <canvas ref={canvasRef} style={failed ? { display: 'none' } : undefined} role="img" aria-label={locale === 'zh' ? `${source?.name ?? 'PDF'} 第 ${pageRef.pageIndex + 1} 页预览` : `${source?.name ?? 'PDF'} page ${pageRef.pageIndex + 1} preview`} />}
+      {visible && failed && <div className="preview-fallback" aria-label={t.previewFail}>{t.previewFail}</div>}
       {!visible && <div className="preview-loading" aria-hidden="true" />}
       {watermarkPreview && <span className="page-watermark-preview" aria-hidden="true">{watermarkPreview}</span>}
     </div>
