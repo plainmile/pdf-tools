@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { loadPdf, convertPdfToImages, compressPdfRaster, extractPdfText, textToPdf, addPageNumbers } from '../lib/pdfUtilities.mjs';
 import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, translateUtilityError } from '../lib/utilityCore.mjs';
 import { saveDownload } from '../lib/pdfEngine.mjs';
@@ -13,6 +13,8 @@ const COPY = {
     compressionWarning: 'This method converts every PDF page into a JPEG image. Text stops being searchable or selectable. Forms, annotations, hyperlinks and signatures are not preserved. Keep the original and inspect the output.',
     original: 'Original', result: 'Result', saved: 'Saved', increased: 'Size increase', unchanged: 'No change', noSaving: 'No size reduction. This file was not downloaded; try a lower resolution or keep the original.',
     compressionReady: 'The output is smaller. Check text sharpness before using it.',
+    noSavingEarly: 'Stopped early: JPEG data already exceeds the original size. Keep the original or lower the resolution.',
+    compressionLowerBound: 'At least', previewAction: 'Generate PDF preview', previewTitle: 'Generated PDF preview', previewFirst: 'Previewing page 1 of {pages}', previewFailed: 'Preview unavailable; you can still download the PDF.', downloadPdf: 'Download PDF',
     textWarning: 'Extracts existing selectable PDF text only, not OCR. Columns, tables and heading formatting may not be preserved. Check the exported text.',
     markdownWarning: 'Markdown conversion is approximate; headings are inferred from font size. Complex PDF layout cannot be faithfully recovered.',
     textLabel: 'Text to convert', textPlaceholder: 'Paste text here or import a .txt / .md file…',
@@ -20,7 +22,7 @@ const COPY = {
     markdownInputHint: 'Supports simple headings, paragraphs, lists, quotes and code blocks; does not render external images, HTML, full tables or complex Markdown. Non-Latin scripts are drawn as page images.',
     pageStart: 'Starting number', pagePosition: 'Position', pageSize: 'Font size', bottomCenter: 'Bottom center', bottomRight: 'Bottom right', topRight: 'Top right',
     numbersHint: 'Adds selectable numbers to every page and preserves page size. Review annotations and digital signatures before using this modified file.',
-    ready: 'Ready to download', noPdf: 'Select a PDF first.', noText: 'Enter text to convert.', sizeLimit: 'PDF up to 100 MB / 1,000 pages; TXT / Markdown up to 5 MB.', limitText: 'TXT / Markdown up to 5 MB; PDF output: up to 1,000 pages (300 image-based pages for CJK).', limitImages: 'PDF up to 100 MB / 1,000 pages; up to 60 selected image pages per batch.', limitCompression: 'PDF up to 100 MB; image-based compression supports up to 120 pages.', limitGeneral: 'PDF up to 100 MB / 1,000 pages.', heavyWarning: 'Large document: processing hundreds of pages may take time and require substantial device memory. Close other heavy tabs if necessary.', progressLabel: 'Processed {done} of {total} pages', tooMuchText: 'Text exceeds 5 MB.',
+    ready: 'Ready to download', noPdf: 'Select a PDF first.', noText: 'Enter text to convert.', sizeLimit: 'PDF up to 100 MB / 1,000 pages; TXT / Markdown up to 5 MB.', limitText: 'TXT / Markdown up to 5 MB; PDF output: up to 1,000 pages (300 image-based pages for CJK).', limitImages: 'PDF up to 100 MB / 1,000 pages; up to 60 selected image pages per batch.', limitCompression: 'PDF up to 100 MB / 120 pages; JPEG output safety budget 96 MB.', limitGeneral: 'PDF up to 100 MB / 1,000 pages.', heavyWarning: 'Large document: processing hundreds of pages may take time and require substantial device memory. Close other heavy tabs if necessary.', progressLabel: 'Processed {done} of {total} pages', tooMuchText: 'Text exceeds 5 MB.',
     noteUnicode: 'This PDF uses rasterized pages for non-Latin characters. Text in the result cannot be selected.', noteSearch: 'Output text is selectable.',
     invalidFile: 'Please select a supported file and retry.', resultPreview: 'Extracted text preview', dropHint: 'Or drag a file here. Nothing is uploaded.', imported: 'Imported', multipleFiles: 'This converter accepts one file at a time. No file was replaced; choose a single file.', batchLabel: 'Image batch {current} of {total}', batchPrev: 'Previous pages', batchNext: 'Next pages', batchCustom: 'Custom page selection', cancel: 'Cancel', cancelling: 'Cancelling…', cancelled: 'Cancelled', packaging: 'Packaging ZIP: {percent}%', replacedFailed: 'Import failed. Previous file remains: {name}.', modified: 'Edited after import', nextStep: 'Continue with another PDF tool', overlap: 'Page numbers are drawn over existing content. Check footers, stamps and existing numbers before using the result.',
   },
@@ -33,6 +35,8 @@ const COPY = {
     compressionWarning: '此压缩方式会将 PDF 各页重新渲染为 JPEG 图片。输出将失去文本搜索和选中能力，也无法保留表单、注释、链接及数字签名。请保存原文件并检查输出画质。',
     original: '原文件', result: '输出文件', saved: '节省', increased: '体积增加', unchanged: '无变化', noSaving: '未缩小文件，因此没有自动下载。可尝试降低清晰度，或保留原文件。',
     compressionReady: '输出文件确实更小。请先核对文字清晰度。',
+    noSavingEarly: '已提前停止：JPEG 数据已不小于原文件，继续转换也不能节省空间。请保留原文件或降低清晰度。',
+    compressionLowerBound: '至少', previewAction: '生成 PDF 预览', previewTitle: '生成的 PDF 预览', previewFirst: '第 1 页预览（共 {pages} 页）', previewFailed: '无法生成预览，但仍可下载 PDF。', downloadPdf: '下载 PDF',
     textWarning: '只提取 PDF 中已有的可选择文字，不具备 OCR。多栏、表格和段落顺序可能不准确，请核对导出内容。',
     markdownWarning: 'Markdown 为近似转换：根据字号推测标题，复杂 PDF 的版式无法完整还原。',
     textLabel: '需要转换的文本', textPlaceholder: '粘贴文字，或选择 .txt / .md 文件……',
@@ -40,11 +44,59 @@ const COPY = {
     markdownInputHint: '支持基础标题、段落、列表、引用和代码块；不支持远程图片、HTML、完整表格或复杂 Markdown。中文会渲染为图片页。',
     pageStart: '起始页码', pagePosition: '页码位置', pageSize: '字号', bottomCenter: '底部居中', bottomRight: '右下角', topRight: '右上角',
     numbersHint: '在每页添加可选择的数字，保持纸张尺寸。重要文件请检查注释、数字签名等内容。',
-    ready: '文件已经生成', noPdf: '请先选择 PDF 文件。', noText: '请输入待转换的文字。', sizeLimit: 'PDF 最多 100 MB / 1000 页；TXT / Markdown 最多 5 MB。', limitText: 'TXT / Markdown 最多 5 MB；输出最多 1000 页（中文等图片化内容最多 300 页）。', limitImages: 'PDF 最多 100 MB / 1000 页；每批最多导出选定的 60 页图片。', limitCompression: 'PDF 最多 100 MB；图片化压缩每次最多 120 页。', limitGeneral: 'PDF 最多 100 MB / 1000 页。', heavyWarning: '大文档提示：处理数百页时可能占用较多设备内存，并需要更长时间。建议关闭其他高负载标签页。', progressLabel: '已处理 {done} / {total} 页', tooMuchText: '文本内容超过 5 MB。',
+    ready: '文件已经生成', noPdf: '请先选择 PDF 文件。', noText: '请输入待转换的文字。', sizeLimit: 'PDF 最多 100 MB / 1000 页；TXT / Markdown 最多 5 MB。', limitText: 'TXT / Markdown 最多 5 MB；输出最多 1000 页（中文等图片化内容最多 300 页）。', limitImages: 'PDF 最多 100 MB / 1000 页；每批最多导出选定的 60 页图片。', limitCompression: 'PDF 最多 100 MB / 120 页；JPEG 数据累计上限 96 MB。', limitGeneral: 'PDF 最多 100 MB / 1000 页。', heavyWarning: '大文档提示：处理数百页时可能占用较多设备内存，并需要更长时间。建议关闭其他高负载标签页。', progressLabel: '已处理 {done} / {total} 页', tooMuchText: '文本内容超过 5 MB。',
     noteUnicode: '由于含有非拉丁文字，此 PDF 输出为图片页，无法选择和搜索文字。', noteSearch: '输出文字可选择和搜索。',
     invalidFile: '请选择受支持的文件后重试。', resultPreview: '提取文字预览', dropHint: '也可以将文件拖到这里，不会上传至服务器。', imported: '已导入', multipleFiles: '此转换工具每次只接受一个文件。当前文件未改变，请只选择一个文件。', batchLabel: '图片批次 {current} / {total}', batchPrev: '上一批', batchNext: '下一批', batchCustom: '自定义页码范围', cancel: '取消处理', cancelling: '正在取消…', cancelled: '已取消', packaging: '正在打包 ZIP：{percent}%', replacedFailed: '导入失败，当前仍是旧文件：{name}。', modified: '导入后已修改', nextStep: '继续使用其他 PDF 工具', overlap: '页码会直接叠加在原页面上，可能遮挡页脚、印章或已有页码，使用前请核对。',
   },
 };
+
+
+function PdfFirstPagePreview({ bytes, pageCount, t, locale }) {
+  const canvasRef = useRef(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let closed = false, task, loadingTask, pdfPage;
+    const canvas = canvasRef.current;
+    setFailed(false);
+    (async () => {
+      const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+      if (closed) return;
+      pdfjs.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs';
+      loadingTask = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true });
+      const doc = await loadingTask.promise;
+      if (closed) return;
+      pdfPage = await doc.getPage(1);
+      if (closed) return;
+      const base = pdfPage.getViewport({ scale: 1 });
+      const viewport = pdfPage.getViewport({ scale: Math.min(1, 550 / base.width) });
+      const density = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.ceil(viewport.width * density);
+      canvas.height = Math.ceil(viewport.height * density);
+      canvas.style.width = viewport.width + 'px';
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Preview canvas unavailable');
+      ctx.setTransform(density, 0, 0, density, 0, 0);
+      task = pdfPage.render({ canvasContext: ctx, canvas, viewport });
+      await task.promise;
+    })().catch(error => {
+      if (!closed && error?.name !== 'RenderingCancelledException') setFailed(true);
+    });
+    return () => {
+      closed = true;
+      task?.cancel();
+      pdfPage?.cleanup();
+      loadingTask?.destroy().catch(() => {});
+      if (canvas) { canvas.width = 0; canvas.height = 0; }
+    };
+  }, [bytes]);
+  return <div className="utility-preview" data-testid="utility-pdf-preview">
+    <strong>{t.previewTitle}</strong>
+    <p className="utility-note">{t.previewFirst.replace('{pages}', pageCount)}</p>
+    <canvas ref={canvasRef} role="img" aria-label={locale === 'zh' ? 'PDF 首页预览' : 'PDF first page preview'}
+      style={{ maxWidth: '100%', height: 'auto', display: failed ? 'none' : 'block' }} />
+    {failed && <p className="utility-note">{t.previewFailed}</p>}
+  </div>;
+}
 
 const TEXT_INPUT_MODES = new Set(['txt-to-pdf', 'markdown-to-pdf']);
 const TEXT_OUTPUT_MODES = new Set(['pdf-to-txt', 'pdf-to-markdown']);
@@ -141,9 +193,9 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         }[compressMode];
         const candidate = await compressPdfRaster(pdf, { ...options, locale, signal: controller.signal }, report);
         ensureNotCancelled();
-        const next = { bytes: candidate.bytes, mime: 'application/pdf', name: `${pdfName}-compressed.pdf`, stats: candidate.stats };
-        setOutput(next);
-        setNotice(candidate.stats.smaller ? t.compressionReady : t.noSaving);
+        setOutput({ bytes: candidate.stats.smaller ? candidate.bytes : null,
+          mime: 'application/pdf', name: `${pdfName}-compressed.pdf`, stats: candidate.stats });
+        setNotice(candidate.stats.smaller ? t.compressionReady : candidate.stats.lowerBound ? t.noSavingEarly : t.noSaving);
       } else if (isTextOutput) {
         const markdown = mode === 'pdf-to-markdown';
         const value = await extractPdfText(pdf, markdown, report, controller.signal);
@@ -158,8 +210,10 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         if (encoded.length > UTILITY_LIMITS.maxTextBytes) throw new Error(t.tooMuchText);
         const created = await textToPdf(sourceText, mode === 'markdown-to-pdf', { signal: controller.signal });
         ensureNotCancelled();
-        result = { bytes: created.bytes, name: `text-${mode === 'markdown-to-pdf' ? 'markdown' : 'plain'}.pdf` };
-        save(result);
+        const baseName = textFileName ? sanitizeFilename(textFileName) : 'plainmile-text';
+        result = { bytes: created.bytes, pageCount: created.pageCount,
+          name: `${baseName}-${mode === 'markdown-to-pdf' ? 'markdown' : 'plain'}.pdf` };
+        setOutput(result);
         setNotice(`${t.ready}: ${created.pageCount} ${t.pages} · ${formatBytes(created.bytes.length)} · ${created.searchable ? t.noteSearch : t.noteUnicode}`);
       } else if (mode === 'add-page-numbers') {
         result = { bytes: await addPageNumbers(pdf, { start: Number(start), position, fontSize: Number(fontSize), signal: controller.signal }, report), name: `${pdfName}-numbered.pdf` };
@@ -236,12 +290,17 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         </div>}
         <p className="utility-note">{description}</p>
         {mode === 'add-page-numbers' && <p className="utility-note" data-testid="page-overlap-warning">{t.overlap}</p>}
-        <div className="utility-actions"><button type="button" className="button button-primary" data-testid="utility-run" onClick={processFile} disabled={busy || (isTextInput ? !sourceText.trim() : !pdf)}>{busy ? t.busy : isCompress ? t.start : t.run} ↓</button><span>{limitHint}</span></div>
+        <div className="utility-actions"><button type="button" className="button button-primary" data-testid="utility-run" onClick={processFile} disabled={busy || (isTextInput ? !sourceText.trim() : !pdf)}>{busy ? t.busy : isCompress ? t.start : isTextInput ? t.previewAction : t.run}{isTextInput || isCompress ? '' : ' ↓'}</button><span>{limitHint}</span></div>
         {busy && processing && <button type="button" className="button button-secondary" data-testid="utility-cancel" disabled={cancelling} onClick={() => { setCancelling(true); taskRef.current?.abort(); }}>{cancelling ? t.cancelling : t.cancel}</button>}
         {progress && (busy || notice) && <p className="utility-note" data-testid="utility-progress" aria-live="polite">{'packaging' in progress ? t.packaging.replace('{percent}', progress.packaging) : t.progressLabel.replace('{done}', progress.done).replace('{total}', progress.total)}</p>}
         {isCompress && output && <div className="utility-result" data-testid="compression-result">
-          <div className="utility-comparison"><div><span>{t.original}</span><strong>{formatBytes(output.stats.original)}</strong></div><div><span>{t.result}</span><strong>{formatBytes(output.stats.candidate)}</strong></div><div><span data-testid="compression-change-label">{output.stats.smaller ? t.saved : output.stats.candidate > output.stats.original ? t.increased : t.unchanged}</span><strong data-testid="compression-change-value" className={output.stats.smaller ? 'utility-smaller' : output.stats.candidate > output.stats.original ? 'utility-not-smaller' : ''}>{Math.abs(output.stats.percent)}%</strong></div></div>
-          <button type="button" className="button button-primary" data-testid="compression-download" disabled={!output.stats.smaller} onClick={() => save(output)}>{t.download} ↓</button>
+          <div className="utility-comparison"><div><span>{t.original}</span><strong>{formatBytes(output.stats.original)}</strong></div><div><span>{t.result}</span><strong>{output.stats.lowerBound ? `${t.compressionLowerBound} ` : ''}{formatBytes(output.stats.candidate)}</strong></div><div><span data-testid="compression-change-label">{output.stats.smaller ? t.saved : output.stats.candidate > output.stats.original ? t.increased : t.unchanged}</span><strong data-testid="compression-change-value" className={output.stats.smaller ? 'utility-smaller' : output.stats.candidate > output.stats.original ? 'utility-not-smaller' : ''}>{Math.abs(output.stats.percent)}%</strong></div></div>
+          <button type="button" className="button button-primary" data-testid="compression-download" disabled={!output.stats.smaller || !output.bytes} onClick={() => save(output)}>{t.download} ↓</button>
+        </div>}
+        {isTextInput && output?.bytes && <div className="utility-result" data-testid="text-pdf-result">
+          <PdfFirstPagePreview bytes={output.bytes} pageCount={output.pageCount} locale={locale} t={t} />
+          <button type="button" className="button button-primary" data-testid="utility-pdf-download"
+            onClick={() => save(output)}>{t.downloadPdf} ↓</button>
         </div>}
         {error && <div className="notice notice-error" role="alert">{error}</div>}
         {notice && <div className="notice notice-success" role="status">{notice}</div>}

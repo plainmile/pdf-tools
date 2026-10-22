@@ -4,7 +4,7 @@ import { pageNumberPlacement } from './pageNumberGeometry.mjs';
 import {
   UTILITY_LIMITS, requestedPages, parseTextBlocks, textContentToLines,
   linesToReadableText, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
-  enforceImageBatchBytes, checkCancelled,
+  enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled,
 } from './utilityCore.mjs';
 
 export async function loadPdf(file, mode = 'pdf-to-txt', locale = 'en') {
@@ -112,6 +112,7 @@ export async function compressPdfRaster(pdf, options = {}, reportProgress = () =
   enforceUtilityPdfLimits(pdf, 'compress-pdf', options.locale);
   const source = await openPdfJs(pdf.bytes);
   const output = await PDFDocument.create();
+  let jpegBytes = 0;
   try {
     for (let i = 1; i <= pdf.count; i++) {
       checkCancelled(options.signal);
@@ -119,14 +120,26 @@ export async function compressPdfRaster(pdf, options = {}, reportProgress = () =
       try {
         const viewport = page.getViewport({ scale: 1 });
         const jpeg = await renderPageAsBlob(page, 'image/jpeg', scale, quality, options.signal);
+        checkCancelled(options.signal);
+        jpegBytes = enforceCompressionImageBytes(jpegBytes, jpeg.size, options.locale);
+        // JPEG data is embedded as-is; once this lower bound exceeds the original,
+        // further page rendering cannot produce a smaller document.
+        if (jpegBytes >= pdf.size) {
+          reportProgress(i, pdf.count);
+          return { bytes: null, stats: { ...compressionStats(pdf.size, jpegBytes), lowerBound: true } };
+        }
         const embedded = await output.embedJpg(await jpeg.arrayBuffer());
         const target = output.addPage([viewport.width, viewport.height]);
         target.drawImage(embedded, { x: 0, y: 0, width: viewport.width, height: viewport.height });
       } finally { page.cleanup(); }
       reportProgress(i, pdf.count);
     }
+    checkCancelled(options.signal);
     const bytes = new Uint8Array(await output.save({ useObjectStreams: true }));
-    return { bytes, stats: compressionStats(pdf.size, bytes.length) };
+    checkCancelled(options.signal);
+    const stats = compressionStats(pdf.size, bytes.length);
+    // Do not hand a bigger, unusable PDF to React state.
+    return { bytes: stats.smaller ? bytes : null, stats };
   } finally { await source.destroy(); }
 }
 

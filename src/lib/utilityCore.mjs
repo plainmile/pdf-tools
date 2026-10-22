@@ -11,6 +11,8 @@ export const UTILITY_LIMITS = Object.freeze({
   // ZIP generation temporarily duplicates buffers. Keep the accumulated images modest.
   maxImageBatchBytes: 64 * MiB,
   maxCompressionPages: 120,
+  // JPEG buffers and PDF serialization coexist in browser memory.
+  maxCompressionImageBytes: 96 * MiB,
   maxPixelCount: 12_000_000,
 });
 
@@ -40,6 +42,17 @@ export function checkCancelled(signal) {
   if (signal?.aborted) throw new Error('Processing cancelled.');
 }
 
+export function enforceCompressionImageBytes(accumulated, next, locale = 'en') {
+  if (!Number.isSafeInteger(accumulated) || !Number.isSafeInteger(next) ||
+      accumulated < 0 || next < 0 ||
+      accumulated + next > UTILITY_LIMITS.maxCompressionImageBytes) {
+    throw new Error(locale === 'zh'
+      ? '图片化压缩 JPEG 数据超过 96 MB 安全上限，请降低清晰度或拆分 PDF。'
+      : 'Compressed image data exceeds the 96 MB safety limit. Lower quality or split the PDF.');
+  }
+  return accumulated + next;
+}
+
 export function enforceImageBatchBytes(accumulated, next, locale = 'en') {
   if (!Number.isFinite(accumulated) || !Number.isFinite(next) || next < 0 || accumulated < 0 ||
       accumulated + next > UTILITY_LIMITS.maxImageBatchBytes) {
@@ -62,6 +75,7 @@ export function translateUtilityError(error, locale = 'en') {
     [/Page is too small for page numbers/i, '页面尺寸太小，无法放下该字号的页码。请调小字号或使用较大的页面。'],
     [/Image encoding failed/i, '图片编码失败，请降低分辨率或改用 JPG。'],
     [/Image batch exceeds/i, '本批图片超过 64 MB 安全上限，请减少选定页数。'],
+    [/Compressed image data exceeds/i, '图片化压缩 JPEG 数据超过 96 MB 上限，请降低清晰度或拆分 PDF。'],
     [/reversed|outside|range|invalid page/i, '页码范围无效，请检查起始页、结束页和 PDF 总页数。'],
     [/canvas|memory|allocation/i, '设备内存不足或无法创建图片画布，请减少页数或降低清晰度。'],
   ];
