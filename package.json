@@ -5,7 +5,9 @@
   "repository": "https://github.com/plainmile/pdf-tools",
   "type": "module",
   "version": "0.1.0",
-  "engines": { "node": ">=22.12.0" },
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "astro dev --host 0.0.0.0",
     "prepare:pdfjs": "node scripts/prepare-worker.mjs",
@@ -32,5 +34,10 @@
     "@playwright/test": "^1.55.0",
     "typescript": "^5.9.3"
   },
-  "allowScripts": { "esbuild": true }
+  "allowScripts": {
+    "esbuild": true
+  },
+  "overrides": {
+    "vscode-languageserver-types": "3.18.4"
+  }
 }
