@@ -430,3 +430,19 @@ test('Chinese split clearly announces ZIP limit before running', async ({ page }
   await page.getByRole('tab', { name: '拆分文件' }).click();
   await expect(page.getByTestId('split-output-budget')).toContainText('128 MB');
 });
+
+test('Chinese workspace keeps specific file count and type errors rather than a generic failure', async ({ page }) => {
+  await page.goto('/zh/workspace/');
+  const sample = await makePdf([300]);
+  await page.getByTestId('file-input').setInputFiles(
+    Array.from({ length: 21 }, (_, n) => ({
+      name: `part-${n}.pdf`, mimeType: 'application/pdf', buffer: sample,
+    })),
+  );
+  await expect(page.getByRole('alert')).toContainText('一次最多处理 20 个文件');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not a PDF'),
+  });
+  await expect(page.getByRole('alert')).toContainText('请选择 PDF、JPG、PNG 或 WebP 文件');
+  await expect(page.getByTestId('page-tile')).toHaveCount(0);
+});

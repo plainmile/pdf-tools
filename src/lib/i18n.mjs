@@ -139,5 +139,8 @@ export function translateProcessingError(message, locale = 'en') {
   if (/100 MB|between 1 byte/i.test(error)) return '单个文件大小必须在 1 字节至 100 MB 之间。';
   if (/image dimensions|too large/i.test(error)) return '图片尺寸过大，请缩小后重试。';
 
+  // Errors already authored in Chinese (including exact limits such as 20 files,
+  // 200 MB, 600 pages) should never be replaced with a generic failure.
+  if (/[\u3400-\u9fff]/.test(error)) return error;
   return workspaceCopy.zh.errorGeneric;
 }

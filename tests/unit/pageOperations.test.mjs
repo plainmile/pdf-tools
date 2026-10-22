@@ -83,3 +83,13 @@ test('generated split-PDF budget protects the final ZIP memory footprint', () =>
   assert.throws(() => enforceSplitZipBudget(100, 0), /128 MB/);
   assert.throws(() => enforceSplitZipBudget(-1, 1), /128 MB/);
 });
+
+import { translateProcessingError, workspaceCopy } from '../../src/lib/i18n.mjs';
+
+test('workspace preserves actionable Chinese input and resource limit messages', () => {
+  for (const key of ['errorFiles', 'errorTypes', 'errorCombined', 'errorPages', 'noFile']) {
+    assert.equal(translateProcessingError(workspaceCopy.zh[key], 'zh'), workspaceCopy.zh[key]);
+  }
+  assert.equal(translateProcessingError('一次最多处理 20 个文件。', 'zh'), '一次最多处理 20 个文件。');
+  assert.equal(translateProcessingError('unknown internal error', 'zh'), workspaceCopy.zh.errorGeneric);
+});
