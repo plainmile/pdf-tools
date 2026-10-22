@@ -1,0 +1,58 @@
+name: Public Site Browser E2E and Technical SEO
+
+on:
+  push:
+    branches:
+      - feature/public-domain-e2e
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/public-qa.yml'
+      - 'tests/e2e/public.spec.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-public-site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe actual public HTTPS, not staging
+        run: |
+          set -eu
+          curl -fsSI --retry 3 https://pdf.plainmile.com/
+          curl -fsSI --retry 3 https://pdf.plainmile.com/zh/
+          curl -fsSI --retry 3 https://pdf.plainmile.com/robots.txt
+          curl -fsSI --retry 3 https://pdf.plainmile.com/sitemap-index.xml
+      - name: Test live Cloudflare site in Chromium with real synthetic PDF downloads
+        run: |
+          set -eu
+          mkdir -p /tmp/pdf-live-qa
+          docker run --rm --network host \
+            -v "$PWD:/work:ro" \
+            -v /tmp/pdf-live-qa:/artifacts \
+            -e PDF_BASE_URL=https://pdf.plainmile.com \
+            -e LIVE_SCREENSHOT_DIR=/artifacts \
+            mcr.microsoft.com/playwright:v1.55.0-noble \
+            bash -lc '
+              set -eu
+              mkdir -p /tmp/live-tests/tests/e2e
+              cp /work/tests/e2e/*.spec.mjs /tmp/live-tests/tests/e2e/
+              cp /work/playwright.config.mjs /tmp/live-tests/
+              cd /tmp/live-tests
+              npm init -y >/dev/null
+              npm install --no-audit --no-fund @playwright/test@1.55.0 pdf-lib@1.17.1 jszip@3.10.1
+              npx playwright test --reporter=list
+            '
+      - name: Upload screenshots and SEO audit artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-qa-screenshots-seo
+          path: /tmp/pdf-live-qa/
+          if-no-files-found: ignore
+          retention-days: 7
