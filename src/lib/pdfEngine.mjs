@@ -28,8 +28,8 @@ export function isSupportedFile(file) {
   return file.type === 'application/pdf' || Boolean(imageTypeFor(file)) || /\.pdf$/i.test(file.name);
 }
 
-// Inspect dimensions in compressed headers before asking pdf-lib to allocate large
-// decoded image buffers. WebP is checked via createImageBitmap below.
+// Inspect dimensions in compressed image headers before allocating decoded buffers.
+// In particular, WebP must be bounded BEFORE createImageBitmap, not after.
 export function compressedImageDimensions(type, bytes) {
   if (type === 'image/png') {
     if (bytes.length < 24 || [137, 80, 78, 71, 13, 10, 26, 10].some((b, i) => bytes[i] !== b) ||
@@ -61,6 +61,47 @@ export function compressedImageDimensions(type, bytes) {
       index += segmentSize;
     }
     throw new Error('Invalid image header.');
+  }
+  if (type === 'image/webp') {
+    // RFC 9649: RIFF WEBP chunks are little-endian, padded to even lengths.
+    // VP8X stores canvas size as LE24 + 1, VP8L as two packed 14-bit fields,
+    // and VP8 key-frame headers store LE16 dimensions masked to 14 bits.
+    const bad = () => { throw new Error('Invalid image header.'); };
+    if (bytes.length < 20 || [82,73,70,70].some((b,i) => bytes[i] !== b) ||
+        [87,69,66,80].some((b,i) => bytes[8+i] !== b)) bad();
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const riffLength = view.getUint32(4, true) + 8;
+    if (riffLength < 20 || riffLength > bytes.length) bad();
+    let offset = 12;
+    while (offset + 8 <= riffLength) {
+      const tag = String.fromCharCode(...bytes.subarray(offset, offset + 4));
+      const size = view.getUint32(offset + 4, true);
+      const start = offset + 8;
+      if (size > riffLength - start) bad();
+      if (tag === 'VP8X') {
+        if (size < 10) bad();
+        const width = 1 + bytes[start + 4] + (bytes[start + 5] << 8) + (bytes[start + 6] << 16);
+        const height = 1 + bytes[start + 7] + (bytes[start + 8] << 8) + (bytes[start + 9] << 16);
+        return { width, height };
+      }
+      if (tag === 'VP8L') {
+        if (size < 5 || bytes[start] !== 0x2f) bad();
+        const bits = view.getUint32(start + 1, true);
+        return { width: 1 + (bits & 0x3fff), height: 1 + ((bits >>> 14) & 0x3fff) };
+      }
+      if (tag === 'VP8 ') {
+        if (size < 10 || bytes[start + 3] !== 0x9d ||
+            bytes[start + 4] !== 0x01 || bytes[start + 5] !== 0x2a) bad();
+        const width = view.getUint16(start + 6, true) & 0x3fff;
+        const height = view.getUint16(start + 8, true) & 0x3fff;
+        if (!width || !height) bad();
+        return { width, height };
+      }
+      const padded = size + (size & 1);
+      if (padded > riffLength - start) bad();
+      offset = start + padded;
+    }
+    bad();
   }
   return null;
 }
