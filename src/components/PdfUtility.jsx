@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { loadPdf, convertPdfToImages, compressPdfRaster, extractPdfText, textToPdf, addPageNumbers } from '../lib/pdfUtilities.mjs';
-import { UTILITY_LIMITS, formatBytes, sanitizeFilename } from '../lib/utilityCore.mjs';
+import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch } from '../lib/utilityCore.mjs';
 import { saveDownload } from '../lib/pdfEngine.mjs';
 
 const COPY = {
@@ -22,7 +22,7 @@ const COPY = {
     numbersHint: 'Adds selectable numbers to every page and preserves page size. Review annotations and digital signatures before using this modified file.',
     ready: 'Ready to download', noPdf: 'Select a PDF first.', noText: 'Enter text to convert.', sizeLimit: 'PDF up to 100 MB / 1,000 pages; TXT / Markdown up to 5 MB.', limitText: 'TXT / Markdown up to 5 MB; PDF output: up to 1,000 pages (300 image-based pages for CJK).', limitImages: 'PDF up to 100 MB / 1,000 pages; up to 60 selected image pages per batch.', limitCompression: 'PDF up to 100 MB; image-based compression supports up to 120 pages.', limitGeneral: 'PDF up to 100 MB / 1,000 pages.', heavyWarning: 'Large document: processing hundreds of pages may take time and require substantial device memory. Close other heavy tabs if necessary.', progressLabel: 'Processed {done} of {total} pages', tooMuchText: 'Text exceeds 5 MB.',
     noteUnicode: 'This PDF uses rasterized pages for non-Latin characters. Text in the result cannot be selected.', noteSearch: 'Output text is selectable.',
-    invalidFile: 'Please select a supported file and retry.', resultPreview: 'Extracted text preview',
+    invalidFile: 'Please select a supported file and retry.', resultPreview: 'Extracted text preview', dropHint: 'Or drag a file here. Nothing is uploaded.', imported: 'Imported', batchLabel: 'Image batch {current} of {total}', batchPrev: 'Previous pages', batchNext: 'Next pages', batchCustom: 'Custom page selection',
   },
   zh: {
     label: '仅在浏览器本地处理', file: '选择 PDF 文件', textFile: '导入 TXT / Markdown', uploaded: '已读取', pages: '页', choose: '选择文件', start: '开始处理', run: '转换并下载', busy: '正在本机处理…',
@@ -42,7 +42,7 @@ const COPY = {
     numbersHint: '在每页添加可选择的数字，保持纸张尺寸。重要文件请检查注释、数字签名等内容。',
     ready: '文件已经生成', noPdf: '请先选择 PDF 文件。', noText: '请输入待转换的文字。', sizeLimit: 'PDF 最多 100 MB / 1000 页；TXT / Markdown 最多 5 MB。', limitText: 'TXT / Markdown 最多 5 MB；输出最多 1000 页（中文等图片化内容最多 300 页）。', limitImages: 'PDF 最多 100 MB / 1000 页；每批最多导出选定的 60 页图片。', limitCompression: 'PDF 最多 100 MB；图片化压缩每次最多 120 页。', limitGeneral: 'PDF 最多 100 MB / 1000 页。', heavyWarning: '大文档提示：处理数百页时可能占用较多设备内存，并需要更长时间。建议关闭其他高负载标签页。', progressLabel: '已处理 {done} / {total} 页', tooMuchText: '文本内容超过 5 MB。',
     noteUnicode: '由于含有非拉丁文字，此 PDF 输出为图片页，无法选择和搜索文字。', noteSearch: '输出文字可选择和搜索。',
-    invalidFile: '请选择受支持的文件后重试。', resultPreview: '提取文字预览',
+    invalidFile: '请选择受支持的文件后重试。', resultPreview: '提取文字预览', dropHint: '也可以将文件拖到这里，不会上传至服务器。', imported: '已导入', batchLabel: '图片批次 {current} / {total}', batchPrev: '上一批', batchNext: '下一批', batchCustom: '自定义页码范围',
   },
 };
 
@@ -69,23 +69,42 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const [output, setOutput] = useState(null);
   const [preview, setPreview] = useState('');
   const [progress, setProgress] = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const [textFileName, setTextFileName] = useState('');
+  const [batchIndex, setBatchIndex] = useState(0);
 
   function clearOutput() { setOutput(null); setNotice(''); setError(''); setPreview(''); setProgress(null); }
-  function reset() { setPdf(null); setSourceText(''); setPages(''); clearOutput(); }
-  async function chooseFile(event) {
-    clearOutput(); setBusy(true);
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) { setBusy(false); return; }
+  function reset() { setPdf(null); setSourceText(''); setPages(''); setTextFileName(''); setBatchIndex(0); clearOutput(); }
+  async function acceptFile(file) {
+    if (!file || busy) return;
+    clearOutput();
+    setBusy(true);
     try {
       if (isTextInput) {
-        if (!/\.(?:txt|md|markdown)$/i.test(file.name) || file.size > UTILITY_LIMITS.maxTextBytes) throw new Error(t.invalidFile);
+        if (!/\.(?:txt|md|markdown)$/i.test(file.name) || !file.size || file.size > UTILITY_LIMITS.maxTextBytes) throw new Error(t.invalidFile);
         setSourceText(await file.text());
+        setTextFileName(file.name);
       } else {
-        setPdf(await loadPdf(file, mode, locale));
+        const loaded = await loadPdf(file, mode, locale);
+        setPdf(loaded);
+        setBatchIndex(0);
+        setPages(mode === 'pdf-to-images' && loaded.count > UTILITY_LIMITS.maxImagePagesPerRun
+          ? imagePageBatch(loaded.count).range : '');
       }
-    } catch (e) { setError(locale === 'zh' ? `${t.invalidFile} ${e.message}` : e.message); }
-    finally { setBusy(false); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t.invalidFile);
+    } finally { setBusy(false); }
+  }
+  async function chooseFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    await acceptFile(file);
+  }
+  function chooseBatch(index) {
+    if (!pdf) return;
+    setBatchIndex(index);
+    setPages(imagePageBatch(pdf.count, index).range);
+    clearOutput();
   }
   function save(outputFile) {
     saveDownload(outputFile.bytes, outputFile.name, outputFile.mime || 'application/pdf');
@@ -103,7 +122,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
       let result;
       if (mode === 'pdf-to-images') {
         result = await convertPdfToImages(pdf, { format, scale: Number(scale), pages, locale }, report);
-        result.name = result.count === 1 ? `${pdfName}-${result.name}` : `${pdfName}-images.zip`;
+        const selectedRange = pages.trim().replace(/[^0-9,\-]/g, '').replace(/,/g, '_').slice(0, 45);
+        result.name = result.count === 1 ? `${pdfName}-${result.name}` : selectedRange ? `${pdfName}-pages-${selectedRange}.zip` : `${pdfName}-images.zip`;
         save(result);
         setNotice(`${t.ready}: ${result.count} ${t.pages} · ${formatBytes(result.bytes.length)}`);
       } else if (isCompress) {
@@ -138,16 +158,38 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     finally { setBusy(false); }
   }
 
-  const limitHint = isTextInput ? t.limitText : isCompress ? t.limitCompression : mode === 'pdf-to-images' ? t.limitImages : t.limitGeneral;
+  const isImages = mode === 'pdf-to-images';
+  const imageBatch = isImages && pdf && pdf.count > UTILITY_LIMITS.maxImagePagesPerRun
+    ? imagePageBatch(pdf.count, batchIndex) : null;
+  const limitHint = isTextInput ? t.limitText : isCompress ? t.limitCompression : isImages ? t.limitImages : t.limitGeneral;
   const description = isCompress ? t.compressionWarning : isTextOutput ? `${t.textWarning} ${mode === 'pdf-to-markdown' ? t.markdownWarning : ''}` : isTextInput ? mode === 'markdown-to-pdf' ? t.markdownInputHint : t.textInputHint : mode === 'add-page-numbers' ? t.numbersHint : t.privacy;
   return (
     <section className="pdf-workspace pdf-utility" data-testid="pdf-utility">
       <div className="workspace-bar"><div className="workspace-heading"><span className="workspace-app-icon" aria-hidden="true">▤</span><div><strong>{t.label}</strong><span>{t.privacy}</span></div></div></div>
       <div className="utility-main">
-        <label className="utility-file">
-          <span className="utility-field-label">{isTextInput ? t.textFile : t.file}</span>
-          <input data-testid="utility-file-input" type="file" accept={isTextInput ? '.txt,.md,.markdown,text/plain,text/markdown' : '.pdf,application/pdf'} disabled={busy} onChange={chooseFile} />
-        </label>
+        <div className={`utility-dropzone${dragging ? ' is-dragging-over' : ''}`} data-testid="utility-dropzone"
+          onDragOver={(event) => {
+            if (!Array.from(event.dataTransfer.types || []).includes('Files')) return;
+            event.preventDefault();
+            if (!busy) setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(event) => {
+            if (!event.dataTransfer.files?.length) return;
+            event.preventDefault();
+            event.stopPropagation();
+            setDragging(false);
+            void acceptFile(event.dataTransfer.files[0]);
+          }}>
+          <label className="utility-file">
+            <span className="utility-field-label">{isTextInput ? t.textFile : t.file}</span>
+            <input data-testid="utility-file-input" type="file"
+              accept={isTextInput ? '.txt,.md,.markdown,text/plain,text/markdown' : '.pdf,application/pdf'}
+              disabled={busy} onChange={chooseFile} />
+          </label>
+          <span className="utility-drop-hint">{t.dropHint}</span>
+        </div>
+        {isTextInput && textFileName && <div className="utility-file-summary" data-testid="text-file-summary"><strong>{t.imported}: {textFileName}</strong><button type="button" disabled={busy} onClick={reset}>{t.clear}</button></div>}
         {pdf && <div className="utility-file-summary" data-testid="utility-file-summary"><strong>{pdf.name}</strong><span>{formatBytes(pdf.size)} · {pdf.count} {t.pages}</span><button type="button" onClick={reset} disabled={busy}>{t.clear}</button></div>}
         {pdf && (pdf.count >= 250 || pdf.size >= 75 * 1024 * 1024) && <p className="utility-note" data-testid="large-document-note">{t.heavyWarning}</p>}
         {isTextInput && <label className="utility-text-input"><span className="utility-field-label">{t.textLabel}</span><textarea data-testid="utility-text" rows={10} maxLength={UTILITY_LIMITS.maxTextBytes} placeholder={t.textPlaceholder} value={sourceText} onChange={e => { setSourceText(e.target.value); clearOutput(); }} disabled={busy} /></label>}
@@ -155,6 +197,18 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           <label><span>{t.imageType}</span><select aria-label={t.imageType} value={format} onChange={e => { setFormat(e.target.value); clearOutput(); }}><option value="jpg">JPG</option><option value="png">PNG</option></select></label>
           <label><span>{t.quality}</span><select aria-label={t.quality} value={scale} onChange={e => { setScale(e.target.value); clearOutput(); }}><option value="1">{t.low}</option><option value="1.5">{t.medium}</option><option value="2">{t.high}</option></select></label>
           <label><span>{t.pageRange}</span><input data-testid="utility-page-ranges" value={pages} onChange={e => { setPages(e.target.value); clearOutput(); }} placeholder="1-3, 5" /></label>
+        </div>}
+        {isImages && <p className="utility-helper">{t.rangeHint}</p>}
+        {imageBatch && <div className="utility-batch-nav" data-testid="utility-batch-nav">
+          <span>{pages === imageBatch.range
+            ? t.batchLabel.replace('{current}', batchIndex + 1).replace('{total}', imageBatch.total)
+            : t.batchCustom}</span>
+          <div role="group" aria-label={t.batchLabel.replace('{current}', batchIndex + 1).replace('{total}', imageBatch.total)}>
+            <button type="button" data-testid="utility-batch-prev" disabled={busy || batchIndex === 0}
+              onClick={() => chooseBatch(batchIndex - 1)}>← {t.batchPrev}</button>
+            <button type="button" data-testid="utility-batch-next" disabled={busy || batchIndex >= imageBatch.total - 1}
+              onClick={() => chooseBatch(batchIndex + 1)}>{t.batchNext} →</button>
+          </div>
         </div>}
         {isCompress && <div className="utility-options"><label><span>{t.compressionMethod}</span><select aria-label={t.compressionMethod} value={compressMode} onChange={e => { setCompressMode(e.target.value); clearOutput(); }}><option value="compact">{t.compressionLow}</option><option value="balanced">{t.compressionMid}</option><option value="clearer">{t.compressionHigh}</option></select></label></div>}
         {mode === 'add-page-numbers' && <div className="utility-options">

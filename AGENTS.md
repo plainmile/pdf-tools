@@ -50,3 +50,9 @@
 - The publicly distributed image must include a **visible and crawlable** bilingual footer link to `https://pdf.plainmile.com/` labeled Official site / 官方网站. Keep this useful to people and consistent across both locales and all static tool pages; use `rel="nofollow"` on the distributed template link to avoid a mass-produced backlink scheme. No cloaking, hidden links, anchor keyword stuffing, review manipulation or guaranteed SEO-benefit claims.
 - The original website remains the canonical source of the shipped static content. Self-hosts seeking independent indexability should rebuild with their actual origin/canonical/hreflang/schema settings rather than blindly duplicating official URLs. The site is MIT-licensed; this on-page origin link is default attribution, **not an additional legal licensing condition**.
 - Verify footer origin attribution on every real public URL through the post-deploy Runner E2E, plus a JS-disabled pre-merge check of representative English/Chinese pages; never skip functional E2E.
+
+## File entry and repeatable image batches
+
+- All standalone utility converters support **both native file picker and drag/drop** with a clearly visible no-upload message; neither may issue a POST to process document contents. Preserve native keyboard/screen-reader file picker access.
+- When a long PDF has more than 60 pages, pre-select a safe 60-page image batch rather than defaulting to all pages and failing. Provide bilingual previous/next batch controls and distinguish ZIP filenames by selected range. Keep arbitrary page ranges available.
+- Verify the resulting images and ZIP, not just navigation: the post-deploy public Runner must cover drag/drop PDF/TXT, mobile 375px batch navigation and image extraction from the last pages of a long synthetic document. Never loosen PDF raster memory caps merely for convenience.

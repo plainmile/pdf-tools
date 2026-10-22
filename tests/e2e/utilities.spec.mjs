@@ -212,3 +212,81 @@ test('compression has its own 120-page limit rather than blocking all PDF tools 
   await expect(page.getByRole('alert')).toContainText('120 pages');
   await expect(page.getByTestId('utility-file-summary')).toHaveCount(0);
 });
+
+
+test('dragging a PDF into a converter loads it locally and exports real text', async ({ page }) => {
+  await page.goto('/pdf-to-txt/');
+  const writes = [];
+  page.on('request', request => { if (!['GET', 'HEAD'].includes(request.method())) writes.push(request.method() + ' ' + request.url()); });
+  const bytes = (await fixturePdf('Drag and drop PlainMile')).toString('base64');
+  await expect(page.getByTestId('utility-dropzone')).toBeVisible();
+  await page.evaluate(base64 => {
+    const data = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([data], 'local.pdf', { type: 'application/pdf' }));
+    const dropzone = document.querySelector('[data-testid="utility-dropzone"]');
+    dropzone.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    dropzone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+  }, bytes);
+  await expect(page.getByTestId('utility-file-summary')).toContainText('local.pdf');
+  const text = await getDownload(page, () => page.getByTestId('utility-run').click());
+  expect(text.bytes.toString('utf8')).toContain('Drag and drop PlainMile');
+  expect(writes).toEqual([]);
+});
+
+test('TXT drag and drop opens editable text, and Clear empties imported source', async ({ page }) => {
+  await page.goto('/txt-to-pdf/');
+  await expect(page.getByTestId('utility-dropzone')).toBeVisible();
+  await page.evaluate(() => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(['Local book text input'], 'chapter.txt', { type: 'text/plain' }));
+    const dropzone = document.querySelector('[data-testid="utility-dropzone"]');
+    dropzone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+  });
+  await expect(page.getByTestId('utility-text')).toHaveValue('Local book text input');
+  await expect(page.getByTestId('text-file-summary')).toContainText('chapter.txt');
+  const pdf = await getDownload(page, () => page.getByTestId('utility-run').click());
+  expect((await PDFDocument.load(pdf.bytes)).getPageCount()).toBe(1);
+  await page.getByTestId('text-file-summary').getByRole('button', { name: 'Clear' }).click();
+  await expect(page.getByTestId('utility-text')).toHaveValue('');
+  await expect(page.getByTestId('utility-run')).toBeDisabled();
+});
+
+test('125-page PDF displays safe image batches and exports last five actual pages as ZIP', async ({ page }) => {
+  test.setTimeout(70000);
+  await page.goto('/pdf-to-images/');
+  await upload(page, await fixturePdf('Batch source', 125));
+  const input = page.getByTestId('utility-page-ranges');
+  await expect(input).toHaveValue('1-60');
+  await expect(page.getByTestId('utility-batch-nav')).toContainText('1 of 3');
+  await expect(page.getByTestId('utility-batch-prev')).toBeDisabled();
+  await page.getByTestId('utility-batch-next').click();
+  await expect(input).toHaveValue('61-120');
+  await page.getByTestId('utility-batch-next').click();
+  await expect(input).toHaveValue('121-125');
+  await expect(page.getByTestId('utility-batch-next')).toBeDisabled();
+  const result = await getDownload(page, () => page.getByTestId('utility-run').click(), 45000);
+  expect(result.name).toMatch(/pages-121-125\.zip$/);
+  const zip = await JSZip.loadAsync(result.bytes);
+  expect(Object.keys(zip.files).sort()).toEqual(['page-121.jpg', 'page-122.jpg', 'page-123.jpg', 'page-124.jpg', 'page-125.jpg']);
+  const last = await zip.files['page-125.jpg'].async('uint8array');
+  expect(Array.from(last.slice(0, 3))).toEqual([255, 216, 255]);
+  await page.getByTestId('utility-batch-prev').click();
+  await expect(input).toHaveValue('61-120');
+});
+
+test('Chinese converter on narrow mobile keeps native file chooser and page batches accessible', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/pdf-to-images/');
+  await expect(page.getByTestId('utility-dropzone')).toContainText('文件拖到这里');
+  await upload(page, await fixturePdf('Chinese batch layout', 61));
+  await expect(page.getByTestId('utility-page-ranges')).toHaveValue('1-60');
+  await page.getByTestId('utility-batch-next').click();
+  await expect(page.getByTestId('utility-page-ranges')).toHaveValue('61-61');
+  await expect(page.getByTestId('utility-batch-nav')).toContainText('2 / 2');
+  const width = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    viewport: document.documentElement.clientWidth,
+  }));
+  expect(width.scroll).toBeLessThanOrEqual(width.viewport + 2);
+});
