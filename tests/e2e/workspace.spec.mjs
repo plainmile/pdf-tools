@@ -744,6 +744,12 @@ test('image-to-PDF layout: A4 defaults, US Letter landscape and fit-to-image; re
   await page.getByTestId('image-orientation').selectOption('landscape');
   await page.getByTestId('image-margin').selectOption('12');
   await expect(page.getByTestId('image-layout-dirty')).toBeVisible();
+  // Importing again before applying must not silently mix letter/A4 page layouts.
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'third.png', mimeType: 'image/png', buffer: one,
+  });
+  await expect(page.getByRole('alert')).toContainText('Apply updated page settings before adding');
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
   await expect(page.getByRole('button', { name: 'Export PDF' })).toBeDisabled();
   await page.getByTestId('image-layout-apply').click();
   await expect(page.getByTestId('image-layout-dirty')).toHaveCount(0);
