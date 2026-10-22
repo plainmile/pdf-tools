@@ -49,7 +49,8 @@ function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPre
       canvas.style.height = `${viewport.height}px`;
       context.setTransform(density, 0, 0, density, 0, 0);
       renderTask = pdfPage.render({ canvasContext: context, canvas, viewport });
-      await renderTask.promise;
+      try { await renderTask.promise; }
+      finally { pdfPage.cleanup(); }
     })().catch((error) => {
       if (!cancelled && error?.name !== 'RenderingCancelledException') setFailed(true);
     });
@@ -99,21 +100,33 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     } catch (_error) { return null; }
   }, [pages.length, splitMode, ranges, chunkSize]);
 
+  // Retain PDF.js loading tasks so the worker and its memory are truly released on reset/unmount.
   const getPreviewDoc = useCallback((source) => {
-    let promise = previewDocuments.current.get(source.id);
-    if (!promise) {
-      promise = import('pdfjs-dist/legacy/build/pdf.mjs').then((pdfjs) => {
+    let entry = previewDocuments.current.get(source.id);
+    if (!entry) {
+      entry = { task: null, cancelled: false, promise: null };
+      const current = entry;
+      entry.promise = import('pdfjs-dist/legacy/build/pdf.mjs').then((pdfjs) => {
+        if (current.cancelled) throw new Error('Preview was cleared.');
         pdfjs.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs';
-        // PDF.js transfers the buffer to the worker. Always pass a copy.
-        return pdfjs.getDocument({ data: new Uint8Array(source.bytes), useSystemFonts: true }).promise;
+        current.task = pdfjs.getDocument({ data: new Uint8Array(source.bytes), useSystemFonts: true });
+        return current.task.promise;
       }).catch((reason) => {
-        previewDocuments.current.delete(source.id);
+        if (previewDocuments.current.get(source.id) === current) previewDocuments.current.delete(source.id);
         throw reason;
       });
-      previewDocuments.current.set(source.id, promise);
+      previewDocuments.current.set(source.id, entry);
     }
-    return promise;
+    return entry.promise;
   }, []);
+  const releasePreviewDocuments = useCallback(() => {
+    for (const entry of previewDocuments.current.values()) {
+      entry.cancelled = true;
+      entry.task?.destroy().catch(() => {});
+    }
+    previewDocuments.current.clear();
+  }, []);
+  useEffect(() => () => releasePreviewDocuments(), [releasePreviewDocuments]);
 
   const resetSelection = () => { setSelected(new Set()); lastSelectedIndex.current = null; };
   const commit = (operation, preserveSelection = false) => {
@@ -208,8 +221,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const clearAll = () => {
     setWatermarkEnabled(false); setWatermarkText(''); setExportSettingsOpen(mode === 'watermark-pdf');
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
-    for (const promise of previewDocuments.current.values()) promise.then((doc) => doc.loadingTask?.destroy?.() ?? doc.cleanup?.()).catch(() => {});
-    previewDocuments.current.clear();
+    releasePreviewDocuments();
   };
 
   const onMoveDrop = (event, targetId) => {
@@ -222,6 +234,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     if (group.length) commit((previous) => group.length === 1 ? movePage(previous, group[0], targetId) : movePageGroup(previous, group, targetId));
     setDragged(null);
   };
+  const largeWorkspace = pages.length >= 250 || bytesInMemory >= 100 * 1024 * 1024;
   const selectedText = locale === 'zh' ? `${selectedCount} ${t.selected}` : `${selectedCount} ${selectedCount === 1 ? 'page' : 'pages'} selected`;
   const pageName = (number) => locale === 'zh' ? `第 ${number} 页` : `Page ${number}`;
 
@@ -262,6 +275,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       <div className="workspace-content" onDragOver={(event) => { if (Array.from(event.dataTransfer.types ?? []).includes('Files')) event.preventDefault(); }} onDrop={(event) => { if (event.dataTransfer.files?.length) { event.preventDefault(); void addFiles(event.dataTransfer.files); } }}>
         {error && <div className="notice notice-error" role="alert">{error}<button type="button" aria-label={t.dismiss} onClick={() => setError('')}>×</button></div>}
         {notice && <div className="notice notice-success" role="status">{notice}<button type="button" aria-label={t.dismiss} onClick={() => setNotice('')}>×</button></div>}
+        {largeWorkspace && <p className="utility-note" data-testid="workspace-large-warning">{t.bigDocWarning}</p>}
         {!pages.length ? (
           <div className="dropzone" data-testid="dropzone" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); void addFiles(event.dataTransfer.files); }}>
             <div className="drop-icon" aria-hidden="true">＋</div>

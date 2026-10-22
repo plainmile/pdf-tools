@@ -30,3 +30,9 @@
 - PDF to JPG/PNG must verify image signatures and page selection; multi-page exports are a ZIP. PDF compression uses optional rasterization and must show measured input/output bytes; do not claim lossless compression or download files that grow larger. Warn users about text, links, annotations, forms and signatures being rasterized/lost.
 - PDF-to-TXT/Markdown extracts only existing selectable text, never claim OCR or precise original layout. Markdown heading conversion is heuristic. TXT/Markdown-to-PDF supports a limited Markdown subset; non-Latin scripts rendered using local browser fonts yield image-based, not searchable, PDF pages.
 - Keep input/resource limits, no upload network calls, bilingual SEO routes and end-to-end checks of exported files for every new tool. E2E gate before each publish and public GitHub Runner E2E after each netcup deployment. Clean QA containers even on failure.
+
+## Book-length PDF limits (2026-10)
+
+- Avoid one arbitrary 25 MiB/50-page limit for all tools. Set and show mode-specific safeguards: PDF text extraction/numbering 100 MiB and 1,000 pages; PDF-to-images max 60 selected pages per export with page-range batching and 12 MP/canvas; lossy compression 120 pages; TXT/Markdown input 5 MiB with 1,000 output pages for Latin and 300 image-based output pages for CJK; workspace up to 100 MiB/file, 200 MiB total and 600 pages with lazy thumbnail rendering.
+- These are *ceilings*, not performance guarantees. Favor per-page cleanup, explicit worker teardown, a visible progress indication, and clearly localized warnings. Keep generated ZIP size bounded.
+- Unit and public Playwright E2E must verify a synthetic 320+ page PDF (text first+last, numbered PDF, late-page raster selection), boundary rejection, and old workspace PDF behavior. Never claim 500-page memory safety without testing a representative input. No customer data in CI.

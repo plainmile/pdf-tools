@@ -2,17 +2,32 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import JSZip from 'jszip';
 import {
   UTILITY_LIMITS, requestedPages, parseTextBlocks, textContentToLines,
-  linesToReadableText, compressionStats,
+  linesToReadableText, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
 } from './utilityCore.mjs';
 
-export async function loadPdf(file) {
-  if (!file || (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf')) throw new Error('Choose a PDF file.');
-  if (!file.size || file.size > UTILITY_LIMITS.maxPdfBytes) throw new Error('Choose a PDF under 25 MB.');
+export async function loadPdf(file, mode = 'pdf-to-txt', locale = 'en') {
+  if (!file || (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf')) {
+    throw new Error(locale === 'zh' ? '请选择 PDF 文件。' : 'Choose a PDF file.');
+  }
+  // Check size BEFORE allocating a large ArrayBuffer or PDF.js worker.
+  if (!file.size || file.size > UTILITY_LIMITS.maxPdfBytes) {
+    enforceUtilityPdfLimits({ size: file.size, count: 1 }, mode, locale);
+  }
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const pdfLibDoc = await PDFDocument.load(bytes, { updateMetadata: false }).catch(() => { throw new Error('The PDF is damaged or password-protected.'); });
-  const count = pdfLibDoc.getPageCount();
-  if (!count || count > UTILITY_LIMITS.maxPages) throw new Error('PDFs must have between 1 and 50 pages.');
-  return { bytes, count, size: file.size, name: file.name };
+  // Use PDF.js for page counting rather than eagerly parsing a potentially 100 MB
+  // document in pdf-lib as well. The actual page-number operation loads pdf-lib later.
+  let document;
+  try {
+    document = await openPdfJs(bytes);
+  } catch {
+    throw new Error(locale === 'zh' ? 'PDF 无法打开，文件可能损坏或有密码保护。' : 'The PDF is damaged or password-protected.');
+  }
+  try {
+    enforceUtilityPdfLimits({ size: file.size, count: document.count }, mode, locale);
+    return { bytes, count: document.count, size: file.size, name: file.name };
+  } finally {
+    await document.destroy();
+  }
 }
 
 async function openPdfJs(bytes) {
@@ -20,9 +35,14 @@ async function openPdfJs(bytes) {
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs';
   // Pass a copy: PDF.js transfers its buffer to its worker.
   const loadingTask = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true });
-  const proxy = await loadingTask.promise;
-  // PDF.js 6 removed PDFDocumentProxy.destroy(); the loading task owns worker teardown.
-  return { getPage: (number) => proxy.getPage(number), destroy: () => loadingTask.destroy() };
+  try {
+    const proxy = await loadingTask.promise;
+    // The loading task owns the worker and its memory, not the PDFDocumentProxy.
+    return { count: proxy.numPages, getPage: (number) => proxy.getPage(number), destroy: () => loadingTask.destroy() };
+  } catch (error) {
+    await loadingTask.destroy().catch(() => {});
+    throw error;
+  }
 }
 
 function freeCanvas(canvas) { if (canvas) { canvas.width = 1; canvas.height = 1; } }
@@ -42,19 +62,22 @@ async function renderPageAsBlob(page, format = 'image/jpeg', scale = 1.5, qualit
   } finally { freeCanvas(canvas); }
 }
 
-export async function convertPdfToImages(pdf, options = {}) {
+export async function convertPdfToImages(pdf, options = {}, reportProgress = () => {}) {
   const format = options.format === 'png' ? 'png' : 'jpg';
   const mime = format === 'png' ? 'image/png' : 'image/jpeg';
   const scale = options.scale === 2 ? 2 : options.scale === 1 ? 1 : 1.5;
   const selected = requestedPages(options.pages ?? '', pdf.count);
+  enforceImageBatchLimit(selected.length, options.locale);
   const document = await openPdfJs(pdf.bytes);
   const files = [];
   try {
     for (const index of selected) {
       const page = await document.getPage(index);
-      const blob = await renderPageAsBlob(page, mime, scale, .87);
-      files.push({ name: `page-${String(index).padStart(3, '0')}.${format}`, bytes: new Uint8Array(await blob.arrayBuffer()) });
-      page.cleanup();
+      try {
+        const blob = await renderPageAsBlob(page, mime, scale, .87);
+        files.push({ name: `page-${String(index).padStart(3, '0')}.${format}`, bytes: new Uint8Array(await blob.arrayBuffer()) });
+      } finally { page.cleanup(); }
+      reportProgress(files.length, selected.length);
     }
   } finally { await document.destroy(); }
   if (files.length === 1) return { ...files[0], mime, count: 1 };
@@ -65,41 +88,45 @@ export async function convertPdfToImages(pdf, options = {}) {
 
 // Honest, intentionally lossy raster recompression: no promise to keep searchable text,
 // internal links, annotations, form fields or digital signatures. Never auto-download if larger.
-export async function compressPdfRaster(pdf, options = {}) {
+export async function compressPdfRaster(pdf, options = {}, reportProgress = () => {}) {
   const scale = options.scale === 1.5 ? 1.5 : options.scale === 1 ? 1 : .75;
   const quality = options.quality === .8 ? .8 : options.quality === .55 ? .55 : .7;
+  enforceUtilityPdfLimits(pdf, 'compress-pdf', options.locale);
   const source = await openPdfJs(pdf.bytes);
   const output = await PDFDocument.create();
   try {
     for (let i = 1; i <= pdf.count; i++) {
       const page = await source.getPage(i);
-      const viewport = page.getViewport({ scale: 1 });
-      const jpeg = await renderPageAsBlob(page, 'image/jpeg', scale, quality);
-      const embedded = await output.embedJpg(await jpeg.arrayBuffer());
-      const target = output.addPage([viewport.width, viewport.height]);
-      target.drawImage(embedded, { x: 0, y: 0, width: viewport.width, height: viewport.height });
-      page.cleanup();
+      try {
+        const viewport = page.getViewport({ scale: 1 });
+        const jpeg = await renderPageAsBlob(page, 'image/jpeg', scale, quality);
+        const embedded = await output.embedJpg(await jpeg.arrayBuffer());
+        const target = output.addPage([viewport.width, viewport.height]);
+        target.drawImage(embedded, { x: 0, y: 0, width: viewport.width, height: viewport.height });
+      } finally { page.cleanup(); }
+      reportProgress(i, pdf.count);
     }
     const bytes = new Uint8Array(await output.save({ useObjectStreams: true }));
     return { bytes, stats: compressionStats(pdf.size, bytes.length) };
   } finally { await source.destroy(); }
 }
 
-export async function extractPdfText(pdf, markdown = false) {
+export async function extractPdfText(pdf, markdown = false, reportProgress = () => {}) {
   const document = await openPdfJs(pdf.bytes);
   const pages = [];
   try {
     for (let i = 1; i <= pdf.count; i++) {
       const page = await document.getPage(i);
-      pages.push(textContentToLines(await page.getTextContent()));
-      page.cleanup();
+      try { pages.push(textContentToLines(await page.getTextContent())); }
+      finally { page.cleanup(); }
+      reportProgress(i, pdf.count);
     }
   } finally { await document.destroy(); }
   if (!pages.some(p => p.length)) throw new Error('No selectable text found. Scanned PDFs require OCR, which this tool does not provide.');
   return linesToReadableText(pages, markdown);
 }
 
-export async function addPageNumbers(pdf, opts = {}) {
+export async function addPageNumbers(pdf, opts = {}, reportProgress = () => {}) {
   const doc = await PDFDocument.load(pdf.bytes, { updateMetadata: false });
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const size = opts.fontSize === 16 ? 16 : opts.fontSize === 10 ? 10 : 12;
@@ -114,6 +141,7 @@ export async function addPageNumbers(pdf, opts = {}) {
     const x = position.endsWith('right') ? box.x + box.width - 28 - textWidth : box.x + (box.width - textWidth) / 2;
     const y = position.startsWith('top') ? box.y + box.height - size - 22 : box.y + 24;
     page.drawText(text, { x, y, font, size, color: rgb(.28, .33, .39) });
+    reportProgress(i + 1, doc.getPageCount());
   }
   return new Uint8Array(await doc.save({ useObjectStreams: true }));
 }
@@ -150,7 +178,11 @@ export async function textToPdf(text, markdown = false) {
   }
   async function newPage() {
     if (pdfPage) await finishPage();
-    if (++totalPages > UTILITY_LIMITS.maxOutputPages) throw new Error('Text exceeds 50 output pages.');
+    if (++totalPages > (unicode ? UTILITY_LIMITS.maxRasterTextPages : UTILITY_LIMITS.maxOutputPages)) {
+      throw new Error(unicode
+        ? 'Non-Latin text can create up to 300 image-based PDF pages per conversion. Split the text into volumes.'
+        : 'Text exceeds 1,000 PDF pages. Split the text into volumes.');
+    }
     pdfPage = doc.addPage([pdfWidth, pdfHeight]);
     y = pdfHeight - margin;
     if (unicode) {
@@ -172,16 +204,17 @@ export async function textToPdf(text, markdown = false) {
       const paragraphs = block.text.split('\n');
       for (const para of paragraphs) {
         let row = '';
-        // Character-level fallback guarantees even extremely long unbroken words fit the page.
-        const words = Array.from(para);
-        for (const word of words) {
-          const next = row + word;
-          const width = unicode ? measure.measureText(next).width : safeTextWidth(font, next, size);
-          if (width > bodyWidth && row) {
+        let rowWidth = 0;
+        // Measure only the NEW character, not the full growing row: O(n)
+        // rather than O(n squared) on book-length paragraphs.
+        for (const char of para) {
+          const charWidth = unicode ? measure.measureText(char).width : safeTextWidth(font, char, size);
+          if (row && rowWidth + charWidth > bodyWidth - 4) {
             if (y - lineHeight < margin) await newPage();
             drawLine(row.trimEnd(), font, size, isBold, cssFont); y -= lineHeight;
-            row = word.trimStart();
-          } else row = next;
+            row = char.trimStart();
+            rowWidth = row ? charWidth : 0;
+          } else { row += char; rowWidth += charWidth; }
         }
         if (row) {
           if (y - lineHeight < margin) await newPage();

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, parseTextBlocks,
   textContentToLines, linesToReadableText, sanitizeFilename,
+  UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit,
 } from '../../src/lib/utilityCore.mjs';
 
 test('compression reports actual savings; a larger result must not count as savings', () => {
@@ -38,4 +39,32 @@ test('PDF positioned text is approximately sorted by vertical position then X', 
 });
 test('generated download filename removes unsafe path characters', () => {
   assert.equal(sanitizeFilename('../secret\n local.pdf'), '..-secret-local');
+});
+
+test('book-length text extraction and page numbering accept 500 pages up to 100 MiB', () => {
+  const info = { size: 80 * 1024 ** 2, count: 500 };
+  assert.equal(enforceUtilityPdfLimits(info, 'pdf-to-txt'), true);
+  assert.equal(enforceUtilityPdfLimits(info, 'pdf-to-markdown'), true);
+  assert.equal(enforceUtilityPdfLimits(info, 'add-page-numbers'), true);
+  assert.equal(enforceUtilityPdfLimits(info, 'pdf-to-images'), true);
+  assert.equal(UTILITY_LIMITS.maxPages, 1000);
+  assert.equal(UTILITY_LIMITS.maxTextBytes, 5 * 1024 ** 2);
+  assert.equal(UTILITY_LIMITS.maxOutputPages, 1000);
+});
+
+test('oversized PDFs and 1001-page PDFs fail before expensive rasterization', () => {
+  assert.throws(() => enforceUtilityPdfLimits({ size: 100 * 1024 ** 2 + 1, count: 1 }, 'pdf-to-txt'), /100 MB/);
+  assert.throws(() => enforceUtilityPdfLimits({ size: 2000, count: 1001 }, 'pdf-to-markdown'), /1,000 pages/);
+  assert.throws(() => enforceUtilityPdfLimits({ size: 2000, count: 121 }, 'compress-pdf'), /120 pages/);
+  assert.equal(enforceUtilityPdfLimits({ size: 2000, count: 120 }, 'compress-pdf'), true);
+  assert.throws(() => enforceUtilityPdfLimits({ size: 2000, count: 121 }, 'compress-pdf', 'zh'), /120 页/);
+});
+
+test('image conversion selects any 60 pages from a 500-page book, not only first 60', () => {
+  const selected = requestedPages('301-360', 500);
+  assert.equal(selected.length, 60);
+  assert.equal(selected[0], 301);
+  assert.equal(selected.at(-1), 360);
+  assert.equal(enforceImageBatchLimit(selected.length), true);
+  assert.throws(() => enforceImageBatchLimit(requestedPages('1-61', 500).length), /60 pages/);
 });

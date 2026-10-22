@@ -1,6 +1,37 @@
 import { parsePageRanges } from './pageOperations.mjs';
 
-export const UTILITY_LIMITS = Object.freeze({ maxPdfBytes: 25 * 1024 * 1024, maxPages: 50, maxTextBytes: 1_000_000, maxOutputPages: 50, maxPixelCount: 12_000_000 });
+const MiB = 1024 * 1024;
+export const UTILITY_LIMITS = Object.freeze({
+  maxPdfBytes: 100 * MiB,
+  maxPages: 1000,
+  maxTextBytes: 5 * MiB,
+  maxOutputPages: 1000,
+  maxRasterTextPages: 300,
+  maxImagePagesPerRun: 60,
+  maxCompressionPages: 120,
+  maxPixelCount: 12_000_000,
+});
+
+export function enforceUtilityPdfLimits({ size, count }, mode, locale = 'en') {
+  const zh = locale === 'zh';
+  if (!Number.isFinite(size) || size <= 0 || size > UTILITY_LIMITS.maxPdfBytes) {
+    throw new Error(zh ? 'PDF 文件大小须在 1 字节至 100 MB 之间。' : 'PDF must be between 1 byte and 100 MB.');
+  }
+  if (!Number.isSafeInteger(count) || count < 1 || count > UTILITY_LIMITS.maxPages) {
+    throw new Error(zh ? 'PDF 最多支持 1000 页。' : 'PDF must have 1 to 1,000 pages.');
+  }
+  if (mode === 'compress-pdf' && count > UTILITY_LIMITS.maxCompressionPages) {
+    throw new Error(zh ? '图片化压缩每次最多处理 120 页。长文档请先拆分，避免浏览器耗尽内存。' : 'Image-based compression supports at most 120 pages per run. Split long PDFs first to avoid memory exhaustion.');
+  }
+  return true;
+}
+export function enforceImageBatchLimit(count, locale = 'en') {
+  if (!Number.isSafeInteger(count) || count < 1 || count > UTILITY_LIMITS.maxImagePagesPerRun) {
+    throw new Error(locale === 'zh' ? '一次最多导出 60 张图片，请使用页码范围分批导出。' : 'Export up to 60 pages per batch. Use page ranges for longer PDFs.');
+  }
+  return true;
+}
+
 export const utilitySlugs = Object.freeze([
   'pdf-to-images', 'compress-pdf', 'pdf-to-txt', 'pdf-to-markdown',
   'txt-to-pdf', 'markdown-to-pdf', 'add-page-numbers',
