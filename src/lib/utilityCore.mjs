@@ -63,8 +63,11 @@ export function translateUtilityError(error, locale = 'en') {
     [/reversed|outside|range|invalid page/i, '页码范围无效，请检查起始页、结束页和 PDF 总页数。'],
     [/canvas|memory|allocation/i, '设备内存不足或无法创建图片画布，请减少页数或降低清晰度。'],
   ];
-  return translations.find(([pattern]) => pattern.test(message))?.[1] ??
-    '处理失败，请检查文件内容或尝试更小的文件。';
+  const translated = translations.find(([pattern]) => pattern.test(message));
+  if (translated) return translated[1];
+  // Keep already-localized, specific limits (e.g. 100 MB / 1,000 pages).
+  if (/[\u3400-\u9fff]/.test(message)) return message;
+  return '处理失败，请检查文件内容或尝试更小的文件。';
 }
 
 export function imagePageBatch(count, batchIndex = 0) {
