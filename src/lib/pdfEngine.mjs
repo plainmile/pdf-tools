@@ -1,4 +1,5 @@
 import { PDFDocument, degrees } from 'pdf-lib';
+import { renderWatermarkPng, watermarkTextFromOptions, WATERMARK_OPACITY } from './watermark.mjs';
 
 export const LIMITS = Object.freeze({
   maxFiles: 20,
@@ -77,8 +78,10 @@ async function imageToPdfBytes(file, originalBytes) {
 }
 
 /** Export pages in workspace order. The originals are never modified. */
-export async function composePdf(sources, pageRefs) {
+export async function composePdf(sources, pageRefs, options = {}) {
   if (!pageRefs.length) throw new Error('There are no pages to export.');
+  const watermarkText = watermarkTextFromOptions(options.watermark);
+  const watermarkImages = new Map();
   const destination = await PDFDocument.create();
   const originalDocs = new Map();
   const byId = new Map(sources.map((source) => [source.id, source]));
@@ -98,6 +101,19 @@ export async function composePdf(sources, pageRefs) {
       page.setRotation(degrees(angle));
     }
     destination.addPage(page);
+    if (watermarkText) {
+      const crop = page.getCropBox();
+      const key = `${crop.width}x${crop.height}`;
+      let watermarkImage = watermarkImages.get(key);
+      if (!watermarkImage) {
+        const png = await renderWatermarkPng(watermarkText, crop.width, crop.height);
+        watermarkImage = await destination.embedPng(png);
+        watermarkImages.set(key, watermarkImage);
+      }
+      page.drawImage(watermarkImage, {
+        x: crop.x, y: crop.y, width: crop.width, height: crop.height, opacity: WATERMARK_OPACITY,
+      });
+    }
   }
   destination.setTitle('Organized with PlainMile PDF');
   destination.setCreator('PlainMile PDF');

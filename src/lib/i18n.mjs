@@ -12,7 +12,7 @@ export const siteCopy = {
     home: {
       eyebrow: 'PDF TOOLS · FREE TO USE', title: 'Work with PDF pages, your way.',
       lead: 'Combine documents, move pages into the right order, rotate, remove or split them. See the result before you save.',
-      start: 'Open PDF workspace', explore: 'Browse tools', local: 'Processed in your browser', noaccount: 'No account or watermarks', ordered: 'Full control of page order',
+      start: 'Open PDF workspace', explore: 'Browse tools', local: 'Processed in your browser', noaccount: 'No account or automatic watermarks', ordered: 'Full control of page order',
       visualTitle: 'Example page workspace', file1: 'Contract · page 1', file2: 'Attachment · page 2', file3: 'Contract · page 2',
       toolsEyebrow: 'PDF TOOLBOX', toolsTitle: 'Choose a task', toolsLead: 'Each tool opens the same workspace, so you can combine actions without reloading your files.',
       howTitle: 'A familiar, straightforward workflow', howSteps: ['Add one or more PDFs or images', 'Reorder or edit with visual page thumbnails', 'Download the finished PDF'],
@@ -35,7 +35,7 @@ export const siteCopy = {
     home: {
       eyebrow: 'PDF 工具 · 免费使用', title: '整理 PDF 页面，就这么简单。',
       lead: '合并多个文件、自由调整页面顺序、旋转、删除或拆分。先预览，再下载，不需要上传文件。',
-      start: '打开 PDF 工作台', explore: '查看全部工具', local: '浏览器本地处理', noaccount: '无需账号、不加水印', ordered: '逐页查看与精确排序',
+      start: '打开 PDF 工作台', explore: '查看全部工具', local: '浏览器本地处理', noaccount: '无需账号、不强制添加水印', ordered: '逐页查看与精确排序',
       visualTitle: '页面工作台示意', file1: '合同 · 第 1 页', file2: '附件 · 第 2 页', file3: '合同 · 第 2 页',
       toolsEyebrow: 'PDF 工具箱', toolsTitle: '选择您要做的操作', toolsLead: '各工具共用同一个工作台，可以连续操作，不必反复导入文件。',
       howTitle: '熟悉、直接的操作流程', howSteps: ['添加 PDF 或图片', '通过页面缩略图调整顺序和内容', '下载整理完成的 PDF'],
@@ -62,11 +62,16 @@ export const chineseTools = {
   'rotate-pdf': { title: '旋转 PDF 页面', short: '修正方向不对的扫描页', headline: '轻松调整歪倒的页面。', description: '选中一页或多页，以 90° 为单位旋转，再导出新的 PDF。', details: '选中方向不正确的页面，向左或向右旋转。原始文件不会被修改。', steps: ['添加 PDF', '选择并旋转页面', '导出 PDF'] },
   'extract-pages': { title: '提取 PDF 页面', short: '只保留需要的页面', headline: '把选中的页面单独保存。', description: '从一个或多个 PDF 中勾选页面，按照工作台当前顺序提取成新 PDF。', details: '适合从报告、合同和附件中快速提取需要的几页。', steps: ['添加 PDF', '选择需要的页面', '导出所选页面'] },
   'delete-pages': { title: '删除 PDF 页面', short: '去除不需要的页面', headline: '去掉不需要的 PDF 页面。', description: '预览并批量删除页面，支持撤销操作。不会修改原始 PDF。', details: '勾选一个或多个页面、删除、核对结果，再下载整理好的文档。', steps: ['添加 PDF', '选择并删除页面', '导出 PDF'] },
+  'watermark-pdf': { title: '添加 PDF 水印', short: '自定义文字水印', headline: '按需给 PDF 添加水印。', description: '默认无水印。可选择开启并填写中文或英文文字，在浏览器本地生成水印 PDF。', details: '通过工作台的“导出选项”开启文字水印。默认关闭，不会给文件自动加标记。', steps: ['添加 PDF 文件', '打开导出选项并输入水印内容', '导出带水印的 PDF'] },
   'image-to-pdf': { title: '图片转 PDF', short: '支持 JPG、PNG、WebP', headline: '将图片整理为 PDF。', description: '将 JPG、PNG、WebP 图片转为 PDF 页面，可与现有 PDF 混排和合并。', details: '图片会按比例放入 A4 纸张，不会被拉伸。可随时调整顺序后导出。', steps: ['添加图片', '调整顺序', '导出 PDF'] },
 };
 
 export const workspaceCopy = {
   en: {
+    exportOptions: 'Export options', exportOptionsHint: 'No watermark is added unless you enable it.', watermarkOn: 'Watermark on',
+    watermarkLabel: 'Add text watermark (optional)', watermarkTextLabel: 'Watermark text', watermarkPlaceholder: 'e.g. CONFIDENTIAL',
+    watermarkHelp: 'Light diagonal text on every exported page. Thumbnail previews are approximate.',
+    watermarkNeedsText: 'Enter text to apply a watermark, or switch it off to export without one.',
     app: 'PDF page workspace', local: 'ON-DEVICE PROCESSING', organize: 'Organize', split: 'Split', add: 'Add files', export: 'Export PDF', working: 'Working…',
     dropTitle: 'Drop PDF files or images here', dropSub: 'Or choose files from your device', choose: 'Choose PDF or images', opening: 'Opening files…',
     limits: 'PDF, JPG, PNG, WebP · Up to 20 files · 25 MB each · 200 pages total', private: 'Your files stay on this device.', reset: 'Clear workspace and start over',
@@ -84,6 +89,10 @@ export const workspaceCopy = {
     invalidRange: 'Check page ranges or pages per file to continue.', estimate: '{files} PDF file(s) will be generated.',
   },
   zh: {
+    exportOptions: '导出选项', exportOptionsHint: '默认无水印，只有主动开启后才会添加。', watermarkOn: '水印已开启',
+    watermarkLabel: '添加文字水印（可选）', watermarkTextLabel: '水印文字', watermarkPlaceholder: '例如：内部资料',
+    watermarkHelp: '导出时在每页添加居中斜向的浅色水印，缩略图为近似预览。',
+    watermarkNeedsText: '请填写水印内容；不需要时可关闭水印开关。',
     app: 'PDF 页面工作台', local: '文件仅在本机处理', organize: '整理页面', split: '拆分文件', add: '添加文件', export: '导出 PDF', working: '正在处理…',
     dropTitle: '将 PDF 或图片拖入此处', dropSub: '也可以从您的设备中选择文件', choose: '选择 PDF 或图片', opening: '正在读取…',
     limits: 'PDF、JPG、PNG、WebP · 最多 20 个文件 · 单文件 25 MB · 共 200 页', private: '文件始终留在您的设备上。', reset: '清空工作台，重新开始',
@@ -109,6 +118,7 @@ export function interpolate(template, params = {}) {
 export function translateProcessingError(message, locale = 'en') {
   if (locale !== 'zh') return message;
   const error = String(message);
+  if (/enter watermark text|watermark text must|watermarks require|canvas is unavailable for watermark|could not create the watermark image|invalid PDF page dimensions for watermark/i.test(error)) return '请填写有效的水印文字，或关闭水印功能。';
   if (/reversed|outside pages|invalid page range|range such as|range is supported|pages.per.file|no pages to split/i.test(error)) return workspaceCopy.zh.invalidRange;
   if (/password.protected|encrypted/i.test(error)) return '暂不支持带密码保护的 PDF，请先使用已授权方式解锁。';
   if (/could not be opened|as a PDF|corrupt/i.test(error)) return '文件无法作为 PDF 打开，请检查文件是否损坏。';

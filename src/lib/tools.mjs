@@ -50,6 +50,13 @@ export const tools = [
     steps: ['Open your PDF', 'Select and delete unnecessary pages', 'Export the cleaned PDF'],
   },
   {
+    slug: 'watermark-pdf', title: 'Add PDF Watermark', short: 'Optional custom text',
+    headline: 'Add a watermark only when you want one.',
+    description: 'Add your own light diagonal text watermark to a PDF. Watermarking is off by default, and your files stay in the browser.',
+    details: 'Open Export options, turn on Add text watermark and enter your text. Without opting in, files export without any watermark.',
+    steps: ['Add a PDF', 'Enable text watermark under Export options', 'Export the marked PDF'],
+  },
+  {
     slug: 'image-to-pdf', title: 'Images to PDF', short: 'JPG, PNG and WebP',
     headline: 'Turn your images into a tidy PDF.',
     description: 'Convert JPG, PNG and WebP images into PDF pages, reorder them and combine with existing PDF files if needed.',

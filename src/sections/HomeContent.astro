@@ -6,7 +6,7 @@ const { locale = 'en' } = Astro.props;
 const p = siteCopy[locale].home;
 const href = (path) => langPath(path, locale);
 const title = locale === 'zh' ? '免费 PDF 合并、拆分与页面排序工具 - PlainMile' : 'Free PDF Merge, Split & Page Organizer - PlainMile';
-const desc = locale === 'zh' ? '无需登录、无需上传文件。在浏览器中合并 PDF、拆分、拖拽排序、旋转、删除和提取页面；支持 JPG、PNG、WebP 图片转 PDF。' : 'Merge, split, reorder, rotate, delete and extract PDF pages in your browser. No file uploads, account or watermarks.';
+const desc = locale === 'zh' ? '无需登录、无需上传文件。在浏览器中合并 PDF、拆分、拖拽排序、旋转、删除和提取页面；支持 JPG、PNG、WebP 图片转 PDF，可选添加文字水印。' : 'Merge, split, reorder, rotate, delete and extract PDF pages in your browser. No file uploads or accounts. No automatic watermarks; custom watermarks are optional.';
 ---
 <Base locale={locale} title={title} description={desc}>
   <section class="hero site-container">

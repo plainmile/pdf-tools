@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFDict, PDFName } from 'pdf-lib';
 import JSZip from 'jszip';
 import { readFile } from 'node:fs/promises';
 
@@ -30,6 +30,82 @@ async function downloadPdf(page, action) {
   const bytes = await readFile(await download.path());
   return PDFDocument.load(bytes);
 }
+
+function watermarkImageCounts(pdf) {
+  return pdf.getPages().map((pdfPage) => {
+    const resources = pdf.context.lookup(pdfPage.node.Resources(), PDFDict);
+    const xObjects = resources?.lookup(PDFName.of('XObject'), PDFDict);
+    return xObjects?.keys().length ?? 0;
+  });
+}
+
+test('exports without any watermark by default and only marks pages after opt-in', async ({ page }) => {
+  await loadInput(page);
+  await page.getByTestId('export-options-button').click();
+  await expect(page.getByTestId('watermark-toggle')).not.toBeChecked();
+  const plain = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(watermarkImageCounts(plain)).toEqual([0, 0, 0]);
+
+  await page.getByTestId('watermark-toggle').check();
+  await page.getByTestId('watermark-text').fill('CONFIDENTIAL');
+  await expect(page.getByText('CONFIDENTIAL').first()).toBeVisible();
+  const marked = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(watermarkImageCounts(marked)).toEqual([1, 1, 1]);
+
+  await page.getByTestId('watermark-toggle').uncheck();
+  const plainAgain = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(watermarkImageCounts(plainAgain)).toEqual([0, 0, 0]);
+});
+
+test('watermark requires custom text, never inserts a default brand watermark', async ({ page }) => {
+  await loadInput(page);
+  await page.getByTestId('export-options-button').click();
+  await page.getByTestId('watermark-toggle').check();
+  await page.getByRole('button', { name: 'Export PDF' }).click();
+  await expect(page.getByRole('alert')).toContainText('Enter watermark text');
+  await page.getByTestId('watermark-text').fill('  ');
+  await page.getByRole('button', { name: 'Export PDF' }).click();
+  await expect(page.getByRole('alert')).toContainText('Enter watermark text');
+});
+
+test('Chinese watermark page supports custom Chinese text and resets to no watermark', async ({ page }) => {
+  await page.goto('/zh/watermark-pdf/');
+  await page.getByTestId('file-input').setInputFiles((await inputDocuments())[0]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await expect(page.getByTestId('watermark-toggle')).toBeVisible();
+  await expect(page.getByTestId('watermark-toggle')).not.toBeChecked();
+  await page.getByTestId('watermark-toggle').check();
+  await page.getByTestId('watermark-text').fill('\u5185\u90e8\u8d44\u6599');
+  const marked = await downloadPdf(page, () => page.getByRole('button', { name: '\u5bfc\u51fa PDF' }).click());
+  expect(watermarkImageCounts(marked)).toEqual([1, 1]);
+  await page.getByRole('button', { name: '\u6e05\u7a7a', exact: true }).click();
+  await page.getByTestId('file-input').setInputFiles((await inputDocuments())[0]);
+  await expect(page.getByTestId('watermark-toggle')).not.toBeChecked();
+  const plain = await downloadPdf(page, () => page.getByRole('button', { name: '\u5bfc\u51fa PDF' }).click());
+  expect(watermarkImageCounts(plain)).toEqual([0, 0]);
+});
+
+test('optional watermark is applied to selected extraction and every split PDF', async ({ page }) => {
+  await loadInput(page);
+  await page.getByTestId('export-options-button').click();
+  await page.getByTestId('watermark-toggle').check();
+  await page.getByTestId('watermark-text').fill('REVIEW COPY');
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  const extracted = await downloadPdf(page, () => page.getByRole('button', { name: 'Extract selected pages' }).click());
+  expect(watermarkImageCounts(extracted)).toEqual([1]);
+
+  await page.getByRole('tab', { name: 'Split' }).click();
+  const pending = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download split PDFs (ZIP)' }).click();
+  const downloaded = await pending;
+  const zip = await JSZip.loadAsync(await readFile(await downloaded.path()));
+  const parts = Object.values(zip.files);
+  expect(parts).toHaveLength(2);
+  for (const part of parts) {
+    const pdf = await PDFDocument.load(await part.async('uint8array'));
+    expect(watermarkImageCounts(pdf).every((n) => n === 1)).toBe(true);
+  }
+});
 
 test('cross-file drag-and-drop changes the actual exported page order', async ({ page }) => {
   await loadInput(page);
@@ -80,7 +156,7 @@ test('split PDFs into ZIP ranges in the current workspace order', async ({ page 
 test('rejects invalid reversed split range without a download', async ({ page }) => {
   await loadInput(page);
   await page.getByRole('tab', { name: 'Split' }).click();
-  await page.getByLabel('Page ranges').fill('3-1');
+  await page.getByRole('textbox', { name: 'Page ranges', exact: true }).fill('3-1');
   await page.getByRole('button', { name: 'Download split PDFs (ZIP)' }).click();
   await expect(page.getByRole('alert')).toContainText('reversed');
 });

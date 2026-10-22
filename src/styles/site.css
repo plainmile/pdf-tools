@@ -181,6 +181,17 @@ main { flex: 1; }
 .tool-switch button.active { color: var(--text); background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
 .workspace-primary-buttons { display: flex; gap: 9px; }
 .hidden-input { position: absolute; height: 1px; width: 1px; left: -9999px; overflow: hidden; }
+/* Optional export treatment stays beside Export, not in the page editing toolbar. */
+.workspace-primary-buttons { flex-wrap: wrap; justify-content: flex-end; }
+.export-options-panel { padding: 17px 20px 19px; border-bottom: 1px solid var(--border); background: var(--panel); }
+.export-options-header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 17px; margin-bottom: 13px; }
+.export-options-header strong { font-size: 13px; }
+.export-options-header span { font-size: 11px; color: var(--muted); }
+.export-watermark-switch { margin: 0; }
+.watermark-fields { display: flex; flex-direction: column; align-items: start; max-width: 520px; margin: 15px 0 0 25px; }
+.watermark-fields input { height: 39px; width: 100%; padding: 9px 11px; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 5px; }
+.watermark-fields .input-note { margin: 8px 0 0; }
+.page-watermark-preview { position: absolute; top: 50%; left: 50%; width: max-content; max-width: 88%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transform: translate(-50%, -50%) rotate(-30deg); opacity: .26; color: #424a56; font-size: clamp(11px, 1.5vw, 20px); font-weight: 700; pointer-events: none; text-align: center; }
 .workspace-content { min-height: 340px; padding: 21px; }
 .dropzone { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; padding: 33px 20px; text-align: center; border: 1.5px dashed var(--border); background: var(--bg); border-radius: 9px; }
 .drop-icon { display: grid; place-items: center; font-size: 27px; height: 45px; width: 45px; color: var(--accent); border: 1px solid var(--border); background: var(--surface); border-radius: 8px; margin-bottom: 18px; }
@@ -264,7 +275,7 @@ main { flex: 1; }
   .tool-explanation, .split-panel { grid-template-columns: 1fr; gap: 19px; }
   .workspace-controls, .workspace-subbar { flex-wrap: wrap; }
   .workspace-content { padding: 13px; }
-  .workspace-bar, .workspace-controls, .workspace-foot { padding-inline: 13px; }
+  .workspace-bar, .workspace-controls, .workspace-foot, .export-options-panel { padding-inline: 13px; }
   .workspace-status { display: none; }
   .workspace-foot { flex-wrap: wrap; }
   .split-panel { padding: 19px; }
@@ -279,5 +290,7 @@ main { flex: 1; }
   .page-tile { padding: 7px; } .page-preview { height: 155px; }
   .page-action-buttons button { font-size: 10px; padding: 7px; }
   .dropzone { padding: 30px 11px; } .dropzone h2 { font-size: 18px; }
+  .workspace-primary-buttons { width: 100%; justify-content: flex-start; }
+  .watermark-fields { margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }

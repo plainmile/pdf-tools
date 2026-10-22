@@ -11,8 +11,9 @@ A free, browser-local PDF workspace intended for `https://pdf.plainmile.com/`.
 - Select, rotate, delete, extract and undo/redo up to 20 edits.
 - Split by page ranges (`1-3, 4-6`) or every N pages, bundled in a ZIP download.
 - Convert JPG, PNG and WebP to A4 PDF pages and mix with other PDFs.
+- Optional text watermarks: **off by default**. Open Export options near the download button, enable the checkbox and enter your own text (English or Chinese). The light diagonal overlay is added on export only and also works for extracted/split PDFs. No automatic company watermark.
 - No upload API, account, server-side PDF processing, analytics or advertising code.
-- Human-written bilingual English / Simplified Chinese SEO pages: `/workspace/`, `/merge-pdf/`, `/split-pdf/`, `/organize-pdf/`, `/rotate-pdf/`, `/extract-pages/`, `/delete-pages/`, `/image-to-pdf/`, `/privacy/` plus `/zh/` counterparts. Hreflang and canonical tags provided.
+- Human-written bilingual English / Simplified Chinese SEO pages: `/workspace/`, `/merge-pdf/`, `/split-pdf/`, `/organize-pdf/`, `/rotate-pdf/`, `/extract-pages/`, `/delete-pages/`, `/image-to-pdf/`, `/watermark-pdf/`, `/privacy/` plus `/zh/` counterparts. Hreflang and canonical tags provided.
 - Three appearance modes: follow system, light, dark. Preference saved locally if the browser allows localStorage; all modes are CSS token-based.
 
 ## Limits and known non-goals
@@ -23,6 +24,7 @@ A free, browser-local PDF workspace intended for `https://pdf.plainmile.com/`.
 - Not a PDF to Word, OCR, PDF compression, secure redaction or cryptographic signature tool.
 - Source documents are not sent to any server. The generated PDF exists in browser memory until download. Hosting infrastructure may still record routine HTTP requests for website assets.
 - Browser performance depends on device RAM/CPU, especially for large documents.
+- Watermarks are visual overlays, **not** secure redactions or digital signatures. Watermark text is rendered using local system fonts and rasterized into each exported PDF page (no external font download). If your device does not have a suitable Chinese font, preview and output may show fallback glyphs; check important exports. Preview overlays on thumbnails are approximate.
 - Native drag-and-drop may vary on touch devices. Dedicated move buttons are supported there.
 
 ## Architecture
@@ -65,6 +67,7 @@ CI builds the final image, smoke-tests routes and static assets, and runs Playwr
 - Image conversion to a PDF.
 - English / Chinese language routing, accessible language link, three appearance choices and saved preference.
 - Group-drag page ordering and Chinese split ZIP exports.
+- Watermark default-off, custom English and Chinese text, actual PDF page image overlays, disable/reset behavior, and optional watermarking in extracted and split outputs.
 
 **A successful local unit test is not a substitute for CI or E2E.** Do not merge until GitHub checks pass.
 

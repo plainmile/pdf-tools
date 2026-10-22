@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import JSZip from 'jszip';
 import { LIMITS, composePdf, isSupportedFile, readSourceFile, saveDownload } from '../lib/pdfEngine.mjs';
+import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, shiftPage, rotatePages, deletePages, parsePageRanges, chunkPageRanges,
   getRangePages, makeHistoryState, commitHistory, undoHistory, redoHistory,
 } from '../lib/pageOperations.mjs';
 
-function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t }) {
+function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview }) {
   const targetRef = useRef(null);
   const canvasRef = useRef(null);
   const [visible, setVisible] = useState(false);
@@ -61,6 +62,7 @@ function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t }) {
         <canvas ref={canvasRef} role="img" aria-label={locale === 'zh' ? `${source?.name ?? 'PDF'} 第 ${pageRef.pageIndex + 1} 页预览` : `${source?.name ?? 'PDF'} page ${pageRef.pageIndex + 1} preview`} />
       )}
       {!visible && <div className="preview-loading" aria-hidden="true" />}
+      {watermarkPreview && <span className="page-watermark-preview" aria-hidden="true">{watermarkPreview}</span>}
     </div>
   );
 }
@@ -81,7 +83,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [splitMode, setSplitMode] = useState('ranges');
   const [ranges, setRanges] = useState('1-2, 3');
   const [chunkSize, setChunkSize] = useState('1');
+  const [exportSettingsOpen, setExportSettingsOpen] = useState(mode === 'watermark-pdf');
+  const [watermarkEnabled, setWatermarkEnabled] = useState(false);
+  const [watermarkText, setWatermarkText] = useState('');
   const pages = history.present;
+  const watermark = { enabled: watermarkEnabled, text: watermarkText };
+  const watermarkPreview = watermarkEnabled && watermarkText.trim() ? watermarkText.trim() : null;
   const selectedCount = selected.size;
   const bytesInMemory = useMemo(() => sources.reduce((total, item) => total + item.inputSize, 0), [sources]);
   const sourceLookup = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources]);
@@ -160,13 +167,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
 
   const exportAll = () => withBusy(async () => {
     if (!pages.length) throw new Error(t.noFile);
-    saveDownload(await composePdf(sources, pages), 'plainmile-organized.pdf');
+    saveDownload(await composePdf(sources, pages, { watermark }), 'plainmile-organized.pdf');
     setNotice(t.exported);
   });
   const exportSelected = () => withBusy(async () => {
     const chosen = pages.filter((page) => selected.has(page.id));
     if (!chosen.length) throw new Error(t.selectionNeeded);
-    saveDownload(await composePdf(sources, chosen), 'plainmile-extracted.pdf');
+    saveDownload(await composePdf(sources, chosen, { watermark }), 'plainmile-extracted.pdf');
     setNotice(interpolate(t.extracted, { pages: chosen.length }));
   });
   const splitIntoZip = () => withBusy(async () => {
@@ -177,7 +184,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     const zip = new JSZip();
     for (let index = 0; index < pieces.length; index++) {
       const range = pieces[index];
-      const contents = await composePdf(sources, getRangePages(pages, range));
+      const contents = await composePdf(sources, getRangePages(pages, range), { watermark });
       zip.file(`part-${String(index + 1).padStart(2, '0')}-pages-${range.start}-${range.end}.pdf`, contents);
     }
     saveDownload(await zip.generateAsync({ type: 'blob', compression: 'STORE' }), 'plainmile-split-pdfs.zip', 'application/zip');
@@ -199,6 +206,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   };
 
   const clearAll = () => {
+    setWatermarkEnabled(false); setWatermarkText(''); setExportSettingsOpen(mode === 'watermark-pdf');
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
     for (const promise of previewDocuments.current.values()) promise.then((doc) => doc.destroy()).catch(() => {});
     previewDocuments.current.clear();
@@ -231,9 +239,26 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         <div className="workspace-primary-buttons">
           <input ref={inputRef} data-testid="file-input" aria-label={t.add} className="hidden-input" type="file" multiple accept=".pdf,application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => { void addFiles(event.target.files); event.target.value = ''; }} />
           <button className="button button-secondary button-small" type="button" disabled={busy} onClick={() => inputRef.current?.click()}>＋ {t.add}</button>
+          {pages.length > 0 && <button className="button button-secondary button-small" type="button" disabled={busy} onClick={() => setExportSettingsOpen((value) => !value)} aria-expanded={exportSettingsOpen} aria-controls="export-options-panel" data-testid="export-options-button">{t.exportOptions}{watermarkEnabled ? ` \u00b7 ${t.watermarkOn}` : ""}</button>}
           <button className="button button-primary button-small" type="button" disabled={!pages.length || busy} onClick={exportAll} aria-label={t.export}>{busy ? t.working : t.export} ↓</button>
         </div>
       </div>
+      {pages.length > 0 && exportSettingsOpen && (
+        <section id="export-options-panel" className="export-options-panel" aria-label={t.exportOptions}>
+          <div className="export-options-header"><strong>{t.exportOptions}</strong><span>{t.exportOptionsHint}</span></div>
+          <label className="option-radio export-watermark-switch">
+            <input type="checkbox" data-testid="watermark-toggle" checked={watermarkEnabled} disabled={busy} onChange={(event) => { setWatermarkEnabled(event.target.checked); setError(''); }} />
+            <span>{t.watermarkLabel}</span>
+          </label>
+          {watermarkEnabled && (
+            <div className="watermark-fields">
+              <label className="input-label" htmlFor="watermark-text">{t.watermarkTextLabel}</label>
+              <input id="watermark-text" data-testid="watermark-text" type="text" maxLength={MAX_WATERMARK_CHARS} value={watermarkText} disabled={busy} onChange={(event) => { setWatermarkText(event.target.value); setError(''); }} placeholder={t.watermarkPlaceholder} />
+              <p className="input-note" aria-live="polite">{watermarkText.trim() ? t.watermarkHelp : t.watermarkNeedsText}</p>
+            </div>
+          )}
+        </section>
+      )}
       <div className="workspace-content" onDragOver={(event) => { if (Array.from(event.dataTransfer.types ?? []).includes('Files')) event.preventDefault(); }} onDrop={(event) => { if (event.dataTransfer.files?.length) { event.preventDefault(); void addFiles(event.dataTransfer.files); } }}>
         {error && <div className="notice notice-error" role="alert">{error}<button type="button" aria-label={t.dismiss} onClick={() => setError('')}>×</button></div>}
         {notice && <div className="notice notice-success" role="status">{notice}<button type="button" aria-label={t.dismiss} onClick={() => setNotice('')}>×</button></div>}
@@ -279,7 +304,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                         onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }} onDrop={(event) => { event.stopPropagation(); onMoveDrop(event, pageRef.id); }} onDragEnd={() => setDragged(null)}>
                         <label className="page-tile-checkbox"><input type="checkbox" checked={selected.has(pageRef.id)} onChange={(event) => toggleSelection(pageRef.id, index, Boolean(event.nativeEvent?.shiftKey))} aria-label={locale === 'zh' ? `${t.selectPage} ${index + 1} 页` : `Select page ${index + 1}`} /></label>
                         <div className="tile-sequence">{String(index + 1).padStart(2, '0')}</div>
-                        <PageThumbnail source={source} pageRef={pageRef} getPreviewDoc={getPreviewDoc} locale={locale} t={t} />
+                        <PageThumbnail source={source} pageRef={pageRef} getPreviewDoc={getPreviewDoc} locale={locale} t={t} watermarkPreview={watermarkPreview} />
                         <div className="tile-info" title={source?.name}><strong>{pageName(pageRef.pageIndex + 1)}</strong><small>{source?.name ?? t.document}</small></div>
                         <div className="tile-moves"><button type="button" disabled={index === 0 || busy} title={t.moveLeft.replace('{n}', index + 1)} aria-label={interpolate(t.moveLeft, { n: index + 1 })} onClick={() => commit((previous) => shiftPage(previous, pageRef.id, -1))}>←</button><span title={t.dragTitle} aria-hidden="true">⠿</span><button type="button" disabled={index === pages.length - 1 || busy} title={interpolate(t.moveRight, { n: index + 1 })} aria-label={interpolate(t.moveRight, { n: index + 1 })} onClick={() => commit((previous) => shiftPage(previous, pageRef.id, 1))}>→</button></div>
                       </div>
