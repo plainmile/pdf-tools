@@ -360,7 +360,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           <div className="utility-options">
             <label><span>{t.imagePaper}</span>
               <select aria-label={t.imagePaper} data-testid="image-paper" value={imageLayout.paper} disabled={busy}
-                onChange={event => setImageLayout(value => ({ ...value, paper: event.target.value }))}>
+                onChange={event => setImageLayout(value => ({ ...value, paper: event.target.value,
+                  // "Fit to image" should follow each photo by default, without
+                  // silently inheriting the previous portrait/landscape paper orientation.
+                  orientation: event.target.value === 'fit' ? 'auto' : value.orientation }))}>
                 <option value="a4">A4</option>
                 <option value="letter">US Letter</option>
                 <option value="fit">{t.imageFit}</option>
