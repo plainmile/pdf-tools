@@ -325,3 +325,18 @@ test('page number tool warns that overlay can overlap content', async ({ page })
   await page.goto('/zh/add-page-numbers/');
   await expect(page.getByTestId('page-overlap-warning')).toContainText('可能遮挡页脚');
 });
+
+test('cancel stops long text-to-PDF generation without downloading partial output', async ({ page }) => {
+  test.setTimeout(30000);
+  await page.goto('/txt-to-pdf/');
+  await page.getByTestId('utility-text').fill('A long line for cancellation testing. '.repeat(7000));
+  const downloads = [];
+  page.on('download', download => downloads.push(download.suggestedFilename()));
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('utility-cancel')).toBeVisible();
+  await page.getByTestId('utility-cancel').click();
+  await expect(page.getByRole('alert')).toContainText('Processing cancelled', { timeout: 15000 });
+  await expect(page.getByTestId('utility-cancel')).toHaveCount(0);
+  await expect(page.getByTestId('utility-run')).toBeEnabled();
+  expect(downloads).toEqual([]);
+});
