@@ -374,3 +374,59 @@ test('Chinese empty workspace explains undo and reset before starting a new docu
   const restored = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
   expect(restored.getPages().map(p => p.getWidth())).toEqual([314]);
 });
+
+test('split ZIP supports 50 outputs with progress controls and valid downloaded PDFs', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'fifty-parts.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf(Array.from({ length: 50 }, (_, index) => 301 + index)),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(50);
+  await page.getByRole('tab', { name: 'Split' }).click();
+  await expect(page.getByTestId('split-output-budget')).toContainText('128 MB');
+  await page.getByRole('radio', { name: 'Split every N pages' }).check();
+  const waiting = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download split PDFs (ZIP)' }).click();
+  const download = await waiting;
+  const archive = await JSZip.loadAsync(await readFile(await download.path()));
+  const names = Object.keys(archive.files).sort();
+  expect(names).toHaveLength(50);
+  const first = await PDFDocument.load(await archive.files[names[0]].async('uint8array'));
+  const last = await PDFDocument.load(await archive.files[names[49]].async('uint8array'));
+  expect(first.getPages()[0].getWidth()).toBe(301);
+  expect(last.getPages()[0].getWidth()).toBe(350);
+  await expect(page.getByRole('status')).toContainText('Created 50 PDF file(s)');
+  await expect(page.getByTestId('split-cancel')).toHaveCount(0);
+});
+
+test('cancelling a long split stops ZIP download and restores workspace controls', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'cancel-split.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf(Array.from({ length: 320 }, (_, index) => 300 + index % 12)),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(320);
+  await page.getByRole('tab', { name: 'Split' }).click();
+  await page.getByRole('radio', { name: 'Split every N pages' }).check();
+  await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('7');
+  const downloads = [];
+  page.on('download', event => downloads.push(event.suggestedFilename()));
+  await page.getByRole('button', { name: 'Download split PDFs (ZIP)' }).click();
+  await expect(page.getByTestId('split-cancel')).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Organize' })).toBeDisabled();
+  await page.getByTestId('split-cancel').click();
+  await expect(page.getByRole('alert')).toContainText('Split cancelled', { timeout: 30000 });
+  await expect(page.getByRole('button', { name: 'Download split PDFs (ZIP)' })).toBeEnabled();
+  expect(downloads).toEqual([]);
+});
+
+test('Chinese split clearly announces ZIP limit before running', async ({ page }) => {
+  await page.goto('/zh/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'simple.pdf', mimeType: 'application/pdf', buffer: await makePdf([300, 310]),
+  });
+  await page.getByRole('tab', { name: '拆分文件' }).click();
+  await expect(page.getByTestId('split-output-budget')).toContainText('128 MB');
+});

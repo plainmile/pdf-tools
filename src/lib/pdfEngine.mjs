@@ -138,7 +138,13 @@ export async function composePdf(sources, pageRefs, options = {}) {
   const destination = await PDFDocument.create();
   const originalDocs = new Map();
   const byId = new Map(sources.map((source) => [source.id, source]));
-  for (const pageRef of pageRefs) {
+  for (let index = 0; index < pageRefs.length; index++) {
+    const pageRef = pageRefs[index];
+    if (options.signal) {
+      // Yield periodically so a user can cancel a long split without locking the UI.
+      if (index % 8 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+      if (options.signal.aborted) throw new Error('Split cancelled.');
+    }
     let sourceDoc = originalDocs.get(pageRef.sourceId);
     if (!sourceDoc) {
       const source = byId.get(pageRef.sourceId);
@@ -170,7 +176,10 @@ export async function composePdf(sources, pageRefs, options = {}) {
   }
   destination.setTitle('Organized with PlainMile PDF');
   destination.setCreator('PlainMile PDF');
-  return new Uint8Array(await destination.save({ useObjectStreams: true }));
+  if (options.signal?.aborted) throw new Error('Split cancelled.');
+  const result = new Uint8Array(await destination.save({ useObjectStreams: true }));
+  if (options.signal?.aborted) throw new Error('Split cancelled.');
+  return result;
 }
 
 export function saveDownload(bytesOrBlob, filename, mime = 'application/pdf') {

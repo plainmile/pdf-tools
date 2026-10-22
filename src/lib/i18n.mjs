@@ -87,6 +87,7 @@ export const workspaceCopy = {
     dragHint: 'Drag thumbnails to reorder. To move several pages, select them first and drag one of the selected pages. Shift-click selects a range. On touch screens or with a keyboard, use the move buttons.',
     addMore: 'Add more files', pageName: 'Page', document: 'Document', previewFail: 'Preview unavailable', selectPage: 'Select page', moveLeft: 'Move page {n} left', moveRight: 'Move page {n} right', dragTitle: 'Drag to reorder',
     splitTitle: 'Choose how to split', splitHint: 'Page numbers follow your current workspace order. Each ZIP supports up to 50 output PDFs.',
+    splitOutputBudget: 'Up to 128 MB of generated PDF files per ZIP to protect browser memory.', splitPartsProgress: 'Creating PDF {done} of {total}', splitZipProgress: 'Packaging ZIP: {percent}%', splitCancel: 'Cancel split', splitCancelling: 'Cancelling…',
     byRanges: 'Split by page ranges', pageRanges: 'Page ranges', rangeHint: 'Example: 1-3, 4-5, 6. Each range becomes one PDF.', every: 'Split every N pages', perFile: 'Pages per PDF', downloadZip: 'Download split PDFs (ZIP)', creating: 'Creating PDFs…',
     foot: 'All document processing stays in your browser', footLimit: '200 MB combined · No password-protected PDFs', bigDocWarning: 'Large PDF: previews are loaded as you scroll. Hundreds of pages can still consume significant device memory. Export may take longer.',
     emptyHistoryHint: 'All pages were removed. Undo to restore them, or add a file to begin a new workspace (the old undo history will be cleared).',
@@ -109,6 +110,7 @@ export const workspaceCopy = {
     dragHint: '拖拽缩略图可调整顺序。先多选再拖动选中页面，可成组移动；按住 Shift 点击可选择连续页面。触屏或键盘操作可用每页下方的左右按钮。',
     addMore: '继续添加文件', pageName: '第', document: '文档', previewFail: '无法预览', selectPage: '选择第', moveLeft: '向左移动第 {n} 页', moveRight: '向右移动第 {n} 页', dragTitle: '拖动可调整顺序',
     splitTitle: '选择拆分方式', splitHint: '页码按当前工作台顺序计算。每个 ZIP 最多包含 50 个拆分 PDF。',
+    splitOutputBudget: '每个 ZIP 的 PDF 输出累计不得超过 128 MB，以保护浏览器内存。', splitPartsProgress: '正在生成第 {done}/{total} 个 PDF', splitZipProgress: '正在打包 ZIP：{percent}%', splitCancel: '取消拆分', splitCancelling: '正在取消…',
     byRanges: '按页码范围拆分', pageRanges: '页码范围', rangeHint: '例如：1-3, 4-5, 6。每个范围独立生成一个 PDF。', every: '每 N 页拆分一次', perFile: '每个 PDF 的页数', downloadZip: '下载拆分文件（ZIP）', creating: '正在生成…',
     foot: '所有文档操作均在浏览器本地完成', footLimit: '合计最多 200 MB · 暂不支持加密 PDF', bigDocWarning: '大文档提示：仅在滚动到页面时生成缩略图，但数百页仍可能消耗较多内存，导出也可能较慢。',
     emptyHistoryHint: '所有页面都已删除。可点击“撤销”恢复；如果添加新文件，将开始新工作台，并清除旧操作的撤销记录。',
@@ -127,6 +129,8 @@ export function interpolate(template, params = {}) {
 export function translateProcessingError(message, locale = 'en') {
   if (locale !== 'zh') return message;
   const error = String(message);
+  if (/Split cancelled/i.test(error)) return '已取消拆分，没有下载未完成的 ZIP。';
+  if (/Split PDF outputs exceed the 128 MB/i.test(error)) return '拆分输出累计超过 128 MB 安全上限，请减少或调整拆分范围。';
   if (/enter watermark text|watermark text must|watermarks require|canvas is unavailable for watermark|could not create the watermark image|invalid PDF page dimensions for watermark/i.test(error)) return '请填写有效的水印文字，或关闭水印功能。';
   if (/50 output|50 ranges|maximum of 50/i.test(error)) return '一次最多生成 50 个 PDF 或使用 50 段页码范围，请减少输出文件数。';
   if (/reversed|outside pages|invalid page range|range such as|range is supported|pages.per.file|no pages to split/i.test(error)) return workspaceCopy.zh.invalidRange;

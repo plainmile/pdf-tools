@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   movePage, movePageGroup, shiftPage, rotatePages, deletePages, parsePageRanges,
   chunkPageRanges, getRangePages, commitHistory, makeHistoryState, undoHistory, redoHistory,
+  MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget,
 } from '../../src/lib/pageOperations.mjs';
 
 const pages = Object.freeze([
@@ -72,4 +73,13 @@ test('selected pages move together while retaining source order', () => {
   assert.deepEqual(movePageGroup(original, ['b', 'd'], 'a').map((p) => p.id), ['b', 'd', 'a', 'c', 'e']);
   assert.deepEqual(movePageGroup(original, ['b', 'd'], 'd'), original);
   assert.deepEqual(original.map((p) => p.id), ['a', 'b', 'c', 'd', 'e']);
+});
+
+test('generated split-PDF budget protects the final ZIP memory footprint', () => {
+  assert.equal(MAX_SPLIT_ZIP_BYTES, 128 * 1024 * 1024);
+  assert.equal(enforceSplitZipBudget(20, 30), 50);
+  assert.equal(enforceSplitZipBudget(MAX_SPLIT_ZIP_BYTES - 1, 1), MAX_SPLIT_ZIP_BYTES);
+  assert.throws(() => enforceSplitZipBudget(MAX_SPLIT_ZIP_BYTES - 1, 2), /128 MB/);
+  assert.throws(() => enforceSplitZipBudget(100, 0), /128 MB/);
+  assert.throws(() => enforceSplitZipBudget(-1, 1), /128 MB/);
 });

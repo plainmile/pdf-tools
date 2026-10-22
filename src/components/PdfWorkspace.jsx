@@ -5,7 +5,7 @@ import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, shiftPage, rotatePages, deletePages, parsePageRanges, chunkPageRanges,
-  getRangePages, makeHistoryState, commitHistory, undoHistory, redoHistory,
+  getRangePages, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget,
 } from '../lib/pageOperations.mjs';
 
 function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview }) {
@@ -73,10 +73,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const inputRef = useRef(null);
   const lastSelectedIndex = useRef(null);
   const previewDocuments = useRef(new Map());
+  const splitAbortRef = useRef(null);
   const [sources, setSources] = useState([]);
   const [history, setHistory] = useState(() => makeHistoryState());
   const [selected, setSelected] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
+  const [splitProgress, setSplitProgress] = useState(null);
+  const [splitCancelling, setSplitCancelling] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [dragged, setDragged] = useState(null);
@@ -126,7 +129,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     }
     previewDocuments.current.clear();
   }, []);
-  useEffect(() => () => releasePreviewDocuments(), [releasePreviewDocuments]);
+  useEffect(() => () => { splitAbortRef.current?.abort(); releasePreviewDocuments(); }, [releasePreviewDocuments]);
 
   const resetSelection = () => { setSelected(new Set()); lastSelectedIndex.current = null; };
   const commit = (operation, preserveSelection = false) => {
@@ -203,14 +206,42 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     const pieces = splitMode === 'ranges'
       ? parsePageRanges(ranges, pages.length)
       : chunkPageRanges(pages.length, Number(chunkSize));
-    const zip = new JSZip();
-    for (let index = 0; index < pieces.length; index++) {
-      const range = pieces[index];
-      const contents = await composePdf(sources, getRangePages(pages, range), { watermark });
-      zip.file(`part-${String(index + 1).padStart(2, '0')}-pages-${range.start}-${range.end}.pdf`, contents);
+    const controller = new AbortController();
+    splitAbortRef.current = controller;
+    setSplitCancelling(false);
+    setSplitProgress({ phase: 'parts', done: 0, total: pieces.length });
+    let size = 0;
+    try {
+      const zip = new JSZip();
+      for (let index = 0; index < pieces.length; index++) {
+        if (controller.signal.aborted) throw new Error('Split cancelled.');
+        const range = pieces[index];
+        const contents = await composePdf(sources, getRangePages(pages, range), { watermark, signal: controller.signal });
+        if (controller.signal.aborted) throw new Error('Split cancelled.');
+        size = enforceSplitZipBudget(size, contents.length);
+        zip.file(`part-${String(index + 1).padStart(2, '0')}-pages-${range.start}-${range.end}.pdf`, contents);
+        setSplitProgress({ phase: 'parts', done: index + 1, total: pieces.length });
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+      if (controller.signal.aborted) throw new Error('Split cancelled.');
+      setSplitProgress({ phase: 'zip', percent: 0 });
+      let lastPercent = -1;
+      const archive = await zip.generateAsync({ type: 'blob', compression: 'STORE', streamFiles: true }, meta => {
+        if (controller.signal.aborted) throw new Error('Split cancelled.');
+        const percent = Math.floor(meta.percent);
+        if (percent >= lastPercent + 5 || percent === 100) {
+          lastPercent = percent;
+          setSplitProgress({ phase: 'zip', percent });
+        }
+      });
+      if (controller.signal.aborted) throw new Error('Split cancelled.');
+      saveDownload(archive, 'plainmile-split-pdfs.zip', 'application/zip');
+      setNotice(interpolate(t.zipped, { files: pieces.length }));
+    } finally {
+      splitAbortRef.current = null;
+      setSplitProgress(null);
+      setSplitCancelling(false);
     }
-    saveDownload(await zip.generateAsync({ type: 'blob', compression: 'STORE' }), 'plainmile-split-pdfs.zip', 'application/zip');
-    setNotice(interpolate(t.zipped, { files: pieces.length }));
   });
 
   const toggleSelection = (id, index, shift) => {
@@ -255,8 +286,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       </div>
       <div className="workspace-controls">
         <div className="tool-switch" role="tablist" aria-label={t.app}>
-          <button type="button" role="tab" aria-selected={tab === 'organize'} className={tab === 'organize' ? 'active' : ''} onClick={() => setTab('organize')}>{t.organize}</button>
-          <button type="button" role="tab" aria-selected={tab === 'split'} className={tab === 'split' ? 'active' : ''} onClick={() => setTab('split')}>{t.split}</button>
+          <button type="button" role="tab" aria-selected={tab === 'organize'} className={tab === 'organize' ? 'active' : ''} onClick={() => setTab('organize')} disabled={busy}>{t.organize}</button>
+          <button type="button" role="tab" aria-selected={tab === 'split'} className={tab === 'split' ? 'active' : ''} onClick={() => setTab('split')} disabled={busy}>{t.split}</button>
         </div>
         <div className="workspace-primary-buttons">
           <input ref={inputRef} data-testid="file-input" aria-label={t.add} className="hidden-input" type="file" multiple accept=".pdf,application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => { void addFiles(event.target.files); event.target.value = ''; }} />
@@ -343,14 +374,19 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
               <section className="split-panel" aria-label={t.splitTitle}>
                 <div className="split-intro"><div className="split-graphic" aria-hidden="true">1–3 <span>→</span> 4–6</div><h3>{t.splitTitle}</h3><p>{t.splitHint}</p></div>
                 <div className="split-fields">
-                  <label className="option-radio"><input type="radio" name="split-method" checked={splitMode === 'ranges'} onChange={() => setSplitMode('ranges')} />{t.byRanges}</label>
+                  <label className="option-radio"><input type="radio" name="split-method" checked={splitMode === 'ranges'} disabled={busy} onChange={() => setSplitMode('ranges')} />{t.byRanges}</label>
                   <label className="input-label" htmlFor="ranges-input">{t.pageRanges}</label>
                   <input id="ranges-input" value={ranges} onChange={(event) => setRanges(event.target.value)} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7" />
                   <p className="input-note">{t.rangeHint}</p>
-                  <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} onChange={() => setSplitMode('chunks')} />{t.every}</label>
+                  <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => setSplitMode('chunks')} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
                   <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} onChange={(event) => setChunkSize(event.target.value)} disabled={splitMode !== 'chunks' || busy} />
                   <div className="split-estimate" aria-live="polite">{splitEstimate === null ? t.invalidRange : interpolate(t.estimate, { files: splitEstimate })}</div>
+                   <p className="input-note" data-testid="split-output-budget">{t.splitOutputBudget}</p>
+                   {splitProgress && <p className="utility-note" role="status" data-testid="split-progress" aria-live="polite">{splitProgress.phase === 'parts'
+                     ? interpolate(t.splitPartsProgress, { done: splitProgress.done, total: splitProgress.total })
+                     : interpolate(t.splitZipProgress, { percent: splitProgress.percent })}</p>}
+                   {busy && splitProgress && <button type="button" className="button button-secondary button-small" data-testid="split-cancel" disabled={splitCancelling} onClick={() => { splitAbortRef.current?.abort(); setSplitCancelling(true); }}>{splitCancelling ? t.splitCancelling : t.splitCancel}</button>}
                   <button type="button" className="button button-primary split-download" onClick={splitIntoZip} disabled={busy || splitEstimate === null}>{busy ? t.creating : t.downloadZip} ↓</button>
                 </div>
               </section>
