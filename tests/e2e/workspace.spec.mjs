@@ -265,7 +265,7 @@ test('workbench imports 320-page book with lazy previews and extracts one page',
   });
   await expect(page.getByTestId('page-tile')).toHaveCount(320, { timeout: 30000 });
   await expect(page.getByTestId('workspace-large-warning')).toBeVisible();
-  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  await page.getByRole('checkbox', { name: 'Select page 1', exact: true }).check();
   const one = await downloadPdf(page, () => page.getByRole('button', { name: 'Extract selected pages' }).click());
   expect(one.getPageCount()).toBe(1);
 });
