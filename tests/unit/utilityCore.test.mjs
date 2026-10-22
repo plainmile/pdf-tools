@@ -91,4 +91,6 @@ test('batch output budget and cancellation prevent oversized downloads', () => {
   assert.throws(() => checkCancelled(c.signal), /cancelled/);
   assert.match(translateUtilityError(new Error('This page is too large to rasterize safely.'), 'zh'), /页面尺寸/);
   assert.match(translateUtilityError(new Error('Processing cancelled.'), 'zh'), /取消/);
+  assert.match(translateUtilityError(new Error('PDF 文件大小须在 1 字节至 100 MB 之间。'), 'zh'), /100 MB/);
+  assert.match(translateUtilityError(new Error('PDF 最多支持 1000 页。'), 'zh'), /1000 页/);
 });
