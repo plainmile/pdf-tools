@@ -86,7 +86,7 @@ export const workspaceCopy = {
     all: 'Select all', none: 'Deselect', rotateLeft: 'Rotate left', rotateRight: 'Rotate right', extract: 'Extract', del: 'Delete',
     dragHint: 'Drag thumbnails to reorder. To move several pages, select them first and drag one of the selected pages. Shift-click selects a range. On touch screens or with a keyboard, use the move buttons.',
     addMore: 'Add more files', pageName: 'Page', document: 'Document', previewFail: 'Preview unavailable', selectPage: 'Select page', moveLeft: 'Move page {n} left', moveRight: 'Move page {n} right', dragTitle: 'Drag to reorder',
-    splitTitle: 'Choose how to split', splitHint: 'Page numbers follow your current workspace order. Each ZIP supports up to 50 output PDFs.',
+    splitTitle: 'Choose how to split', splitHint: 'Specify the pages you want in each result; we will not choose a split point for you. Pages follow the current workspace order. Up to 50 output PDFs.',
     splitOutputBudget: 'Up to 128 MB of generated PDF files per ZIP to protect browser memory.', splitPartsProgress: 'Creating PDF {done} of {total}', splitZipProgress: 'Packaging ZIP: {percent}%', splitCancel: 'Cancel split', splitCancelling: 'Cancelling…',
     byRanges: 'Split by page ranges', pageRanges: 'Page ranges', rangeHint: 'Example: 1-3, 4-5, 6. Each range becomes one PDF.', every: 'Split every N pages', perFile: 'Pages per PDF', downloadZip: 'Download split PDFs (ZIP)', creating: 'Creating PDFs…',
     foot: 'All document processing stays in your browser', footLimit: '200 MB combined · No password-protected PDFs', bigDocWarning: 'Large PDF: previews are loaded as you scroll. Hundreds of pages can still consume significant device memory. Export may take longer.',
@@ -95,6 +95,7 @@ export const workspaceCopy = {
     loaded: 'Added {files} file(s) and {pages} page(s).', exported: 'Export complete. Your original files were not changed.',
     extracted: 'Exported {pages} selected page(s).', zipped: 'Created {files} PDF file(s) in a ZIP archive.', cleared: 'Workspace cleared.',
     errorGeneric: 'Could not complete the operation.', errorFiles: 'You can work with at most {n} files.', errorTypes: 'Choose PDF, JPG, PNG or WebP files.', errorCombined: 'The total input size must be 200 MB or less.', errorPages: 'At most {n} pages can be added.', dismiss: 'Dismiss message',
+    enterSplitRanges: 'Enter page ranges to split (for example, 1-3, 4-6).', enterSplitSize: 'Enter how many pages to put in each PDF.',
     invalidRange: 'Check the page ranges or pages per file (maximum 50 output PDFs).', estimate: '{files} PDF file(s) will be generated.',
   },
   zh: {
@@ -109,7 +110,7 @@ export const workspaceCopy = {
     all: '全选', none: '取消选择', rotateLeft: '向左旋转', rotateRight: '向右旋转', extract: '提取页面', del: '删除页面',
     dragHint: '拖拽缩略图可调整顺序。先多选再拖动选中页面，可成组移动；按住 Shift 点击可选择连续页面。触屏或键盘操作可用每页下方的左右按钮。',
     addMore: '继续添加文件', pageName: '第', document: '文档', previewFail: '无法预览', selectPage: '选择第', moveLeft: '向左移动第 {n} 页', moveRight: '向右移动第 {n} 页', dragTitle: '拖动可调整顺序',
-    splitTitle: '选择拆分方式', splitHint: '页码按当前工作台顺序计算。每个 ZIP 最多包含 50 个拆分 PDF。',
+    splitTitle: '选择拆分方式', splitHint: '请自己指定拆分范围或每份页数；我们不会替您选择拆分点。页码按当前工作台顺序计算，每个 ZIP 最多包含 50 个 PDF。',
     splitOutputBudget: '每个 ZIP 的 PDF 输出累计不得超过 128 MB，以保护浏览器内存。', splitPartsProgress: '正在生成第 {done}/{total} 个 PDF', splitZipProgress: '正在打包 ZIP：{percent}%', splitCancel: '取消拆分', splitCancelling: '正在取消…',
     byRanges: '按页码范围拆分', pageRanges: '页码范围', rangeHint: '例如：1-3, 4-5, 6。每个范围独立生成一个 PDF。', every: '每 N 页拆分一次', perFile: '每个 PDF 的页数', downloadZip: '下载拆分文件（ZIP）', creating: '正在生成…',
     foot: '所有文档操作均在浏览器本地完成', footLimit: '合计最多 200 MB · 暂不支持加密 PDF', bigDocWarning: '大文档提示：仅在滚动到页面时生成缩略图，但数百页仍可能消耗较多内存，导出也可能较慢。',
@@ -118,6 +119,7 @@ export const workspaceCopy = {
     loaded: '已添加 {files} 个文件，共 {pages} 页。', exported: '导出成功，原始文件没有被修改。',
     extracted: '已提取 {pages} 页。', zipped: '已将 {files} 个 PDF 打包为 ZIP。', cleared: '工作台已清空。',
     errorGeneric: '操作失败，请检查文件后重试。', errorFiles: '一次最多处理 {n} 个文件。', errorTypes: '请选择 PDF、JPG、PNG 或 WebP 文件。', errorCombined: '所有输入文件总大小不得超过 200 MB。', errorPages: '一次最多支持 {n} 页，请减少文件。', dismiss: '关闭提示',
+    enterSplitRanges: '请填写要拆分的页码范围，例如 1-3, 4-6。', enterSplitSize: '请填写每份 PDF 包含多少页。',
     invalidRange: '请检查拆分页码或每份页数（最多生成 50 个 PDF）。', estimate: '预计生成 {files} 个 PDF 文件。',
   },
 };
