@@ -51,7 +51,8 @@ jobs:
           test "$(docker image inspect plainmile-pdf-tools:e2e --format '{{ index .Config.Labels "org.opencontainers.image.source" }}')" = "https://github.com/plainmile/pdf-tools"
           test "$(docker image inspect plainmile-pdf-tools:e2e --format '{{ index .Config.Labels "org.opencontainers.image.licenses" }}')" = "MIT"
           docker compose -f compose.selfhost.yaml config --quiet
-          docker compose -f compose.selfhost.yaml config | grep -q 'ghcr.io/plainmile/pdf-tools:latest'
+          docker compose -f compose.selfhost.yaml config > /tmp/pdf-selfhost-rendered.yml
+          grep -q 'ghcr.io/plainmile/pdf-tools:latest' /tmp/pdf-selfhost-rendered.yml
           ! grep -E 'edge:|container_name:|external: true' compose.selfhost.yaml
       - name: Run production container
         run: |
@@ -70,7 +71,8 @@ jobs:
           curl -fsS http://127.0.0.1:18081/zh/ >/dev/null
           curl -fsS http://127.0.0.1:18081/zh/workspace/ >/dev/null
           curl -fsS http://127.0.0.1:18081/merge-pdf/ >/dev/null
-          curl -fsSI http://127.0.0.1:18081/pdfjs/pdf.worker.min.mjs | grep -iq 'content-type: application/javascript'
+          curl -fsSI http://127.0.0.1:18081/pdfjs/pdf.worker.min.mjs > /tmp/pdf-worker-headers.txt
+          grep -iq 'content-type: application/javascript' /tmp/pdf-worker-headers.txt
           test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18081/unknown-route)" = "404"
       - name: Browser E2E against production image (Playwright in Docker)
         run: |
