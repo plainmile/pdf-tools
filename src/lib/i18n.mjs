@@ -126,11 +126,12 @@ export function translateProcessingError(message, locale = 'en') {
   if (locale !== 'zh') return message;
   const error = String(message);
   if (/enter watermark text|watermark text must|watermarks require|canvas is unavailable for watermark|could not create the watermark image|invalid PDF page dimensions for watermark/i.test(error)) return '请填写有效的水印文字，或关闭水印功能。';
+  if (/50 output|50 ranges|maximum of 50/i.test(error)) return '一次最多生成 50 个 PDF 或使用 50 段页码范围，请减少输出文件数。';
   if (/reversed|outside pages|invalid page range|range such as|range is supported|pages.per.file|no pages to split/i.test(error)) return workspaceCopy.zh.invalidRange;
   if (/password.protected|encrypted/i.test(error)) return '暂不支持带密码保护的 PDF，请先使用已授权方式解锁。';
   if (/could not be opened|as a PDF|corrupt/i.test(error)) return '文件无法作为 PDF 打开，请检查文件是否损坏。';
-  if (/25 MB|between 1 byte/i.test(error)) return '单个文件大小必须在 25 MB 以内，且不能为空。';
+  if (/100 MB|between 1 byte/i.test(error)) return '单个文件大小必须在 1 字节至 100 MB 之间。';
   if (/image dimensions|too large/i.test(error)) return '图片尺寸过大，请缩小后重试。';
-  if (/50 output|50 ranges/i.test(error)) return '一次最多生成 50 个 PDF，请调整拆分范围。';
+
   return workspaceCopy.zh.errorGeneric;
 }
