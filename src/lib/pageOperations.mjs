@@ -1,4 +1,15 @@
 /** Pure, deterministic page operations; none of these mutate their arguments. */
+export const MAX_SPLIT_ZIP_BYTES = 128 * 1024 * 1024;
+
+// ZIP assembly holds generated PDF buffers plus archive buffers in browser memory.
+export function enforceSplitZipBudget(totalBytes, nextBytes) {
+  if (!Number.isSafeInteger(totalBytes) || !Number.isSafeInteger(nextBytes) ||
+      totalBytes < 0 || nextBytes < 1 || totalBytes + nextBytes > MAX_SPLIT_ZIP_BYTES) {
+    throw new Error('Split PDF outputs exceed the 128 MB safety limit. Use fewer or smaller page ranges.');
+  }
+  return totalBytes + nextBytes;
+}
+
 export function movePage(pages, draggedId, targetId) {
   const from = pages.findIndex((page) => page.id === draggedId);
   const to = pages.findIndex((page) => page.id === targetId);
