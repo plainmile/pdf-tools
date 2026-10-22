@@ -730,9 +730,11 @@ test('image-to-PDF layout: A4 defaults, US Letter landscape and fit-to-image; re
   await expect(page.getByTestId('image-orientation')).toHaveValue('portrait');
   await expect(page.getByTestId('image-margin')).toHaveValue('30');
 
+  const one = await makeTestPng(page, 160, 90, 'red');
+  const two = await makeTestPng(page, 90, 160, 'green');
   await page.getByTestId('file-input').setInputFiles([
-    { name: 'wide.png', mimeType: 'image/png', buffer: await makeTestPng(page, 160, 90, 'red') },
-    { name: 'tall.png', mimeType: 'image/png', buffer: await makeTestPng(page, 90, 160, 'green') },
+    { name: 'wide.png', mimeType: 'image/png', buffer: one },
+    { name: 'tall.png', mimeType: 'image/png', buffer: two },
   ]);
   await expect(page.getByTestId('page-tile')).toHaveCount(2);
 
