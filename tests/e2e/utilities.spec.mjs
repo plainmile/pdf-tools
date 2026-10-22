@@ -290,3 +290,38 @@ test('Chinese converter on narrow mobile keeps native file chooser and page batc
   }));
   expect(width.scroll).toBeLessThanOrEqual(width.viewport + 2);
 });
+
+test('failed replacement never silently changes the active PDF and editing state is visible', async ({ page }) => {
+  await page.goto('/pdf-to-txt/');
+  await upload(page, await fixturePdf('Still current document'));
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'broken.pdf', mimeType: 'application/pdf', buffer: Buffer.from('not a PDF'),
+  });
+  await expect(page.getByRole('alert')).toContainText('Previous file remains');
+  await expect(page.getByTestId('utility-file-summary')).toContainText('fixture.pdf');
+  const output = await getDownload(page, () => page.getByTestId('utility-run').click());
+  expect(output.bytes.toString('utf8')).toContain('Still current document');
+
+  await page.goto('/zh/txt-to-pdf/');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'sample.txt', mimeType: 'text/plain', buffer: Buffer.from('first version'),
+  });
+  await expect(page.getByTestId('text-file-summary')).toContainText('sample.txt');
+  await page.getByTestId('utility-text').fill('edited version');
+  await expect(page.getByTestId('text-file-summary')).toContainText('导入后已修改');
+});
+
+test('image conversion exposes cancel and a ZIP packaging stage', async ({ page }) => {
+  await page.goto('/pdf-to-images/');
+  await upload(page, await fixturePdf('Batch example', 6));
+  await page.getByRole('combobox', { name: 'Image format' }).selectOption('png');
+  const download = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+  expect(download.name).toMatch(/\\.zip$/);
+  await expect(page.getByTestId('utility-progress')).toContainText('Packaging ZIP');
+  await expect(page.getByTestId('utility-next-step')).toContainText('Continue with another PDF tool');
+});
+
+test('page number tool warns that overlay can overlap content', async ({ page }) => {
+  await page.goto('/zh/add-page-numbers/');
+  await expect(page.getByTestId('page-overlap-warning')).toContainText('可能遮挡页脚');
+});
