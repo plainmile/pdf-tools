@@ -33,9 +33,11 @@ async function downloadPdf(page, action) {
 
 function watermarkImageCounts(pdf) {
   return pdf.getPages().map((pdfPage) => {
-    const resources = pdf.context.lookup(pdfPage.node.Resources(), PDFDict);
-    const xObjects = resources?.lookup(PDFName.of('XObject'), PDFDict);
-    return xObjects?.keys().length ?? 0;
+    const resourcesRef = pdfPage.node.Resources();
+    if (!resourcesRef) return 0;
+    const resources = pdf.context.lookup(resourcesRef, PDFDict);
+    const xObjectRef = resources.get(PDFName.of('XObject'));
+    return xObjectRef ? pdf.context.lookup(xObjectRef, PDFDict).keys().length : 0;
   });
 }
 
