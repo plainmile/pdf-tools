@@ -1,5 +1,6 @@
 import { PDFDocument, degrees } from 'pdf-lib';
 import { renderWatermarkPng, watermarkTextFromOptions, WATERMARK_OPACITY } from './watermark.mjs';
+import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement } from './jpegExif.mjs';
 
 export const LIMITS = Object.freeze({
   maxFiles: 20,
@@ -96,6 +97,7 @@ async function imageToPdfBytes(file, originalBytes, imageType) {
     if (header && (!header.width || !header.height || header.width * header.height > LIMITS.maxImagePixels)) {
       throw new Error('Image dimensions are too large.');
     }
+    const exifOrientation = imageType === 'image/jpeg' ? jpegExifOrientation(originalBytes) : 1;
     if (imageType === 'image/jpeg') embedded = await doc.embedJpg(originalBytes);
     else if (imageType === 'image/png') embedded = await doc.embedPng(originalBytes);
     else {
@@ -116,11 +118,21 @@ async function imageToPdfBytes(file, originalBytes, imageType) {
     const width = 595.28;
     const height = 841.89;
     const margin = 30;
-    const factor = Math.min((width - margin * 2) / embedded.width, (height - margin * 2) / embedded.height);
-    const drawWidth = embedded.width * factor;
-    const drawHeight = embedded.height * factor;
+    const oriented = orientedJpegSize(embedded.width, embedded.height, exifOrientation);
+    const factor = Math.min((width - margin * 2) / oriented.width, (height - margin * 2) / oriented.height);
+    const drawWidth = oriented.width * factor;
+    const drawHeight = oriented.height * factor;
     const page = doc.addPage([width, height]);
-    page.drawImage(embedded, { x: (width - drawWidth) / 2, y: (height - drawHeight) / 2, width: drawWidth, height: drawHeight });
+    const placement = jpegPdfPlacement({
+      x: (width - drawWidth) / 2, y: (height - drawHeight) / 2,
+      width: drawWidth, height: drawHeight,
+    }, exifOrientation);
+    // EXIF changes the displayed orientation, not the JPEG pixel data or its
+    // compression quality. PDF transforms handle all eight incl. mirrors.
+    page.drawImage(embedded, {
+      x: placement.x, y: placement.y, width: placement.width, height: placement.height,
+      rotate: degrees(placement.angle),
+    });
     return new Uint8Array(await doc.save({ useObjectStreams: true }));
   } catch (error) {
     if (error?.message === 'Image dimensions are too large.') throw error;
