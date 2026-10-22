@@ -109,7 +109,7 @@ export const tools = [
     slug: 'image-to-pdf', title: 'Images to PDF', short: 'JPG, PNG and WebP',
     headline: 'Turn your images into a tidy PDF.',
     description: 'Convert JPG, PNG and WebP images into PDF pages, reorder them and combine with existing PDF files if needed.',
-    details: 'Images are fitted inside A4 portrait pages without stretching. Reorder image pages or mix them with PDF pages before export.',
+    details: 'Images fit A4 portrait pages without stretching. Imported JPEGs have common EXIF, XMP, IPTC and comment metadata (which may include GPS) removed without recompressing their image pixels. This does not sanitize existing PDF metadata.',
     steps: ['Choose JPG, PNG or WebP files', 'Reorder or combine pages', 'Export as PDF'],
   },
 ];

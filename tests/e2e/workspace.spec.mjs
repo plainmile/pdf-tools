@@ -632,11 +632,17 @@ test('all eight EXIF orientations render actual PDF pages upright, including mir
   });
   for (let orientation = 1; orientation <= 8; orientation++) {
     const jpeg = addExifOrientationToJpeg(source, orientation, orientation % 2 ? 'II' : 'MM');
+    // XMP/IPTC/COM can contain private camera/GPS fields; none should be
+    // embedded in the PDF's JPEG image XObject after orientation is read.
+    const secret = Buffer.from('PM_GPS_PRIVATE_37.7749_-122.4194', 'ascii');
+    const jpegWithSecrets = Buffer.concat([jpeg.subarray(0, 2),
+      jpegTestSegment(0xe1, secret), jpegTestSegment(0xed, secret),
+      jpegTestSegment(0xfe, secret), jpeg.subarray(2)]);
     await page.goto('/image-to-pdf/');
     await page.getByTestId('file-input').setInputFiles({
       name: 'phone-' + orientation + '.jpg',
       mimeType: orientation % 2 ? 'image/jpeg' : 'application/octet-stream',
-      buffer: jpeg,
+      buffer: jpegWithSecrets,
     });
     await expect(page.getByTestId('page-tile')).toHaveCount(1);
     const pending = page.waitForEvent('download');
@@ -646,11 +652,15 @@ test('all eight EXIF orientations render actual PDF pages upright, including mir
     const pdf = await PDFDocument.load(bytes);
     expect(pdf.getPageCount()).toBe(1);
 
-    // pdf-lib retains JPEG data in an Image XObject rather than recompressing.
+    // Strip private JPEG headers, but preserve the original entropy-coded
+    // image data byte-for-byte, without a lossy canvas re-encode.
     const resources = pdf.context.lookup(pdf.getPage(0).node.Resources(), PDFDict);
     const xObjects = pdf.context.lookup(resources.get(PDFName.of('XObject')), PDFDict);
     const image = pdf.context.lookup(xObjects.get(xObjects.keys()[0]));
-    expect(Buffer.from(image.getContents()).equals(jpeg)).toBe(true);
+    const embedded = Buffer.from(image.getContents());
+    expect(embedded.equals(source)).toBe(true);
+    expect(embedded.includes(Buffer.from('PM_GPS_PRIVATE'))).toBe(false);
+    expect(embedded.includes(Buffer.from('Exif'))).toBe(false);
 
     // Re-open the ACTUAL DOWNLOADED PDF and inspect PDF.js-rendered pixel colors.
     await page.goto('/workspace/');
@@ -663,3 +673,8 @@ test('all eight EXIF orientations render actual PDF pages upright, including mir
   }
   expect(writes).toEqual([]);
 });
+
+function jpegTestSegment(marker, payload) {
+  const size = payload.length + 2;
+  return Buffer.concat([Buffer.from([0xff, marker, size >>> 8, size & 255]), payload]);
+}

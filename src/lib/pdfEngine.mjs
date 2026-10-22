@@ -1,6 +1,6 @@
 import { PDFDocument, degrees } from 'pdf-lib';
 import { renderWatermarkPng, watermarkTextFromOptions, WATERMARK_OPACITY } from './watermark.mjs';
-import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement } from './jpegExif.mjs';
+import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement, stripJpegPrivateMetadata } from './jpegExif.mjs';
 
 export const LIMITS = Object.freeze({
   maxFiles: 20,
@@ -98,7 +98,7 @@ async function imageToPdfBytes(file, originalBytes, imageType) {
       throw new Error('Image dimensions are too large.');
     }
     const exifOrientation = imageType === 'image/jpeg' ? jpegExifOrientation(originalBytes) : 1;
-    if (imageType === 'image/jpeg') embedded = await doc.embedJpg(originalBytes);
+    if (imageType === 'image/jpeg') embedded = await doc.embedJpg(stripJpegPrivateMetadata(originalBytes));
     else if (imageType === 'image/png') embedded = await doc.embedPng(originalBytes);
     else {
       bitmap = await createImageBitmap(file);
@@ -135,7 +135,8 @@ async function imageToPdfBytes(file, originalBytes, imageType) {
     });
     return new Uint8Array(await doc.save({ useObjectStreams: true }));
   } catch (error) {
-    if (error?.message === 'Image dimensions are too large.') throw error;
+    if (error?.message === 'Image dimensions are too large.' ||
+        error?.message === 'JPEG metadata could not be safely removed.') throw error;
     throw new Error(`${file.name}: image could not be converted to PDF.`);
   } finally {
     bitmap?.close();

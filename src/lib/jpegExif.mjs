@@ -86,3 +86,63 @@ export function jpegPdfPlacement(rect, orientation) {
     default: return { x, y, width: w, height: h, angle: 0 };
   }
 }
+
+/**
+ * Strip common sensitive JPEG metadata without re-encoding the image pixels.
+ * APP1 = EXIF/XMP (including possible GPS); APP13 = IPTC/Photoshop metadata;
+ * COM = arbitrary comments. Keep APP0/JFIF, APP2 ICC, APP14 Adobe color data.
+ * Stop at the first SOS to preserve the original encoded image bitstream.
+ *
+ * If headers cannot be parsed safely, FAIL CLOSED instead of embedding a
+ * possibly sensitive uninspected APP1 into a shared PDF.
+ */
+export function stripJpegPrivateMetadata(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.length < 4 ||
+      bytes[0] !== 0xff || bytes[1] !== 0xd8) {
+    throw new Error('JPEG metadata could not be safely removed.');
+  }
+  const parts = [bytes.subarray(0, 2)];
+  let at = 2;
+  let removed = false;
+  let foundScan = false;
+  while (at < bytes.length) {
+    const markerStart = at;
+    if (bytes[at] !== 0xff) break;
+    while (at < bytes.length && bytes[at] === 0xff) at++;
+    if (at >= bytes.length) break;
+    const marker = bytes[at++];
+    if (marker === 0xda) {
+      // A scan can contain escaped 0xff bytes and additional progressive scans.
+      // Never rewrite entropy-coded data or trailing markers.
+      parts.push(bytes.subarray(markerStart));
+      foundScan = true;
+      break;
+    }
+    if (marker === 0xd9) break;
+    if (marker === 0x01 || marker === 0xd8 ||
+        (marker >= 0xd0 && marker <= 0xd7)) {
+      parts.push(bytes.subarray(markerStart, at));
+      continue;
+    }
+    if (at + 1 >= bytes.length) break;
+    const size = (bytes[at] << 8) | bytes[at + 1];
+    if (size < 2 || size > bytes.length - at) break;
+    const end = at + size;
+    if (marker === 0xe1 || marker === 0xed || marker === 0xfe) {
+      removed = true;
+    } else {
+      parts.push(bytes.subarray(markerStart, end));
+    }
+    at = end;
+  }
+  if (!foundScan) throw new Error('JPEG metadata could not be safely removed.');
+  if (!removed) return bytes;
+  const length = parts.reduce((sum, part) => sum + part.length, 0);
+  const result = new Uint8Array(length);
+  let offset = 0;
+  for (const part of parts) {
+    result.set(part, offset);
+    offset += part.length;
+  }
+  return result;
+}
