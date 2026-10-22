@@ -689,7 +689,7 @@ test('deleting one entire source frees an active file slot without discarding Un
   await expect(page.getByTestId('page-tile')).toHaveCount(20);
   await expect(page.getByText('from 20 files')).toBeVisible();
 
-  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  await page.getByRole('checkbox', { name: 'Select page 1', exact: true }).check();
   await page.getByRole('button', { name: 'Delete selected pages' }).click();
   await expect(page.getByTestId('page-tile')).toHaveCount(19);
   await expect(page.getByText('from 19 files')).toBeVisible();
