@@ -340,3 +340,20 @@ test('cancel stops long text-to-PDF generation without downloading partial outpu
   await expect(page.getByTestId('utility-run')).toBeEnabled();
   expect(downloads).toEqual([]);
 });
+
+test('dragging multiple PDFs into a single-file converter explains rejection, preserves source', async ({ page }) => {
+  await page.goto('/pdf-to-txt/');
+  await upload(page, await fixturePdf('Original document'));
+  await page.evaluate(() => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(['first'], 'first.pdf', { type: 'application/pdf' }));
+    transfer.items.add(new File(['second'], 'second.pdf', { type: 'application/pdf' }));
+    document.querySelector('[data-testid="utility-dropzone"]').dispatchEvent(
+      new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }),
+    );
+  });
+  await expect(page.getByRole('alert')).toContainText('one file at a time');
+  await expect(page.getByTestId('utility-file-summary')).toContainText('fixture.pdf');
+  const output = await getDownload(page, () => page.getByTestId('utility-run').click());
+  expect(output.bytes.toString('utf8')).toContain('Original document');
+});
