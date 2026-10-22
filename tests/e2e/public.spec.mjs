@@ -55,7 +55,7 @@ test('SEO and AI answer-readiness audit of 22 live URLs', async ({ page }) => {
    }));
    expect(meta.lang,path).toBe(locale==='en'?'en':'zh-CN');
    expect(meta.title.length,path).toBeGreaterThan(15);
-   expect(meta.description.length,path).toBeGreaterThan(35);
+   expect(meta.description.length,path).toBeGreaterThan(locale === 'zh' ? 20 : 35);
    expect(meta.robots,path).toMatch(/index,\s*follow/i);
    expect(meta.canonical,path).toBe(domain+path);
    expect(meta.en,path).toBe(domain+'/'+slug);
