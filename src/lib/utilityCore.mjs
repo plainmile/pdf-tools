@@ -99,7 +99,7 @@ export function requestedPages(input, count) {
   if (!input || !input.trim()) return Array.from({ length: count }, (_, i) => i + 1);
   const output = [];
   const seen = new Set();
-  for (const { start, end } of parsePageRanges(input, count)) {
+  for (const { start, end } of parsePageRanges(input, count, UTILITY_LIMITS.maxImagePagesPerRun)) {
     for (let page = start; page <= end; page++) {
       if (seen.has(page)) continue;
       seen.add(page);
@@ -124,11 +124,13 @@ export function parseTextBlocks(source, markdown = false) {
       const match = /^\s{0,3}(#{1,3})\s+(.*)$/.exec(line);
       blocks.push({ text: stripMarkdownInline(match[2]), size: [0, 21, 17, 14][match[1].length], kind: 'heading' });
     } else if (markdown && /^\s*(?:[-*+] |\d+[.)] )/.test(line)) {
-      blocks.push({ text: '• ' + stripMarkdownInline(line.replace(/^\s*(?:[-*+] |\d+[.)] )/, '')), size: 11, kind: 'list' });
+      const match = /^\s*(?:[-*+]|(\d+)[.)])\s+(.+)$/.exec(line);
+      const prefix = match[1] ? `${match[1]}. ` : '• ';
+      blocks.push({ text: prefix + stripMarkdownInline(match[2]), size: 11, kind: 'list' });
     } else if (markdown && /^\s*>\s*/.test(line)) {
-      blocks.push({ text: '│ ' + stripMarkdownInline(line.replace(/^\s*>\s*/, '')), size: 11, kind: 'quote' });
+      blocks.push({ text: '> ' + stripMarkdownInline(line.replace(/^\s*>\s*/, '')), size: 11, kind: 'quote' });
     } else if (markdown && /^\s*(?:---+|\*\*\*+)\s*$/.test(line)) {
-      blocks.push({ text: '─────────────', size: 11, kind: 'rule' });
+      blocks.push({ text: '--------------------', size: 11, kind: 'rule' });
     } else {
       blocks.push({ text: markdown ? stripMarkdownInline(line) : line, size: 11, kind: 'paragraph' });
     }

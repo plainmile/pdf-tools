@@ -357,3 +357,17 @@ test('dragging multiple PDFs into a single-file converter explains rejection, pr
   const output = await getDownload(page, () => page.getByTestId('utility-run').click());
   expect(output.bytes.toString('utf8')).toContain('Original document');
 });
+
+test('English Markdown quotes, rules and numbered steps produce searchable PDF text', async ({ page }) => {
+  await page.goto('/markdown-to-pdf/');
+  await page.getByTestId('utility-text').fill('# Weekly report\n\n> Important notice\n\n---\n\n1. First step\n2) Second step');
+  const result = await getDownload(page, () => page.getByTestId('utility-run').click());
+  await expect(page.getByRole('status')).toContainText('Output text is selectable');
+  await page.goto('/pdf-to-txt/');
+  await upload(page, result.bytes);
+  const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
+  const text = extracted.bytes.toString('utf8');
+  expect(text).toContain('Important notice');
+  expect(text).toContain('1. First step');
+  expect(text).toContain('2. Second step');
+});

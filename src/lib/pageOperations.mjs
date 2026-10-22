@@ -43,11 +43,11 @@ export function deletePages(pages, ids) {
   return pages.filter((page) => !selected.has(page.id));
 }
 
-export function parsePageRanges(input, pageCount) {
+export function parsePageRanges(input, pageCount, maxRanges = 50) {
   if (!Number.isSafeInteger(pageCount) || pageCount < 1) throw new Error('There are no pages to split.');
   const parts = input.split(',').map((part) => part.trim());
   if (!parts.length || parts.some((part) => !part)) throw new Error('Use a range such as 1-3, 4-6.');
-  if (parts.length > 50) throw new Error('A maximum of 50 ranges is supported.');
+  if (parts.length > maxRanges) throw new Error(`A maximum of ${maxRanges} ranges is supported.`);
   return parts.map((part) => {
     const match = /^(\d+)(?:\s*-\s*(\d+))?$/.exec(part);
     if (!match) throw new Error(`Invalid page range: ${part}`);

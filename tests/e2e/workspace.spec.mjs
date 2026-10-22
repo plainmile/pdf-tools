@@ -297,3 +297,30 @@ test('split output count over 50 is explained before download', async ({ page })
   await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('2');
   await expect(button).toBeEnabled();
 });
+
+test('image import uses filename when MIME is generic and blocks oversized PNG before decoding', async ({ page }) => {
+  await page.goto('/image-to-pdf/');
+  const base64 = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 96; canvas.height = 48;
+    canvas.getContext('2d').fillRect(0, 0, 96, 48);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'photo.png', mimeType: 'application/octet-stream', buffer: Buffer.from(base64, 'base64'),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(output.getPageCount()).toBe(1);
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
+  const header = Buffer.alloc(24);
+  Buffer.from([137,80,78,71,13,10,26,10]).copy(header, 0);
+  Buffer.from('IHDR').copy(header, 12);
+  header.writeUInt32BE(18000, 16);
+  header.writeUInt32BE(18000, 20);
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'huge.png', mimeType: 'image/png', buffer: header,
+  });
+  await expect(page.getByRole('alert')).toContainText('Image dimensions are too large');
+  await expect(page.getByTestId('page-tile')).toHaveCount(0);
+});

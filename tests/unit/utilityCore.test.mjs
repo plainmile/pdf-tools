@@ -94,3 +94,19 @@ test('batch output budget and cancellation prevent oversized downloads', () => {
   assert.match(translateUtilityError(new Error('PDF 文件大小须在 1 字节至 100 MB 之间。'), 'zh'), /100 MB/);
   assert.match(translateUtilityError(new Error('PDF 最多支持 1000 页。'), 'zh'), /1000 页/);
 });
+
+test('English Markdown quotes, rules and numbered lists preserve searchable ASCII text', () => {
+  const blocks = parseTextBlocks('# Report\n> Important\n---\n1. First\n2) Second', true);
+  assert.deepEqual(blocks.map(({ kind }) => kind), ['heading','quote','rule','list','list']);
+  assert.equal(blocks[1].text, '> Important');
+  assert.equal(blocks[2].text, '--------------------');
+  assert.equal(blocks[3].text, '1. First');
+  assert.equal(blocks[4].text, '2. Second');
+});
+
+test('60 separate image pages are valid while 61 separate ranges still fail safely', () => {
+  const sixty = Array.from({ length: 60 }, (_, index) => index * 2 + 1);
+  assert.deepEqual(requestedPages(sixty.join(', '), 200), sixty);
+  const sixtyOne = Array.from({ length: 61 }, (_, index) => index * 2 + 1);
+  assert.throws(() => requestedPages(sixtyOne.join(', '), 200), /maximum of 60 ranges/);
+});
