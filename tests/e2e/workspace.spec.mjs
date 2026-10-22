@@ -754,7 +754,8 @@ test('image-to-PDF layout: A4 defaults, US Letter landscape and fit-to-image; re
 
   await page.getByRole('button', { name: 'Move page 2 left' }).click();
   await page.getByTestId('image-paper').selectOption('fit');
-  await page.getByTestId('image-orientation').selectOption('auto');
+  // Fit should immediately follow the photo shape instead of reusing old landscape/portrait.
+  await expect(page.getByTestId('image-orientation')).toHaveValue('auto');
   await page.getByTestId('image-margin').selectOption('0');
   await page.getByTestId('image-layout-apply').click();
   const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
@@ -772,7 +773,8 @@ test('image layout before import, mixed PDF inputs and Chinese text labels are c
   await page.goto('/zh/image-to-pdf/');
   await expect(page.getByTestId('image-page-settings')).toContainText('图片页面设置');
   await page.getByTestId('image-paper').selectOption('fit');
-  await page.getByTestId('image-orientation').selectOption('auto');
+  // Fit should immediately follow the photo shape instead of reusing old landscape/portrait.
+  await expect(page.getByTestId('image-orientation')).toHaveValue('auto');
   await page.getByTestId('image-margin').selectOption('0');
   await page.getByTestId('file-input').setInputFiles({
     name: 'sample-phone.png', mimeType: 'image/png',
