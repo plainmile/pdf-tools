@@ -1,6 +1,7 @@
 import { PDFDocument, degrees } from 'pdf-lib';
 import { renderWatermarkPng, watermarkTextFromOptions, WATERMARK_OPACITY } from './watermark.mjs';
 import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement, stripJpegPrivateMetadata } from './jpegExif.mjs';
+import { imagePdfPageLayout } from './imagePdfLayout.mjs';
 
 export const LIMITS = Object.freeze({
   maxFiles: 20,
@@ -64,15 +65,15 @@ export function compressedImageDimensions(type, bytes) {
   return null;
 }
 
-export async function readSourceFile(file) {
+export async function readSourceFile(file, options = {}) {
   if (!isSupportedFile(file)) throw new Error(`${file.name}: choose PDF, JPG, PNG or WebP files.`);
   if (!file.size || file.size > LIMITS.maxFileBytes) {
     throw new Error(`${file.name}: files must be between 1 byte and 100 MB.`);
   }
   const imageType = imageTypeFor(file);
   const isImage = Boolean(imageType);
-  let bytes = new Uint8Array(await file.arrayBuffer());
-  if (isImage) bytes = await imageToPdfBytes(file, bytes, imageType);
+  const originalBytes = new Uint8Array(await file.arrayBuffer());
+  const bytes = isImage ? await imageToPdfBytes(file, originalBytes, imageType, options.imageLayout) : originalBytes;
 
   let doc;
   try {
@@ -85,10 +86,36 @@ export async function readSourceFile(file) {
   }
   const pageCount = doc.getPageCount();
   if (!pageCount) throw new Error(`${file.name}: this document has no pages.`);
-  return { id: crypto.randomUUID(), name: file.name, bytes, pageCount, isImage, inputSize: file.size };
+  return { id: crypto.randomUUID(), name: file.name, bytes, pageCount, isImage, inputSize: file.size,
+    // Retain only in browser RAM, so the user can change paper settings without
+    // re-uploading a photo or losing the existing page order/undo history.
+    originalImageBytes: isImage ? originalBytes : null,
+    originalImageType: isImage ? imageType : null,
+  };
 }
 
-async function imageToPdfBytes(file, originalBytes, imageType) {
+export async function reflowImageSources(sources, layout, report = () => {}) {
+  const updated = [];
+  for (let index = 0; index < sources.length; index++) {
+    const source = sources[index];
+    if (!source.isImage) {
+      updated.push(source);
+    } else {
+      if (!source.originalImageBytes || !source.originalImageType) {
+        throw new Error('Photo source bytes are missing. Reimport the original images.');
+      }
+      const bytes = await imageToPdfBytes({ name: source.name },
+        source.originalImageBytes, source.originalImageType, layout);
+      updated.push({ ...source, bytes });
+    }
+    report(index + 1, sources.length);
+    // Allow React updates and UI progress during bulk photo reflow.
+    if (index % 2 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  return updated;
+}
+
+async function imageToPdfBytes(file, originalBytes, imageType, options = {}) {
   const doc = await PDFDocument.create();
   let embedded;
   let bitmap;
@@ -101,7 +128,7 @@ async function imageToPdfBytes(file, originalBytes, imageType) {
     if (imageType === 'image/jpeg') embedded = await doc.embedJpg(stripJpegPrivateMetadata(originalBytes));
     else if (imageType === 'image/png') embedded = await doc.embedPng(originalBytes);
     else {
-      bitmap = await createImageBitmap(file);
+      bitmap = await createImageBitmap(new Blob([originalBytes], { type: imageType }));
       if (bitmap.width * bitmap.height > LIMITS.maxImagePixels) throw new Error('Image dimensions are too large.');
       const canvas = document.createElement('canvas');
       canvas.width = bitmap.width;
@@ -115,18 +142,10 @@ async function imageToPdfBytes(file, originalBytes, imageType) {
       canvas.height = 1;
     }
     if (embedded.width * embedded.height > LIMITS.maxImagePixels) throw new Error('Image dimensions are too large.');
-    const width = 595.28;
-    const height = 841.89;
-    const margin = 30;
     const oriented = orientedJpegSize(embedded.width, embedded.height, exifOrientation);
-    const factor = Math.min((width - margin * 2) / oriented.width, (height - margin * 2) / oriented.height);
-    const drawWidth = oriented.width * factor;
-    const drawHeight = oriented.height * factor;
-    const page = doc.addPage([width, height]);
-    const placement = jpegPdfPlacement({
-      x: (width - drawWidth) / 2, y: (height - drawHeight) / 2,
-      width: drawWidth, height: drawHeight,
-    }, exifOrientation);
+    const layout = imagePdfPageLayout(oriented.width, oriented.height, options);
+    const page = doc.addPage([layout.width, layout.height]);
+    const placement = jpegPdfPlacement(layout.image, exifOrientation);
     // EXIF changes the displayed orientation, not the JPEG pixel data or its
     // compression quality. PDF transforms handle all eight incl. mirrors.
     page.drawImage(embedded, {
