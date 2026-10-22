@@ -219,6 +219,7 @@ test('dragging a PDF into a converter loads it locally and exports real text', a
   const writes = [];
   page.on('request', request => { if (!['GET', 'HEAD'].includes(request.method())) writes.push(request.method() + ' ' + request.url()); });
   const bytes = (await fixturePdf('Drag and drop PlainMile')).toString('base64');
+  await expect(page.getByTestId('utility-dropzone')).toBeVisible();
   await page.evaluate(base64 => {
     const data = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
     const transfer = new DataTransfer();
@@ -235,6 +236,7 @@ test('dragging a PDF into a converter loads it locally and exports real text', a
 
 test('TXT drag and drop opens editable text, and Clear empties imported source', async ({ page }) => {
   await page.goto('/txt-to-pdf/');
+  await expect(page.getByTestId('utility-dropzone')).toBeVisible();
   await page.evaluate(() => {
     const transfer = new DataTransfer();
     transfer.items.add(new File(['Local book text input'], 'chapter.txt', { type: 'text/plain' }));
