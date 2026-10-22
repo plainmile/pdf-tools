@@ -546,3 +546,120 @@ test('Chinese mobile split requires a typed range and exports exactly the chosen
   expect(first.getPages().map(p => p.getWidth())).toEqual([300, 310]);
   expect(second.getPages().map(p => p.getWidth())).toEqual([320, 330]);
 });
+
+function addExifOrientationToJpeg(jpeg, orientation, endian = 'II') {
+  const payload = Buffer.alloc(32);
+  payload.write('Exif', 0, 'ascii');
+  const little = endian === 'II';
+  payload.write(endian, 6, 'ascii');
+  if (little) {
+    payload.writeUInt16LE(42, 8); payload.writeUInt32LE(8, 10);
+    payload.writeUInt16LE(1, 14); payload.writeUInt16LE(0x0112, 16);
+    payload.writeUInt16LE(3, 18); payload.writeUInt32LE(1, 20);
+    payload.writeUInt16LE(orientation, 24);
+  } else {
+    payload.writeUInt16BE(42, 8); payload.writeUInt32BE(8, 10);
+    payload.writeUInt16BE(1, 14); payload.writeUInt16BE(0x0112, 16);
+    payload.writeUInt16BE(3, 18); payload.writeUInt32BE(1, 20);
+    payload.writeUInt16BE(orientation, 24);
+  }
+  const app1 = Buffer.concat([Buffer.from([0xff, 0xe1, 0, 34]), payload]);
+  return Buffer.concat([jpeg.subarray(0, 2), app1, jpeg.subarray(2)]);
+}
+
+async function visiblePhotoCorners(page) {
+  const canvas = page.getByTestId('page-tile').first().locator('canvas');
+  return canvas.evaluate(element => {
+    if (!element.width || !element.height) return [];
+    const ctx = element.getContext('2d');
+    const width = element.width, height = element.height;
+    const data = ctx.getImageData(0, 0, width, height).data;
+    let minX = width, minY = height, maxX = -1, maxY = -1;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        const red = data[i], green = data[i + 1], blue = data[i + 2];
+        if (Math.max(red, green, blue) - Math.min(red, green, blue) > 70) {
+          minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+          minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+        }
+      }
+    }
+    if (maxX <= minX || maxY <= minY) return [];
+    const reference = [
+      { name: 'R', rgb: [245, 20, 20] },
+      { name: 'G', rgb: [20, 235, 35] },
+      { name: 'B', rgb: [20, 70, 245] },
+      { name: 'Y', rgb: [250, 235, 30] },
+    ];
+    return [[.25, .25], [.75, .25], [.25, .75], [.75, .75]].map(([u, v]) => {
+      const x = Math.round(minX + (maxX - minX) * u);
+      const y = Math.round(minY + (maxY - minY) * v);
+      const i = (y * width + x) * 4;
+      const rgb = [data[i], data[i + 1], data[i + 2]];
+      const choices = reference.map(target => ({
+        name: target.name,
+        distance: target.rgb.reduce((total, component, n) => total + Math.pow(component - rgb[n], 2), 0),
+      })).sort((a, b) => a.distance - b.distance);
+      return choices[0].name;
+    });
+  });
+}
+
+test('all eight EXIF orientations render actual PDF pages upright, including mirrored camera photos', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.goto('/image-to-pdf/');
+  const source = Buffer.from(await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 240; canvas.height = 160;
+    const ctx = canvas.getContext('2d');
+    const quadrants = [
+      [0, 0, '#f51414'], [120, 0, '#14eb23'],
+      [0, 80, '#1446f5'], [120, 80, '#faeb1e'],
+    ];
+    for (const [x, y, color] of quadrants) {
+      ctx.fillStyle = color; ctx.fillRect(x, y, 120, 80);
+    }
+    return canvas.toDataURL('image/jpeg', .96).split(',')[1];
+  }), 'base64');
+  const expected = {
+    1: 'RGBY', 2: 'GRYB', 3: 'YBGR', 4: 'BYRG',
+    5: 'RBGY', 6: 'BRYG', 7: 'YGBR', 8: 'GYRB',
+  };
+  const writes = [];
+  page.on('request', req => {
+    if (!['GET', 'HEAD'].includes(req.method())) writes.push(req.method() + ' ' + req.url());
+  });
+  for (let orientation = 1; orientation <= 8; orientation++) {
+    const jpeg = addExifOrientationToJpeg(source, orientation, orientation % 2 ? 'II' : 'MM');
+    await page.goto('/image-to-pdf/');
+    await page.getByTestId('file-input').setInputFiles({
+      name: 'phone-' + orientation + '.jpg',
+      mimeType: orientation % 2 ? 'image/jpeg' : 'application/octet-stream',
+      buffer: jpeg,
+    });
+    await expect(page.getByTestId('page-tile')).toHaveCount(1);
+    const pending = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export PDF' }).click();
+    const download = await pending;
+    const bytes = await readFile(await download.path());
+    const pdf = await PDFDocument.load(bytes);
+    expect(pdf.getPageCount()).toBe(1);
+
+    // pdf-lib retains JPEG data in an Image XObject rather than recompressing.
+    const resources = pdf.context.lookup(pdf.getPage(0).node.Resources(), PDFDict);
+    const xObjects = pdf.context.lookup(resources.get(PDFName.of('XObject')), PDFDict);
+    const image = pdf.context.lookup(xObjects.get(xObjects.keys()[0]));
+    expect(Buffer.from(image.getContents()).equals(jpeg)).toBe(true);
+
+    // Re-open the ACTUAL DOWNLOADED PDF and inspect PDF.js-rendered pixel colors.
+    await page.goto('/workspace/');
+    await page.getByTestId('file-input').setInputFiles({
+      name: 'exported-' + orientation + '.pdf', mimeType: 'application/pdf', buffer: bytes,
+    });
+    await expect(page.getByTestId('page-tile')).toHaveCount(1);
+    await expect.poll(async () => (await visiblePhotoCorners(page)).join(''), { timeout: 15000 })
+      .toBe(expected[orientation]);
+  }
+  expect(writes).toEqual([]);
+});
