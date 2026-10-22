@@ -6,6 +6,7 @@ const {
   title = locale === 'zh' ? '免费 PDF 工具 - PlainMile' : 'Free PDF Tools - PlainMile',
   description = locale === 'zh' ? '本地合并、拆分、排序 PDF。文件不上传服务器。' : 'Merge, split and organize PDF files locally in your browser.',
   index = true,
+  structuredData = null,
 } = Astro.props;
 const copy = siteCopy[locale];
 const otherLocale = locale === 'zh' ? 'en' : 'zh';
@@ -29,10 +30,14 @@ const pageTitle = title.includes('PlainMile') ? title : `${title} | PlainMile PD
     <link rel="alternate" hreflang="x-default" href={langAlternate('en')} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="PlainMile PDF" />
+    <meta property="og:locale" content={locale === 'zh' ? 'zh_CN' : 'en_US'} />
+    <meta name="twitter:card" content="summary" />
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <title>{pageTitle}</title>
+    {structuredData && <script type="application/ld+json" set:html={JSON.stringify(structuredData).replace(/</g, '\\u003c')} />}
     <script is:inline>
       (() => {
         try {
@@ -43,6 +48,7 @@ const pageTitle = title.includes('PlainMile') ? title : `${title} | PlainMile PD
     </script>
   </head>
   <body>
+    <a class="skip-link" href="#main">{locale === 'zh' ? '跳转到主要内容' : 'Skip to main content'}</a>
     <div class="app-shell">
       <header class="site-header">
         <div class="site-container nav-layout">

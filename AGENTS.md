@@ -36,3 +36,11 @@
 - Avoid one arbitrary 25 MiB/50-page limit for all tools. Set and show mode-specific safeguards: PDF text extraction/numbering 100 MiB and 1,000 pages; PDF-to-images max 60 selected pages per export with page-range batching and 12 MP/canvas; lossy compression 120 pages; TXT/Markdown input 5 MiB with 1,000 output pages for Latin and 300 image-based output pages for CJK; workspace up to 100 MiB/file, 200 MiB total and 600 pages with lazy thumbnail rendering.
 - These are *ceilings*, not performance guarantees. Favor per-page cleanup, explicit worker teardown, a visible progress indication, and clearly localized warnings. Keep generated ZIP size bounded.
 - Unit and public Playwright E2E must verify a synthetic 320+ page PDF (text first+last, numbered PDF, late-page raster selection), boundary rejection, and old workspace PDF behavior. Never claim 500-page memory safety without testing a representative input. No customer data in CI.
+
+## Human-first UI and technical SEO safeguards
+
+- Prefer modest typography, crisp office-style surfaces, practical grouped tools and clear primary actions over gradients, fictional success metrics, stock illustrations or AI-marketing copy.
+- The static HTML catalog must render all 16 genuine tools (four intuitive categories) even when JavaScript is unavailable. Search only filters the already-visible HTML; keep keyboard, mobile and bilingual labels usable.
+- Page-specific useful answers must be true to current implementations, including page limits, rasterized/uncopyable Unicode PDF text and lossy PDF compression. Avoid overclaiming or duplicating generic copy.
+- Keep SEO canonical and reciprocal EN/zh-CN hreflang, sitemap/robots, unique titles and descriptions, one H1 and accurate visible JSON-LD (WebSite, WebApplication, BreadcrumbList) in both languages. Do not add Review/FAQPage rich-result markup unless genuine eligibility and content permit it.
+- Every feature or UI PR must pass unit, container-build and full Playwright E2E before merge; every production deploy runs actual public-site tests on the same Runner and cleans Docker resources. Don't add redundant scheduled QA workflows.

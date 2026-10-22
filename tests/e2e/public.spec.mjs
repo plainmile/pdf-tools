@@ -64,6 +64,7 @@ test('SEO and AI answer-readiness audit of 36 live URLs', async ({ page }) => {
    expect(meta.h1,path).toBe(1);
    expect(meta.mainChars,path).toBeGreaterThan(150);
    expect(meta.ogTitle,path).not.toBe('');
+   if (slug !== 'privacy/') expect(meta.jsonLdCount, path + ': structured data').toBeGreaterThan(0);
    expect(seenTitles.has(meta.title), 'Duplicate: '+meta.title).toBe(false);
    seenTitles.add(meta.title);
    audit.push({path,...meta});
