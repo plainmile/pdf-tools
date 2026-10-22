@@ -155,12 +155,15 @@ test('split PDFs into ZIP ranges in the current workspace order', async ({ page 
   expect(partTwo.getPages().map((p) => p.getWidth())).toEqual([320]);
 });
 
-test('rejects invalid reversed split range without a download', async ({ page }) => {
+test('invalid split ranges disable download until corrected', async ({ page }) => {
   await loadInput(page);
   await page.getByRole('tab', { name: 'Split' }).click();
+  const button = page.getByRole('button', { name: 'Download split PDFs (ZIP)' });
   await page.getByRole('textbox', { name: 'Page ranges', exact: true }).fill('3-1');
-  await page.getByRole('button', { name: 'Download split PDFs (ZIP)' }).click();
-  await expect(page.getByRole('alert')).toContainText('reversed');
+  await expect(button).toBeDisabled();
+  await expect(page.locator('.split-estimate')).toContainText('maximum 50 output PDFs');
+  await page.getByRole('textbox', { name: 'Page ranges', exact: true }).fill('1-2, 3');
+  await expect(button).toBeEnabled();
 });
 
 test('rejects password-protected or malformed PDFs safely', async ({ page }) => {
@@ -268,4 +271,29 @@ test('workbench imports 320-page book with lazy previews and extracts one page',
   await page.getByRole('checkbox', { name: 'Select page 1', exact: true }).check();
   const one = await downloadPdf(page, () => page.getByRole('button', { name: 'Extract selected pages' }).click());
   expect(one.getPageCount()).toBe(1);
+});
+
+test('workbench reports the actual 100 MB file limit, not a stale 25 MB limit', async ({ page }) => {
+  await page.goto('/zh/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'empty.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(0),
+  });
+  await expect(page.getByRole('alert')).toContainText('100 MB');
+  await expect(page.getByRole('alert')).not.toContainText('25 MB');
+});
+
+test('split output count over 50 is explained before download', async ({ page }) => {
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'fifty-one.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf(Array.from({ length: 51 }, () => 300)),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(51);
+  await page.getByRole('tab', { name: 'Split' }).click();
+  await page.getByRole('radio', { name: 'Split every N pages' }).check();
+  const button = page.getByRole('button', { name: 'Download split PDFs (ZIP)' });
+  await expect(button).toBeDisabled();
+  await expect(page.locator('.split-estimate')).toContainText('maximum 50 output PDFs');
+  await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('2');
+  await expect(button).toBeEnabled();
 });

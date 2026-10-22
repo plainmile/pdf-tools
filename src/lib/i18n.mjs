@@ -86,14 +86,14 @@ export const workspaceCopy = {
     all: 'Select all', none: 'Deselect', rotateLeft: 'Rotate left', rotateRight: 'Rotate right', extract: 'Extract', del: 'Delete',
     dragHint: 'Drag thumbnails to reorder. To move several pages, select them first and drag one of the selected pages. Shift-click selects a range. On touch screens or with a keyboard, use the move buttons.',
     addMore: 'Add more files', pageName: 'Page', document: 'Document', previewFail: 'Preview unavailable', selectPage: 'Select page', moveLeft: 'Move page {n} left', moveRight: 'Move page {n} right', dragTitle: 'Drag to reorder',
-    splitTitle: 'Choose how to split', splitHint: 'Page numbers follow your current workspace order. Every result is included in one ZIP download.',
+    splitTitle: 'Choose how to split', splitHint: 'Page numbers follow your current workspace order. Each ZIP supports up to 50 output PDFs.',
     byRanges: 'Split by page ranges', pageRanges: 'Page ranges', rangeHint: 'Example: 1-3, 4-5, 6. Each range becomes one PDF.', every: 'Split every N pages', perFile: 'Pages per PDF', downloadZip: 'Download split PDFs (ZIP)', creating: 'Creating PDFs…',
     foot: 'All document processing stays in your browser', footLimit: '200 MB combined · No password-protected PDFs', bigDocWarning: 'Large PDF: previews are loaded as you scroll. Hundreds of pages can still consume significant device memory. Export may take longer.',
     noFile: 'Add at least one PDF or image first.', selectionNeeded: 'Select at least one page to extract.',
     loaded: 'Added {files} file(s) and {pages} page(s).', exported: 'Export complete. Your original files were not changed.',
     extracted: 'Exported {pages} selected page(s).', zipped: 'Created {files} PDF file(s) in a ZIP archive.', cleared: 'Workspace cleared.',
     errorGeneric: 'Could not complete the operation.', errorFiles: 'You can work with at most {n} files.', errorTypes: 'Choose PDF, JPG, PNG or WebP files.', errorCombined: 'The total input size must be 200 MB or less.', errorPages: 'At most {n} pages can be added.', dismiss: 'Dismiss message',
-    invalidRange: 'Check page ranges or pages per file to continue.', estimate: '{files} PDF file(s) will be generated.',
+    invalidRange: 'Check the page ranges or pages per file (maximum 50 output PDFs).', estimate: '{files} PDF file(s) will be generated.',
   },
   zh: {
     exportOptions: '导出选项', exportOptionsHint: '默认无水印，只有主动开启后才会添加。', watermarkOn: '水印已开启',
@@ -107,14 +107,14 @@ export const workspaceCopy = {
     all: '全选', none: '取消选择', rotateLeft: '向左旋转', rotateRight: '向右旋转', extract: '提取页面', del: '删除页面',
     dragHint: '拖拽缩略图可调整顺序。先多选再拖动选中页面，可成组移动；按住 Shift 点击可选择连续页面。触屏或键盘操作可用每页下方的左右按钮。',
     addMore: '继续添加文件', pageName: '第', document: '文档', previewFail: '无法预览', selectPage: '选择第', moveLeft: '向左移动第 {n} 页', moveRight: '向右移动第 {n} 页', dragTitle: '拖动可调整顺序',
-    splitTitle: '选择拆分方式', splitHint: '页码以当前工作台的顺序为准。所有结果将打包成一个 ZIP 文件。',
+    splitTitle: '选择拆分方式', splitHint: '页码按当前工作台顺序计算。每个 ZIP 最多包含 50 个拆分 PDF。',
     byRanges: '按页码范围拆分', pageRanges: '页码范围', rangeHint: '例如：1-3, 4-5, 6。每个范围独立生成一个 PDF。', every: '每 N 页拆分一次', perFile: '每个 PDF 的页数', downloadZip: '下载拆分文件（ZIP）', creating: '正在生成…',
     foot: '所有文档操作均在浏览器本地完成', footLimit: '合计最多 200 MB · 暂不支持加密 PDF', bigDocWarning: '大文档提示：仅在滚动到页面时生成缩略图，但数百页仍可能消耗较多内存，导出也可能较慢。',
     noFile: '请先添加 PDF 或图片。', selectionNeeded: '请先选择需要提取的页面。',
     loaded: '已添加 {files} 个文件，共 {pages} 页。', exported: '导出成功，原始文件没有被修改。',
     extracted: '已提取 {pages} 页。', zipped: '已将 {files} 个 PDF 打包为 ZIP。', cleared: '工作台已清空。',
     errorGeneric: '操作失败，请检查文件后重试。', errorFiles: '一次最多处理 {n} 个文件。', errorTypes: '请选择 PDF、JPG、PNG 或 WebP 文件。', errorCombined: '所有输入文件总大小不得超过 200 MB。', errorPages: '一次最多支持 {n} 页，请减少文件。', dismiss: '关闭提示',
-    invalidRange: '请检查拆分页码或每份页数。', estimate: '预计生成 {files} 个 PDF 文件。',
+    invalidRange: '请检查拆分页码或每份页数（最多生成 50 个 PDF）。', estimate: '预计生成 {files} 个 PDF 文件。',
   },
 };
 
@@ -126,11 +126,12 @@ export function translateProcessingError(message, locale = 'en') {
   if (locale !== 'zh') return message;
   const error = String(message);
   if (/enter watermark text|watermark text must|watermarks require|canvas is unavailable for watermark|could not create the watermark image|invalid PDF page dimensions for watermark/i.test(error)) return '请填写有效的水印文字，或关闭水印功能。';
+  if (/50 output|50 ranges|maximum of 50/i.test(error)) return '一次最多生成 50 个 PDF 或使用 50 段页码范围，请减少输出文件数。';
   if (/reversed|outside pages|invalid page range|range such as|range is supported|pages.per.file|no pages to split/i.test(error)) return workspaceCopy.zh.invalidRange;
   if (/password.protected|encrypted/i.test(error)) return '暂不支持带密码保护的 PDF，请先使用已授权方式解锁。';
   if (/could not be opened|as a PDF|corrupt/i.test(error)) return '文件无法作为 PDF 打开，请检查文件是否损坏。';
-  if (/25 MB|between 1 byte/i.test(error)) return '单个文件大小必须在 25 MB 以内，且不能为空。';
+  if (/100 MB|between 1 byte/i.test(error)) return '单个文件大小必须在 1 字节至 100 MB 之间。';
   if (/image dimensions|too large/i.test(error)) return '图片尺寸过大，请缩小后重试。';
-  if (/50 output|50 ranges/i.test(error)) return '一次最多生成 50 个 PDF，请调整拆分范围。';
+
   return workspaceCopy.zh.errorGeneric;
 }

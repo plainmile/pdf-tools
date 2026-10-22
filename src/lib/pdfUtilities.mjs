@@ -3,6 +3,7 @@ import JSZip from 'jszip';
 import {
   UTILITY_LIMITS, requestedPages, parseTextBlocks, textContentToLines,
   linesToReadableText, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
+  enforceImageBatchBytes, checkCancelled,
 } from './utilityCore.mjs';
 
 export async function loadPdf(file, mode = 'pdf-to-txt', locale = 'en') {
@@ -47,7 +48,8 @@ async function openPdfJs(bytes) {
 
 function freeCanvas(canvas) { if (canvas) { canvas.width = 1; canvas.height = 1; } }
 
-async function renderPageAsBlob(page, format = 'image/jpeg', scale = 1.5, quality = .8) {
+async function renderPageAsBlob(page, format = 'image/jpeg', scale = 1.5, quality = .8, signal) {
+  checkCancelled(signal);
   const viewport = page.getViewport({ scale });
   if (viewport.width * viewport.height > UTILITY_LIMITS.maxPixelCount) throw new Error('This page is too large to rasterize safely.');
   const canvas = document.createElement('canvas');
@@ -57,7 +59,12 @@ async function renderPageAsBlob(page, format = 'image/jpeg', scale = 1.5, qualit
   if (!context) throw new Error('Canvas is not available.');
   context.fillStyle = '#ffffff'; context.fillRect(0, 0, canvas.width, canvas.height);
   try {
-    await page.render({ canvasContext: context, canvas, viewport, background: '#ffffff' }).promise;
+    const task = page.render({ canvasContext: context, canvas, viewport, background: '#ffffff' });
+    const abort = () => task.cancel();
+    signal?.addEventListener('abort', abort, { once: true });
+    try { await task.promise; checkCancelled(signal); }
+    catch (error) { checkCancelled(signal); throw error; }
+    finally { signal?.removeEventListener('abort', abort); }
     return await new Promise((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Image encoding failed.')), format, quality));
   } finally { freeCanvas(canvas); }
 }
@@ -70,20 +77,30 @@ export async function convertPdfToImages(pdf, options = {}, reportProgress = () 
   enforceImageBatchLimit(selected.length, options.locale);
   const document = await openPdfJs(pdf.bytes);
   const files = [];
+  let accumulated = 0;
   try {
     for (const index of selected) {
+      checkCancelled(options.signal);
       const page = await document.getPage(index);
       try {
-        const blob = await renderPageAsBlob(page, mime, scale, .87);
+        const blob = await renderPageAsBlob(page, mime, scale, .87, options.signal);
+        accumulated = enforceImageBatchBytes(accumulated, blob.size, options.locale);
         files.push({ name: `page-${String(index).padStart(3, '0')}.${format}`, bytes: new Uint8Array(await blob.arrayBuffer()) });
       } finally { page.cleanup(); }
       reportProgress(files.length, selected.length);
     }
   } finally { await document.destroy(); }
+  checkCancelled(options.signal);
   if (files.length === 1) return { ...files[0], mime, count: 1 };
   const zip = new JSZip();
   for (const f of files) zip.file(f.name, f.bytes);
-  return { name: 'pdf-pages.zip', bytes: await zip.generateAsync({ type: 'uint8array', compression: 'STORE' }), mime: 'application/zip', count: files.length };
+  reportProgress(files.length, files.length, 'packaging');
+  const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'STORE', streamFiles: true }, meta => {
+    checkCancelled(options.signal);
+    options.onPackagingProgress?.(Math.round(meta.percent));
+  });
+  checkCancelled(options.signal);
+  return { name: 'pdf-pages.zip', bytes, mime: 'application/zip', count: files.length };
 }
 
 // Honest, intentionally lossy raster recompression: no promise to keep searchable text,
@@ -96,10 +113,11 @@ export async function compressPdfRaster(pdf, options = {}, reportProgress = () =
   const output = await PDFDocument.create();
   try {
     for (let i = 1; i <= pdf.count; i++) {
+      checkCancelled(options.signal);
       const page = await source.getPage(i);
       try {
         const viewport = page.getViewport({ scale: 1 });
-        const jpeg = await renderPageAsBlob(page, 'image/jpeg', scale, quality);
+        const jpeg = await renderPageAsBlob(page, 'image/jpeg', scale, quality, options.signal);
         const embedded = await output.embedJpg(await jpeg.arrayBuffer());
         const target = output.addPage([viewport.width, viewport.height]);
         target.drawImage(embedded, { x: 0, y: 0, width: viewport.width, height: viewport.height });
@@ -111,11 +129,12 @@ export async function compressPdfRaster(pdf, options = {}, reportProgress = () =
   } finally { await source.destroy(); }
 }
 
-export async function extractPdfText(pdf, markdown = false, reportProgress = () => {}) {
+export async function extractPdfText(pdf, markdown = false, reportProgress = () => {}, signal) {
   const document = await openPdfJs(pdf.bytes);
   const pages = [];
   try {
     for (let i = 1; i <= pdf.count; i++) {
+      checkCancelled(signal);
       const page = await document.getPage(i);
       try { pages.push(textContentToLines(await page.getTextContent())); }
       finally { page.cleanup(); }
@@ -134,6 +153,7 @@ export async function addPageNumbers(pdf, opts = {}, reportProgress = () => {}) 
   if (!Number.isSafeInteger(start) || start < 1 || start > 99999) throw new Error('Starting page number must be from 1 to 99999.');
   const position = ['bottom-center', 'bottom-right', 'top-right'].includes(opts.position) ? opts.position : 'bottom-center';
   for (let i = 0; i < doc.getPageCount(); i++) {
+    checkCancelled(opts.signal);
     const page = doc.getPage(i);
     const box = page.getCropBox();
     const text = String(start + i);
@@ -148,7 +168,8 @@ export async function addPageNumbers(pdf, opts = {}, reportProgress = () => {}) 
 
 // Latin text uses real searchable PDF text. For arbitrary Unicode/CJK characters,
 // render with browser's LOCAL fonts as page images to avoid missing glyphs.
-export async function textToPdf(text, markdown = false) {
+export async function textToPdf(text, markdown = false, options = {}) {
+  checkCancelled(options.signal);
   const blocks = parseTextBlocks(text, markdown);
   if (!blocks.some(b => b.text.trim())) throw new Error('Enter some text first.');
   const doc = await PDFDocument.create();
@@ -169,14 +190,17 @@ export async function textToPdf(text, markdown = false) {
   if (!measure) throw new Error('Canvas is unavailable.');
   let pdfPage = null, y = 0, totalPages = 0;
   async function finishPage() {
+    checkCancelled(options.signal);
     if (unicode && pdfPage && canvas) {
       const jpg = await new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('Text rendering failed.')), 'image/jpeg', .92));
+      checkCancelled(options.signal);
       const img = await doc.embedJpg(await jpg.arrayBuffer());
       pdfPage.drawImage(img, { x: 0, y: 0, width: pdfWidth, height: pdfHeight });
     }
     freeCanvas(canvas);
   }
   async function newPage() {
+    checkCancelled(options.signal);
     if (pdfPage) await finishPage();
     if (++totalPages > (unicode ? UTILITY_LIMITS.maxRasterTextPages : UTILITY_LIMITS.maxOutputPages)) {
       throw new Error(unicode
@@ -193,7 +217,9 @@ export async function textToPdf(text, markdown = false) {
   }
   try {
     await newPage();
+    let processedCharacters = 0;
     for (const block of blocks) {
+      checkCancelled(options.signal);
       const size = block.size;
       const lineHeight = size * 1.55;
       const isBold = block.kind === 'heading';
@@ -208,6 +234,11 @@ export async function textToPdf(text, markdown = false) {
         // Measure only the NEW character, not the full growing row: O(n)
         // rather than O(n squared) on book-length paragraphs.
         for (const char of para) {
+          if (++processedCharacters % 4096 === 0) {
+            // Yield to the browser event loop so Cancel remains responsive for book-sized text.
+            await new Promise(resolve => setTimeout(resolve, 0));
+            checkCancelled(options.signal);
+          }
           const charWidth = unicode ? measure.measureText(char).width : safeTextWidth(font, char, size);
           if (row && rowWidth + charWidth > bodyWidth - 4) {
             if (y - lineHeight < margin) await newPage();
@@ -224,7 +255,10 @@ export async function textToPdf(text, markdown = false) {
       if (block.kind === 'heading') y -= 7;
     }
     if (unicode) await finishPage();
-    return { bytes: new Uint8Array(await doc.save({ useObjectStreams: true })), searchable: !unicode, pageCount: totalPages };
+    checkCancelled(options.signal);
+    const bytes = new Uint8Array(await doc.save({ useObjectStreams: true }));
+    checkCancelled(options.signal);
+    return { bytes, searchable: !unicode, pageCount: totalPages };
   } finally { freeCanvas(canvas); freeCanvas(measureCanvas); }
 
   function drawLine(line, font, size, isBold, family) {
