@@ -134,7 +134,8 @@ jobs:
           curl --fail --show-error --silent --location --retry 4 \
             -o /tmp/pdf-workspace.html https://pdf.plainmile.com/workspace/
           grep -q 'Your documents' /tmp/pdf-workspace.html
-          curl -fsS https://pdf.plainmile.com/zh/workspace/ | grep -q '自由整理每一页'
+          curl -fsS -o /tmp/pdf-workspace-zh.html https://pdf.plainmile.com/zh/workspace/
+          grep -q '自由整理每一页' /tmp/pdf-workspace-zh.html
           curl -fsS -o /dev/null https://pdf.plainmile.com/pdfjs/pdf.worker.min.mjs
 
       # Reuse the SAME GitHub-hosted Runner after a successful netcup deployment,
