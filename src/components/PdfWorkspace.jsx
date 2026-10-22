@@ -297,7 +297,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
             {tab === 'organize' ? (
               <section aria-label={t.organize} className="pages-work-area">
                 <div className="selection-toolbar">
-                  <div className="selection-info"><strong>{selectedText}</strong><button type="button" onClick={() => { setSelected(new Set(pages.map((page) => page.id))); lastSelectedIndex.current = null; }}>{t.all}</button><button type="button" onClick={resetSelection} disabled={!selectedCount}>{t.none}</button></div>
+                  <div className="selection-info"><strong>{selectedText}</strong><button type="button" disabled={busy} onClick={() => { setSelected(new Set(pages.map((page) => page.id))); lastSelectedIndex.current = null; }}>{t.all}</button><button type="button" onClick={resetSelection} disabled={busy || !selectedCount}>{t.none}</button></div>
                   <div className="page-action-buttons">
                     <button type="button" disabled={!selectedCount || busy} onClick={() => commit((previous) => rotatePages(previous, selected, -90), true)} aria-label={t.rotateLeft}>↶ {t.rotateLeft}</button>
                     <button type="button" disabled={!selectedCount || busy} onClick={() => commit((previous) => rotatePages(previous, selected, 90), true)} aria-label={locale === 'en' ? 'Rotate clockwise' : t.rotateRight}>↷ {t.rotateRight}</button>
@@ -316,7 +316,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                           setDragged(pageRef.id);
                         }}
                         onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }} onDrop={(event) => { event.stopPropagation(); onMoveDrop(event, pageRef.id); }} onDragEnd={() => setDragged(null)}>
-                        <label className="page-tile-checkbox"><input type="checkbox" checked={selected.has(pageRef.id)} onChange={(event) => toggleSelection(pageRef.id, index, Boolean(event.nativeEvent?.shiftKey))} aria-label={locale === 'zh' ? `${t.selectPage} ${index + 1} 页` : `Select page ${index + 1}`} /></label>
+                        <label className="page-tile-checkbox"><input type="checkbox" checked={selected.has(pageRef.id)} disabled={busy} onChange={(event) => toggleSelection(pageRef.id, index, Boolean(event.nativeEvent?.shiftKey))} aria-label={locale === 'zh' ? `${t.selectPage} ${index + 1} 页` : `Select page ${index + 1}`} /></label>
                         <div className="tile-sequence">{String(index + 1).padStart(2, '0')}</div>
                         <PageThumbnail source={source} pageRef={pageRef} getPreviewDoc={getPreviewDoc} locale={locale} t={t} watermarkPreview={watermarkPreview} />
                         <div className="tile-info" title={source?.name}><strong>{pageName(pageRef.pageIndex + 1)}</strong><small>{source?.name ?? t.document}</small></div>
@@ -340,7 +340,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
                   <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} onChange={(event) => setChunkSize(event.target.value)} disabled={splitMode !== 'chunks' || busy} />
                   <div className="split-estimate" aria-live="polite">{splitEstimate === null ? t.invalidRange : interpolate(t.estimate, { files: splitEstimate })}</div>
-                  <button type="button" className="button button-primary split-download" onClick={splitIntoZip} disabled={busy}>{busy ? t.creating : t.downloadZip} ↓</button>
+                  <button type="button" className="button button-primary split-download" onClick={splitIntoZip} disabled={busy || splitEstimate === null}>{busy ? t.creating : t.downloadZip} ↓</button>
                 </div>
               </section>
             )}
