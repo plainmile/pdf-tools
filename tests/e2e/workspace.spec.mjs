@@ -324,3 +324,53 @@ test('image import uses filename when MIME is generic and blocks oversized PNG b
   await expect(page.getByRole('alert')).toContainText('Image dimensions are too large');
   await expect(page.getByTestId('page-tile')).toHaveCount(0);
 });
+
+test('empty workspace retains undo and a successful reimport does not inherit hidden file quotas', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/workspace/');
+  const initial = await makePdf([300]);
+  await page.getByTestId('file-input').setInputFiles(
+    Array.from({ length: 20 }, (_, n) => ({
+      name: `original-${n + 1}.pdf`, mimeType: 'application/pdf', buffer: initial,
+    })),
+  );
+  await expect(page.getByTestId('page-tile')).toHaveCount(20);
+  await page.getByRole('button', { name: 'Select all' }).click();
+  await page.getByRole('button', { name: 'Delete selected pages' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(0);
+  await expect(page.getByTestId('undo-all-deleted')).toBeVisible();
+  await expect(page.getByTestId('empty-history-hint')).toContainText('old undo history will be cleared');
+
+  // A failed import cannot delete the user's last undo opportunity.
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'broken.pdf', mimeType: 'application/pdf', buffer: Buffer.from('not a PDF'),
+  });
+  await expect(page.getByRole('alert')).toContainText('could not be opened');
+  await page.getByTestId('undo-all-deleted').click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(20);
+
+  await page.getByRole('button', { name: 'Select all' }).click();
+  await page.getByRole('button', { name: 'Delete selected pages' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(0);
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'replacement.pdf', mimeType: 'application/pdf', buffer: await makePdf([501]),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  await expect(page.getByText('from 1 file')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
+  const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(output.getPages().map(p => p.getWidth())).toEqual([501]);
+});
+
+test('Chinese empty workspace explains undo and reset before starting a new document', async ({ page }) => {
+  await page.goto('/zh/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'test.pdf', mimeType: 'application/pdf', buffer: await makePdf([314]),
+  });
+  await page.getByRole('button', { name: '全选' }).click();
+  await page.getByRole('button', { name: '删除页面' }).click();
+  await expect(page.getByTestId('empty-history-hint')).toContainText('清除旧操作的撤销记录');
+  await page.getByTestId('undo-all-deleted').click();
+  const restored = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
+  expect(restored.getPages().map(p => p.getWidth())).toEqual([314]);
+});
