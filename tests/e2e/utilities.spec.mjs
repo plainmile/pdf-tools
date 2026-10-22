@@ -403,7 +403,7 @@ test('page numbering on rotated cropped PDFs preserves page rotations and search
 test('numbering rejects too-small pages and page labels over 99999 in Chinese', async ({ page }) => {
   await page.goto('/zh/add-page-numbers/');
   const tiny = await PDFDocument.create();
-  tiny.addPage([70, 65]);
+  tiny.addPage([50, 50]);
   await upload(page, Buffer.from(await tiny.save()));
   await page.getByTestId('utility-run').click();
   await expect(page.getByRole('alert')).toContainText('页面尺寸太小');
