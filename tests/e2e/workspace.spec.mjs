@@ -801,3 +801,36 @@ test('image layout before import, mixed PDF inputs and Chinese text labels are c
   const revised = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
   expect(revised.getPage(0).getWidth()).toBeCloseTo(841.89, 1);
 });
+
+
+test('fit-to-image cannot produce an arbitrarily portrait page from landscape photos', async ({ page }) => {
+  await page.goto('/image-to-pdf/');
+  await page.getByTestId('image-paper').selectOption('fit');
+  await expect(page.getByTestId('image-orientation')).toHaveValue('auto');
+  await expect(page.getByTestId('image-orientation')).toBeDisabled();
+  await expect(page.getByTestId('image-fit-orientation-hint')).toContainText('follows each photo shape');
+  await page.getByTestId('image-margin').selectOption('0');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'landscape.png', mimeType: 'image/png',
+    buffer: await makeTestPng(page, 400, 200, 'blue'),
+  });
+  const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(output.getPage(0).getWidth()).toBeCloseTo(300, 1);
+  expect(output.getPage(0).getHeight()).toBeCloseTo(150, 1);
+  await page.getByTestId('image-paper').selectOption('a4');
+  await expect(page.getByTestId('image-orientation')).toBeEnabled();
+  await page.getByTestId('image-orientation').selectOption('portrait');
+  await page.getByTestId('image-layout-apply').click();
+  const a4 = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(a4.getPage(0).getWidth()).toBeCloseTo(595.28, 1);
+  expect(a4.getPage(0).getHeight()).toBeCloseTo(841.89, 1);
+});
+
+test('Chinese fit-to-image explains automatic orientation and disabled controls', async ({ page }) => {
+  await page.goto('/zh/image-to-pdf/');
+  await page.getByTestId('image-paper').selectOption('fit');
+  await expect(page.getByTestId('image-orientation')).toBeDisabled();
+  await expect(page.getByTestId('image-fit-orientation-hint')).toContainText('自动匹配每张照片方向');
+  await page.getByTestId('image-paper').selectOption('letter');
+  await expect(page.getByTestId('image-orientation')).toBeEnabled();
+});
