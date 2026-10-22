@@ -185,6 +185,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     // workspace. Keep the old undo history intact until that import succeeds.
     const replacingDeletedPages = pages.length === 0 && sources.length > 0;
     try {
+      // Do not import photos with new settings while previously imported photos
+      // still use the old paper layout. Otherwise switching the form back could
+      // wrongly clear the dirty flag even though the resulting pages differ.
+      if (imageLayoutDirty) throw new Error(t.imageMustApply);
       if (activeSourceCount + items.length > LIMITS.maxFiles) throw new Error(interpolate(t.errorFiles, { n: LIMITS.maxFiles }));
       if (items.some((file) => !isSupportedFile(file))) throw new Error(t.errorTypes);
       const incomingBytes = items.reduce((total, file) => total + file.size, 0);
