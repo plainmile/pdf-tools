@@ -446,3 +446,38 @@ test('Chinese workspace keeps specific file count and type errors rather than a 
   await expect(page.getByRole('alert')).toContainText('请选择 PDF、JPG、PNG 或 WebP 文件');
   await expect(page.getByTestId('page-tile')).toHaveCount(0);
 });
+
+for (const dpr of [1, 2]) {
+  test.describe(`thumbnail canvas recycling at ${dpr}x DPR`, () => {
+    test.use({ deviceScaleFactor: dpr });
+    test('releases offscreen bitmaps, redraws on return, preserves rotation and export', async ({ page }) => {
+      test.setTimeout(60000);
+      await page.goto('/workspace/');
+      await page.getByTestId('file-input').setInputFiles({
+        name: 'long-report.pdf', mimeType: 'application/pdf',
+        buffer: await makePdf(Array.from({ length: 320 }, (_, i) => 300 + i % 13)),
+      });
+      const tiles = page.getByTestId('page-tile');
+      await expect(tiles).toHaveCount(320, { timeout: 30000 });
+      const first = tiles.first();
+      await first.scrollIntoViewIfNeeded();
+      const firstCanvas = first.locator('canvas');
+      await expect.poll(async () => firstCanvas.evaluate(c => c.width), { timeout: 20000 }).toBeGreaterThan(0);
+      const firstBackingStore = await firstCanvas.elementHandle();
+      expect(firstBackingStore).not.toBeNull();
+      await tiles.nth(319).scrollIntoViewIfNeeded();
+      await expect(firstCanvas).toHaveCount(0, { timeout: 10000 });
+      // Keep the detached canvas handle to prove the actual pixel buffer was reset,
+      // not merely hidden while hundreds of thumbnails retain their old bitmaps.
+      await expect.poll(() => firstBackingStore.evaluate(c => [c.width, c.height])).toEqual([0, 0]);
+      await first.scrollIntoViewIfNeeded();
+      await expect.poll(async () => first.locator('canvas').evaluate(c => c.width), { timeout: 20000 }).toBeGreaterThan(0);
+      await first.getByRole('checkbox', { name: 'Select page 1' }).check();
+      await page.getByRole('button', { name: 'Rotate clockwise' }).click();
+      await expect.poll(async () => first.locator('canvas').evaluate(c => c.width), { timeout: 20000 }).toBeGreaterThan(0);
+      const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Extract selected pages' }).click());
+      expect(output.getPageCount()).toBe(1);
+      expect(output.getPages()[0].getRotation().angle).toBe(90);
+    });
+  });
+}
