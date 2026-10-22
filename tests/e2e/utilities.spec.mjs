@@ -57,6 +57,8 @@ test('compression never auto-downloads, blocks a larger PDF, and shows actual by
   });
   await expect(page.getByTestId('compression-download')).toBeDisabled();
   await expect(page.getByRole('status')).toContainText('No size reduction');
+  await expect(page.getByTestId('compression-change-label')).toHaveText('Size increase');
+  await expect(page.getByTestId('compression-change-value')).not.toContainText('-');
 
   const rawPng = await page.evaluate(() => {
     const canvas = document.createElement('canvas'); canvas.width = 700; canvas.height = 700;
@@ -78,6 +80,8 @@ test('compression never auto-downloads, blocks a larger PDF, and shows actual by
   await upload(page, input);
   await page.getByTestId('utility-run').click();
   await expect(page.getByTestId('compression-download')).toBeEnabled();
+  await expect(page.getByTestId('compression-change-label')).toHaveText('Saved');
+  await expect(page.getByTestId('compression-change-value')).not.toContainText('-');
   const compressed = await getDownload(page, () => page.getByTestId('compression-download').click());
   expect(compressed.bytes.byteLength).toBeLessThan(input.byteLength);
   expect((await PDFDocument.load(compressed.bytes)).getPageCount()).toBe(1);
@@ -443,4 +447,14 @@ test('changing any page numbering setting removes stale finished-result messagin
   const text = await getDownload(page, run);
   expect(text.bytes.toString('utf8')).toMatch(/\b41\b/);
   expect(text.bytes.toString('utf8')).toMatch(/\b42\b/);
+});
+
+test('Chinese compression honestly calls larger raster PDFs an increase, never a saving', async ({ page }) => {
+  await page.goto('/zh/compress-pdf/');
+  await upload(page, await fixturePdf('Small text report', 1));
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('compression-result')).toBeVisible();
+  await expect(page.getByTestId('compression-download')).toBeDisabled();
+  await expect(page.getByTestId('compression-change-label')).toHaveText('体积增加');
+  await expect(page.getByTestId('compression-change-value')).not.toContainText('-');
 });

@@ -11,7 +11,7 @@ const COPY = {
     low: 'Smaller (72 DPI)', medium: 'Balanced (108 DPI)', high: 'Sharper (144 DPI)',
     download: 'Download result', compressionMethod: 'Compression level', compressionLow: 'Smaller size (lossier)', compressionMid: 'Balanced', compressionHigh: 'Clearer (larger)',
     compressionWarning: 'This method converts every PDF page into a JPEG image. Text stops being searchable or selectable. Forms, annotations, hyperlinks and signatures are not preserved. Keep the original and inspect the output.',
-    original: 'Original', result: 'Result', saved: 'Saved', noSaving: 'No size reduction. This file was not downloaded; try a lower resolution or keep the original.',
+    original: 'Original', result: 'Result', saved: 'Saved', increased: 'Size increase', unchanged: 'No change', noSaving: 'No size reduction. This file was not downloaded; try a lower resolution or keep the original.',
     compressionReady: 'The output is smaller. Check text sharpness before using it.',
     textWarning: 'Extracts existing selectable PDF text only, not OCR. Columns, tables and heading formatting may not be preserved. Check the exported text.',
     markdownWarning: 'Markdown conversion is approximate; headings are inferred from font size. Complex PDF layout cannot be faithfully recovered.',
@@ -31,7 +31,7 @@ const COPY = {
     low: '更小（72 DPI）', medium: '平衡（108 DPI）', high: '高清（144 DPI）',
     download: '下载结果', compressionMethod: '压缩强度', compressionLow: '更小体积（画质较低）', compressionMid: '平衡', compressionHigh: '画质较清晰（体积较大）',
     compressionWarning: '此压缩方式会将 PDF 各页重新渲染为 JPEG 图片。输出将失去文本搜索和选中能力，也无法保留表单、注释、链接及数字签名。请保存原文件并检查输出画质。',
-    original: '原文件', result: '输出文件', saved: '节省', noSaving: '未缩小文件，因此没有自动下载。可尝试降低清晰度，或保留原文件。',
+    original: '原文件', result: '输出文件', saved: '节省', increased: '体积增加', unchanged: '无变化', noSaving: '未缩小文件，因此没有自动下载。可尝试降低清晰度，或保留原文件。',
     compressionReady: '输出文件确实更小。请先核对文字清晰度。',
     textWarning: '只提取 PDF 中已有的可选择文字，不具备 OCR。多栏、表格和段落顺序可能不准确，请核对导出内容。',
     markdownWarning: 'Markdown 为近似转换：根据字号推测标题，复杂 PDF 的版式无法完整还原。',
@@ -240,7 +240,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         {busy && processing && <button type="button" className="button button-secondary" data-testid="utility-cancel" disabled={cancelling} onClick={() => { setCancelling(true); taskRef.current?.abort(); }}>{cancelling ? t.cancelling : t.cancel}</button>}
         {progress && (busy || notice) && <p className="utility-note" data-testid="utility-progress" aria-live="polite">{'packaging' in progress ? t.packaging.replace('{percent}', progress.packaging) : t.progressLabel.replace('{done}', progress.done).replace('{total}', progress.total)}</p>}
         {isCompress && output && <div className="utility-result" data-testid="compression-result">
-          <div className="utility-comparison"><div><span>{t.original}</span><strong>{formatBytes(output.stats.original)}</strong></div><div><span>{t.result}</span><strong>{formatBytes(output.stats.candidate)}</strong></div><div><span>{t.saved}</span><strong className={output.stats.smaller ? 'utility-smaller' : 'utility-not-smaller'}>{output.stats.percent}%</strong></div></div>
+          <div className="utility-comparison"><div><span>{t.original}</span><strong>{formatBytes(output.stats.original)}</strong></div><div><span>{t.result}</span><strong>{formatBytes(output.stats.candidate)}</strong></div><div><span data-testid="compression-change-label">{output.stats.smaller ? t.saved : output.stats.candidate > output.stats.original ? t.increased : t.unchanged}</span><strong data-testid="compression-change-value" className={output.stats.smaller ? 'utility-smaller' : output.stats.candidate > output.stats.original ? 'utility-not-smaller' : ''}>{Math.abs(output.stats.percent)}%</strong></div></div>
           <button type="button" className="button button-primary" data-testid="compression-download" disabled={!output.stats.smaller} onClick={() => save(output)}>{t.download} ↓</button>
         </div>}
         {error && <div className="notice notice-error" role="alert">{error}</div>}
