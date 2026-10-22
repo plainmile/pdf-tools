@@ -70,11 +70,12 @@ export const chineseTools = {
   'txt-to-pdf': { title: 'TXT 转 PDF', short: '纯文本生成 PDF', headline: '把 TXT 文本转换成 PDF。', description: '在浏览器中粘贴或导入 TXT，生成 A4 PDF。英文尽量保持文字可选中，中文使用本地字体渲染为图片页。', details: '支持 UTF-8 文本。含中文等非拉丁字符时输出为图片页，无法搜索文字；源文本不会上传。', steps: ['输入或导入 TXT', '核对文本内容', '下载 PDF'] },
   'markdown-to-pdf': { title: 'Markdown 转 PDF', short: '支持简单标题、列表和代码', headline: '将基础 Markdown 生成 PDF。', description: '本地转换基础 Markdown 的标题、段落、列表、引用和代码块；暂不支持复杂表格、HTML 与远程图片。', details: '为了安全和轻量化，使用简单 Markdown 子集。含中文等非拉丁文字的输出为图片页，不可搜索。', steps: ['粘贴或导入 Markdown', '检查标题和内容', '下载 PDF'] },
   'add-page-numbers': { title: '添加 PDF 页码', short: '设置位置和起始页码', headline: '为 PDF 每一页添加页码。', description: '为 PDF 增加可选择的页码，支持指定起始数字、位置和字号；全部在本地完成，不上传文件。', details: '可选择页码从几开始，并放在底部中间、右下角或右上角。重要文件请检查数字签名等内容。', steps: ['选择 PDF', '设置起始数字和位置', '下载带页码的 PDF'] },
-  'image-to-pdf': { title: '图片转 PDF', short: '支持 JPG、PNG、WebP', headline: '将图片整理为 PDF。', description: '将 JPG、PNG、WebP 图片转为 PDF 页面，可与现有 PDF 混排和合并。', details: '图片按比例放入 A4 页面。导入 JPG 时，会移除常见 EXIF、XMP、IPTC 和注释元数据（可能包含 GPS），保留照片方向和原有压缩画质；这不适用于已有 PDF 中的元数据。', steps: ['添加图片', '调整顺序', '导出 PDF'] },
+  'image-to-pdf': { title: '图片转 PDF', short: 'JPG、PNG、WebP 与自定义纸张', headline: '将图片整理为 PDF。', description: '将 JPG、PNG、WebP 图片转为 PDF。支持 A4、Letter、适合图片、横竖方向与边距；可调整页面顺序。', details: '可在导入前设置纸张、方向和边距，也可以在导入后重新应用设置。JPG 会移除常见 EXIF、XMP、IPTC 和注释元数据（可能包含 GPS），保留照片方向和原有压缩画质；不处理已有 PDF 的元数据。', steps: ['选择纸张、方向和边距', '添加图片并按需调整顺序', '核对预览后导出 PDF'] },
 };
 
 export const workspaceCopy = {
   en: {
+    imageSettings: 'Image page settings', imageSettingsHint: 'Choose before importing, or apply changes to imported photos below.', imagePaper: 'Paper size', imageFit: 'Fit to image', imageOrientation: 'Page orientation', imagePortrait: 'Portrait', imageLandscape: 'Landscape', imageAuto: 'Auto (match each image)', imageMargin: 'Page margins', imageMarginNone: 'No margins (0 pt)', imageMarginNarrow: 'Narrow (12 pt)', imageMarginNormal: 'Standard (30 pt)', imageMarginWide: 'Wide (48 pt)', imageLayoutDirty: 'These settings have not been applied to the loaded photos. Apply them before exporting.', imageApply: 'Apply to imported photos', imageApplied: 'Photo page settings applied. Page order and selections were preserved.', imageMustApply: 'Apply the updated page settings before exporting.', outputName: 'Download filename',
     exportOptions: 'Export options', exportOptionsHint: 'No watermark is added unless you enable it.', watermarkOn: 'Watermark on',
     watermarkLabel: 'Add text watermark (optional)', watermarkTextLabel: 'Watermark text', watermarkPlaceholder: 'e.g. CONFIDENTIAL',
     watermarkHelp: 'Light diagonal text on every exported page. Thumbnail previews are approximate.',
@@ -99,6 +100,7 @@ export const workspaceCopy = {
     invalidRange: 'Check the page ranges or pages per file (maximum 50 output PDFs).', estimate: '{files} PDF file(s) will be generated.',
   },
   zh: {
+    imageSettings: '图片页面设置', imageSettingsHint: '可在导入前设置；导入后更改时，需点击下方按钮重新应用到已有照片。', imagePaper: '纸张尺寸', imageFit: '适合图片', imageOrientation: '页面方向', imagePortrait: '纵向', imageLandscape: '横向', imageAuto: '自动匹配图片方向', imageMargin: '页面边距', imageMarginNone: '无边距（0 pt）', imageMarginNarrow: '窄（12 pt）', imageMarginNormal: '标准（30 pt）', imageMarginWide: '宽（48 pt）', imageLayoutDirty: '新设置尚未应用到已导入的照片。请先应用设置，再导出 PDF。', imageApply: '应用到已导入照片', imageApplied: '已更新照片页面设置，原有页面顺序和选择不变。', imageMustApply: '请先应用修改后的页面设置，再导出文件。', outputName: '下载文件名',
     exportOptions: '导出选项', exportOptionsHint: '默认无水印，只有主动开启后才会添加。', watermarkOn: '水印已开启',
     watermarkLabel: '添加文字水印（可选）', watermarkTextLabel: '水印文字', watermarkPlaceholder: '例如：内部资料',
     watermarkHelp: '导出时在每页添加居中斜向的浅色水印，缩略图为近似预览。',
