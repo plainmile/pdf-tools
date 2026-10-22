@@ -709,3 +709,95 @@ test('deleting one entire source frees an active file slot without discarding Un
   await expect(page.getByTestId('page-tile')).toHaveCount(20);
   await expect(page.getByText('from 20 files')).toBeVisible();
 });
+
+
+async function makeTestPng(page, width, height, color) {
+  const base64 = await page.evaluate(({ width, height, color }) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width; canvas.height = height;
+    const context = canvas.getContext('2d');
+    context.fillStyle = color; context.fillRect(0, 0, width, height);
+    return canvas.toDataURL('image/png').split(',')[1];
+  }, { width, height, color });
+  return Buffer.from(base64, 'base64');
+}
+
+test('image-to-PDF layout: A4 defaults, US Letter landscape and fit-to-image; reflow keeps reordered pages', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/image-to-pdf/');
+  await expect(page.getByTestId('image-page-settings')).toBeVisible();
+  await expect(page.getByTestId('image-paper')).toHaveValue('a4');
+  await expect(page.getByTestId('image-orientation')).toHaveValue('portrait');
+  await expect(page.getByTestId('image-margin')).toHaveValue('30');
+
+  const one = await makeTestPng(page, 160, 90, 'red');
+  const two = await makeTestPng(page, 90, 160, 'green');
+  await page.getByTestId('file-input').setInputFiles([
+    { name: 'wide.png', mimeType: 'image/png', buffer: one },
+    { name: 'tall.png', mimeType: 'image/png', buffer: two },
+  ]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+
+  const initial = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(initial.getPages().map(p => [Math.round(p.getWidth()), Math.round(p.getHeight())]))
+    .toEqual([[595, 842], [595, 842]]);
+
+  await page.getByTestId('image-paper').selectOption('letter');
+  await page.getByTestId('image-orientation').selectOption('landscape');
+  await page.getByTestId('image-margin').selectOption('12');
+  await expect(page.getByTestId('image-layout-dirty')).toBeVisible();
+  // Importing again before applying must not silently mix letter/A4 page layouts.
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'third.png', mimeType: 'image/png', buffer: one,
+  });
+  await expect(page.getByRole('alert')).toContainText('Apply updated page settings before adding');
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'Export PDF' })).toBeDisabled();
+  await page.getByTestId('image-layout-apply').click();
+  await expect(page.getByTestId('image-layout-dirty')).toHaveCount(0);
+  const letter = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(letter.getPages().map(p => [Math.round(p.getWidth()), Math.round(p.getHeight())]))
+    .toEqual([[792, 612], [792, 612]]);
+  await expect(page.getByTestId('workspace-export-filename')).toContainText('plainmile-2-files-images.pdf');
+
+  await page.getByRole('button', { name: 'Move page 2 left' }).click();
+  await page.getByTestId('image-paper').selectOption('fit');
+  // Fit should immediately follow the photo shape instead of reusing old landscape/portrait.
+  await expect(page.getByTestId('image-orientation')).toHaveValue('auto');
+  await page.getByTestId('image-margin').selectOption('0');
+  await page.getByTestId('image-layout-apply').click();
+  const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  const sizes = output.getPages().map(p => [p.getWidth(), p.getHeight()]);
+  expect(sizes[0][0]).toBeCloseTo(67.5, 2);
+  expect(sizes[0][1]).toBeCloseTo(120, 2);
+  expect(sizes[1][0]).toBeCloseTo(120, 2);
+  expect(sizes[1][1]).toBeCloseTo(67.5, 2);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  const undone = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(undone.getPages()[0].getWidth()).toBeCloseTo(120, 2);
+});
+
+test('image layout before import, mixed PDF inputs and Chinese text labels are consistent', async ({ page }) => {
+  await page.goto('/zh/image-to-pdf/');
+  await expect(page.getByTestId('image-page-settings')).toContainText('图片页面设置');
+  await page.getByTestId('image-paper').selectOption('fit');
+  // Fit should immediately follow the photo shape instead of reusing old landscape/portrait.
+  await expect(page.getByTestId('image-orientation')).toHaveValue('auto');
+  await page.getByTestId('image-margin').selectOption('0');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'sample-phone.png', mimeType: 'image/png',
+    buffer: await makeTestPng(page, 240, 135, 'blue'),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  await expect(page.getByTestId('image-layout-dirty')).toHaveCount(0);
+  await expect(page.getByTestId('workspace-export-filename')).toContainText('sample-phone-images.pdf');
+  const image = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
+  expect(image.getPage(0).getWidth()).toBeCloseTo(180, 2);
+  expect(image.getPage(0).getHeight()).toBeCloseTo(101.25, 2);
+
+  await page.getByTestId('image-paper').selectOption('a4');
+  await expect(page.getByTestId('image-layout-dirty')).toContainText('尚未应用');
+  await page.getByTestId('image-layout-apply').click();
+  const revised = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
+  expect(revised.getPage(0).getWidth()).toBeCloseTo(841.89, 1);
+});
