@@ -91,11 +91,14 @@ test('text-to-PDF draft in mobile Chinese requires explicit navigation choice', 
   await expect(page).toHaveURL(/\/txt-to-pdf\/$/);
 });
 
-test('plain PDF utility after import protects the source but a completed download does not block tools', async ({ page }) => {
+test('plain PDF utility after import protects its source; explicit Clear releases navigation', async ({ page }) => {
   await page.goto('/pdf-to-txt/');
   await page.getByTestId('utility-file-input').setInputFiles({
     name: 'minimal.pdf', mimeType: 'application/pdf', buffer: await syntheticPdf(),
   });
+  // PDF.js loads and counts pages asynchronously; navigation protection
+  // should be tested only once the active file is actually loaded.
+  await expect(page.getByTestId('utility-file-summary')).toContainText('minimal.pdf');
   await page.locator('.primary-nav a[href="/merge-pdf/"]').click();
   await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
   await page.getByTestId('unsaved-keep').click();
