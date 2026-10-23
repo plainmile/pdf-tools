@@ -177,3 +177,37 @@ test('undo after reimport reactivates old paper settings and blocks mixed-layout
   const output = await PDFDocument.load(await readFile(await (await download).path()));
   expect(output.getPages().map(p => Math.round(p.getWidth()))).toEqual([612, 300]);
 });
+
+test('full clear resets prior destructive image cropping and paper options', async ({ page }) => {
+  await page.goto('/image-to-pdf/');
+  await page.getByTestId('image-paper').selectOption('letter');
+  await page.getByTestId('image-orientation').selectOption('landscape');
+  await page.getByTestId('image-margin').selectOption('48');
+  await page.getByTestId('image-sizing').selectOption('cover');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'old-layout-photo.png', mimeType: 'image/png', buffer: await picture(page, 200, 80),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
+  await page.getByTestId('cancel-clear').click();
+  await expect(page.getByTestId('image-paper')).toHaveValue('letter');
+  await expect(page.getByTestId('image-sizing')).toHaveValue('cover');
+
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
+  await page.getByTestId('confirm-clear').click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(0);
+  await expect(page.getByTestId('image-paper')).toHaveValue('a4');
+  await expect(page.getByTestId('image-orientation')).toHaveValue('portrait');
+  await expect(page.getByTestId('image-margin')).toHaveValue('30');
+  await expect(page.getByTestId('image-sizing')).toHaveValue('contain');
+
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'fresh-photo.png', mimeType: 'image/png', buffer: await picture(page, 200, 80),
+  });
+  const waiter = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export PDF' }).click();
+  const pdf = await PDFDocument.load(await readFile(await (await waiter).path()));
+  expect(Math.round(pdf.getPage(0).getWidth())).toBe(595);
+  expect(Math.round(pdf.getPage(0).getHeight())).toBe(842);
+  expect(pageOperators(pdf, pdf.getPage(0))).not.toMatch(/\bW\s+n\b/);
+});
