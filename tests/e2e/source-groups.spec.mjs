@@ -114,3 +114,27 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 780 
     await expect(page.getByTestId('page-tile')).toHaveCount(360);
   });
 }
+
+test('grouped Shift selects only visible pages of the same source, never interleaved PDFs', async ({ page }) => {
+  await importTwo(page, [[300, 310, 315], [320, 330]]);
+  // Interleave the second PDF between first-PDF pages.
+  await page.getByRole('button', { name: 'Move page 4 left' }).click();
+  await page.getByRole('button', { name: 'Move page 3 left' }).click();
+  await page.getByTestId('workspace-view-grouped').click();
+  const first = page.getByTestId('source-group').first();
+  const firstChecks = first.getByRole('checkbox');
+  await firstChecks.first().check();
+  await firstChecks.last().click({ modifiers: ['Shift'] });
+  await expect(page.getByText('3 pages selected')).toBeVisible();
+  await expect(page.getByTestId('source-group').nth(1).getByRole('checkbox').first()).not.toBeChecked();
+  const pdf = await exportPdf(page);
+  expect(pdf.getPages().map(p => p.getWidth())).toEqual([300, 320, 310, 315, 330]);
+
+  // Switching back uses global export order for ranges, never carries a
+  // grouped source anchor into unrelated pages.
+  await page.getByTestId('workspace-view-order').click();
+  await page.getByRole('button', { name: 'Deselect' }).click();
+  await page.getByRole('checkbox', { name: 'Select page 1', exact: true }).check();
+  await page.getByRole('checkbox', { name: 'Select page 3', exact: true }).click({ modifiers: ['Shift'] });
+  await expect(page.getByText('3 pages selected')).toBeVisible();
+});
