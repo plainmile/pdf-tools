@@ -4,7 +4,7 @@ import {
   movePage, movePageGroup, shiftPage, rotatePages, deletePages, parsePageRanges,
   chunkPageRanges, getRangePages, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
-  reversePages, sortPagesByFilename, duplicatePages, insertPageAfter, groupPagesBySource,
+  reversePages, sortPagesByFilename, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges,
 } from '../../src/lib/pageOperations.mjs';
 
 const pages = Object.freeze([
@@ -190,4 +190,16 @@ test('expired Undo snapshots release orphaned sources but reachable Undo/Redo ke
   assert.equal(historyReferencedSourceIds(rolledBack).has('fileC'), true);
   const branched = commitHistory(rolledBack, rotatePages(original, ['a'], 90));
   assert.equal(historyReferencedSourceIds(branched).has('fileC'), false);
+});
+
+
+test('select-by-range uses visible export positions, deduplicates overlaps and rejects invalid edits', () => {
+  assert.deepEqual([...pageIdsForRanges(pages, '1-2, 2, 3')], ['a', 'b', 'c']);
+  assert.deepEqual([...pageIdsForRanges(pages, '3,1')], ['c', 'a']);
+  const reordered = movePage(pages, 'c', 'a');
+  assert.deepEqual([...pageIdsForRanges(reordered, '1, 3')], ['c', 'b']);
+  for (const input of ['3-1', '4', '1,,2', '0']) {
+    assert.throws(() => pageIdsForRanges(pages, input));
+  }
+  assert.deepEqual([...pageIdsForRanges(pages, '1-3')].length, 3);
 });
