@@ -63,6 +63,16 @@ test('Markdown parser preserves generics, placeholders and comparisons without s
   assert.equal(blocks[2].text, 'Check: a<b && c>d');
 });
 
+test('inline Markdown code preserves literal HTML tags, URL text and arithmetic', () => {
+  const input = 'Use `<strong>` and `<script>alert(1)</script>` literally; `[docs](https://example.com)` is code. Outside <strong>bold</strong>.';
+  assert.equal(stripMarkdownInline(input),
+    'Use <strong> and <script>alert(1)</script> literally; [docs](https://example.com) is code. Outside bold.');
+  assert.equal(stripMarkdownInline('**bold `x*y`** with _emphasis_ and `<input>`'),
+    'bold x*y with emphasis and <input>');
+  const blocks = parseTextBlocks('# Using `<a>` tags\nExample: `<div class="x">` and `[link](https://plainmile.com)`', true);
+  assert.equal(blocks[0].text, 'Using <a> tags');
+  assert.equal(blocks[1].text, 'Example: <div class="x"> and [link](https://plainmile.com)');
+});
 test('PDF positioned text is approximately sorted by vertical position then X', () => {
   const items = [
     { str: 'right', transform: [1,0,0,12, 100, 300], height: 12, width: 25 },

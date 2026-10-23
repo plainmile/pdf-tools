@@ -517,6 +517,22 @@ test('technical Markdown generics, placeholders and tight comparisons survive ac
   }
 });
 
+test('Markdown inline-code HTML and URL text survive downloaded PDF and TXT round-trip', async ({ page }) => {
+  await page.goto('/markdown-to-pdf/');
+  await page.getByTestId('utility-text').fill(
+    'Tag: `<strong>`\nScript: `<script>alert(1)</script>`\nCode link: `[docs](https://example.com)`\nEmphasis: **bold `x*y`**',
+  );
+  const created = await generateTextPdfAndDownload(page);
+  expect((await PDFDocument.load(created.bytes)).getPageCount()).toBe(1);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, created.bytes);
+  const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
+  const text = extracted.bytes.toString('utf8');
+  for (const expected of ['Tag: <strong>', 'Script: <script>alert(1)</script>',
+    'Code link: [docs](https://example.com)', 'Emphasis: bold x*y']) {
+    expect(text).toContain(expected);
+  }
+});
 test('page numbering on rotated cropped PDFs preserves page rotations and searchable digits', async ({ page }) => {
   const { degrees } = await import('pdf-lib');
   const input = await PDFDocument.create();
