@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import JSZip from 'jszip';
+import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 import { LIMITS, composePdf, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId } from '../lib/pdfEngine.mjs';
 import { sanitizeFilename } from '../lib/utilityCore.mjs';
 import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLayout.mjs';
@@ -107,6 +108,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [exportProgress, setExportProgress] = useState(null);
   const [exportCancelling, setExportCancelling] = useState(false);
   const [imageLayout, setImageLayout] = useState(() => ({ ...IMAGE_PDF_LAYOUT_DEFAULT }));
+  const [lastDownloadedRevision, setLastDownloadedRevision] = useState(null);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [dragged, setDragged] = useState(null);
@@ -139,6 +141,17 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const activeSourceCount = useMemo(() => countActiveSources(pages), [pages]);
   const onlyImages = pages.length > 1 && pages.every(page => sourceLookup.get(page.sourceId)?.isImage);
   const hasOriginalPdf = pages.some(page => !sourceLookup.get(page.sourceId)?.isImage);
+  // Only a full Export PDF marks these particular edits as safely downloaded.
+  // A later rotation/reorder/paper/watermark change immediately re-enables the
+  // navigation guard; no document bytes ever leave browser RAM or enter storage.
+  const documentRevision = useMemo(() => pages.length ? JSON.stringify({
+    pages: pages.map(page => [page.id, page.sourceId, page.pageIndex, page.rotation]),
+    photos: sources.filter(source => activeImageSources.has(source.id))
+      .map(source => [source.id, source.imageLayout]),
+    paper: mode === 'image-to-pdf' ? imageLayout : null,
+    watermark: watermarkEnabled ? watermarkText : null,
+  }) : null, [pages, sources, imageLayout, watermarkEnabled, watermarkText, mode]);
+  const navigationWouldLoseWork = Boolean(pages.length && documentRevision !== lastDownloadedRevision);
   const splitNeedsInput = splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim();
   const splitEstimate = useMemo(() => {
     if (!pages.length || (splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim())) return null;
@@ -267,6 +280,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       });
       if (controller.signal.aborted) throw new Error('PDF export cancelled.');
       saveDownload(bytes, outputName);
+      if (chosen === pages) setLastDownloadedRevision(documentRevision);
       setNotice(successMessage);
     } finally {
       exportAbortRef.current = null;
@@ -342,6 +356,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setClearConfirm(false);
     setWatermarkEnabled(false); setWatermarkText(''); setExportSettingsOpen(mode === 'watermark-pdf');
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
+    setLastDownloadedRevision(null);
     setRanges(''); setChunkSize(''); setSplitMode('ranges');
     // A fresh image-to-PDF workspace must not inherit a previous crop choice.
     setImageLayout({ ...IMAGE_PDF_LAYOUT_DEFAULT });
@@ -364,6 +379,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
 
   return (
     <div className="pdf-workspace" data-testid="pdf-workspace">
+      <UnsavedNavigationGuard active={navigationWouldLoseWork} locale={locale} />
       <div className="workspace-bar">
         <div className="workspace-heading"><span className="workspace-app-icon" aria-hidden="true">▤</span><div><strong>{t.app}</strong><span>{t.local}</span></div></div>
         <span className="workspace-status"><span className="status-dot" aria-hidden="true" />{t.local}</span>
