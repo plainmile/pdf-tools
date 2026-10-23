@@ -136,6 +136,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const filename = `${fileBase}-${mode === 'image-to-pdf' ? 'images' : 'organized'}.pdf`;
   const activeSourceCount = useMemo(() => countActiveSources(pages), [pages]);
   const onlyImages = pages.length > 1 && pages.every(page => sourceLookup.get(page.sourceId)?.isImage);
+  const hasOriginalPdf = pages.some(page => !sourceLookup.get(page.sourceId)?.isImage);
   const splitNeedsInput = splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim();
   const splitEstimate = useMemo(() => {
     if (!pages.length || (splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim())) return null;
@@ -213,7 +214,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         setChunkSize('');
         setSplitMode('ranges');
       }
-      if ((replacingDeletedPages || sources.length === 0 || !sources.some(source => source.isImage)) && mode === 'image-to-pdf') {
+      if ((replacingDeletedPages || sources.length === 0 || !imageSourcesLoaded) && mode === 'image-to-pdf') {
         setAppliedImageLayout(imageLayout);
       }
       if (replacingDeletedPages) {
@@ -370,7 +371,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                 onChange={event => setImageLayout(value => ({ ...value, paper: event.target.value,
                   // "Fit to image" should follow each photo by default, without
                   // silently inheriting the previous portrait/landscape paper orientation.
-                  orientation: event.target.value === 'fit' ? 'auto' : value.orientation }))}>
+                  orientation: event.target.value === 'fit' ? 'auto' : value.orientation,
+                  imageSizing: event.target.value === 'fit' ? 'contain' : value.imageSizing }))}>
                 <option value="a4">A4</option>
                 <option value="letter">US Letter</option>
                 <option value="fit">{t.imageFit}</option>
@@ -395,7 +397,17 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
               </select>
             </label>
           </div>
-          <div className="utility-options"><label><span>{t.imageSizing}</span><select data-testid="image-sizing" aria-label={t.imageSizing} disabled={busy || imageLayout.paper === "fit"} value={imageLayout.imageSizing} onChange={event => setImageLayout(value => ({ ...value, imageSizing: event.target.value }))}><option value="contain">{t.imageContain}</option><option value="cover">{t.imageCover}</option></select></label></div>
+          <div className="utility-options">
+            <label><span>{t.imageSizing}</span>
+              <select data-testid="image-sizing" aria-label={t.imageSizing}
+                disabled={busy || imageLayout.paper === 'fit'}
+                value={imageLayout.imageSizing}
+                onChange={event => setImageLayout(value => ({ ...value, imageSizing: event.target.value }))}>
+                <option value="contain">{t.imageContain}</option>
+                <option value="cover">{t.imageCover}</option>
+              </select>
+            </label>
+          </div>
           <p className="input-note" data-testid="image-sizing-hint">{imageLayout.paper === "fit" ? t.imageFitSizingHint : imageLayout.imageSizing === "cover" ? t.imageCoverHint : t.imageContainHint}</p>
           {imageLayoutDirty && <p className="utility-note" data-testid="image-layout-dirty">{t.imageLayoutDirty}</p>}
           {imageLayoutDirty && <button type="button" className="button button-secondary" data-testid="image-layout-apply"
@@ -422,7 +434,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       <div className="workspace-content" onDragOver={(event) => { if (Array.from(event.dataTransfer.types ?? []).includes('Files')) event.preventDefault(); }} onDrop={(event) => { if (event.dataTransfer.files?.length) { event.preventDefault(); void addFiles(event.dataTransfer.files); } }}>
         {error && <div className="notice notice-error" role="alert">{error}<button type="button" aria-label={t.dismiss} onClick={() => setError('')}>×</button></div>}
         {notice && <div className="notice notice-success" role="status">{notice}<button type="button" aria-label={t.dismiss} onClick={() => setNotice('')}>×</button></div>}
-        {pages.length > 0 && <p className="utility-note" data-testid="workspace-document-caution">{t.documentCaution}</p>}
+        {hasOriginalPdf && <p className="utility-note" data-testid="workspace-document-caution">{t.documentCaution}</p>}
         {largeWorkspace && <p className="utility-note" data-testid="workspace-large-warning">{t.bigDocWarning}</p>}
         {!pages.length ? (
           <div className="dropzone" data-testid="dropzone" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); void addFiles(event.dataTransfer.files); }}>
