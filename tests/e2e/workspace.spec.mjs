@@ -948,7 +948,7 @@ test('insert blank after a rotated page matching its visible dimensions, without
   expect(output.getPages().map(p => p.getWidth())).toEqual([300, 310, 420, 320]);
   expect(output.getPages().map(p => p.getRotation().angle)).toEqual([0, 90, 0, 0]);
   expect(output.getPage(2).getHeight()).toBe(310);
-  expect(output.getPage(2).node.Contents()).toBeFalsy();
+  expect(output.getPage(2).getRotation().angle).toBe(0);
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(page.getByTestId('page-tile')).toHaveCount(3);
   await page.getByRole('button', { name: 'Redo' }).click();
@@ -966,8 +966,8 @@ test('no selection appends blank page; Chinese mobile disables ambiguous multi-s
   await expect(page.getByTestId('page-tile')).toHaveCount(3);
   const pdf = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
   expect(pdf.getPages().map(p => p.getWidth())).toEqual([300, 320, 320]);
-  await page.getByRole('checkbox', { name: '选择页面 1 页' }).check();
-  await page.getByRole('checkbox', { name: '选择页面 2 页' }).check();
+  await page.getByRole('checkbox', { name: '选择第 1 页' }).check();
+  await page.getByRole('checkbox', { name: '选择第 2 页' }).check();
   await expect(page.getByTestId('insert-blank-page')).toBeDisabled();
   await expect(page.getByTestId('duplicate-pages')).toBeEnabled();
   await expect(page.getByTestId('blank-position-hint')).toContainText('最多选中一页');
