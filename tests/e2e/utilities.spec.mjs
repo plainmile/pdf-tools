@@ -134,6 +134,49 @@ test('compression never auto-downloads, blocks a larger PDF, and shows actual by
   expect((await PDFDocument.load(clearer.bytes)).getPageCount()).toBe(1);
 });
 
+test('unsuccessful compression retry keeps an undownloaded earlier, genuinely smaller PDF', async ({ page }) => {
+  test.setTimeout(70000);
+  await page.goto('/compress-pdf/');
+  // Source JPEG is small at low quality. Downsampled compact recompression
+  // saves bytes, while clearer 1.5x high-quality rasterization is larger.
+  const base64 = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 760; canvas.height = 980;
+    const ctx = canvas.getContext('2d');
+    const image = ctx.createImageData(canvas.width, canvas.height);
+    let seed = 97531;
+    for (let i = 0; i < image.data.length; i += 4) {
+      seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+      image.data[i] = seed & 255;
+      image.data[i + 1] = (seed >>> 8) & 255;
+      image.data[i + 2] = (seed >>> 16) & 255;
+      image.data[i + 3] = 255;
+    }
+    ctx.putImageData(image, 0, 0);
+    return canvas.toDataURL('image/jpeg', .37).split(',')[1];
+  });
+  const doc = await PDFDocument.create();
+  const embedded = await doc.embedJpg(Buffer.from(base64, 'base64'));
+  doc.addPage([595, 842]).drawImage(embedded, { x: 0, y: 0, width: 595, height: 842 });
+  const original = Buffer.from(await doc.save());
+  await upload(page, original);
+  await page.getByRole('combobox', { name: 'Compression level' }).selectOption('compact');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('compression-download')).toBeEnabled({ timeout: 30000 });
+  await expect(page.getByTestId('compression-change-label')).toHaveText('Saved');
+
+  // Leave the successful result UNDOWLOADED and retry with a level that
+  // cannot beat the original; previous code erased these bytes on no savings.
+  await page.getByRole('combobox', { name: 'Compression level' }).selectOption('clearer');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('compression-retry-kept')).toContainText('previous successful result', { timeout: 30000 });
+  await expect(page.getByTestId('compression-download')).toBeEnabled();
+  await expect(page.getByTestId('compression-change-label')).toHaveText('Saved');
+  const stillThere = await getDownload(page, () => page.getByTestId('compression-download').click());
+  expect(stillThere.bytes.length).toBeLessThan(original.length);
+  expect((await PDFDocument.load(stillThere.bytes)).getPageCount()).toBe(1);
+});
+
 test('PDF to TXT and Markdown extract actual text, reject empty scanned pages', async ({ page }) => {
   const pdf = await fixturePdf('Hello searchable PlainMile');
   for (const [path, extension] of [['/pdf-to-txt/', 'txt'], ['/pdf-to-markdown/', 'md']]) {
