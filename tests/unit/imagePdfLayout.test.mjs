@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { imagePdfPageLayout, IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../../src/lib/imagePdfLayout.mjs';
+import { imagePdfPageLayout, IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout, shouldReflowImageSource } from '../../src/lib/imagePdfLayout.mjs';
 
 function near(a, b) { assert.ok(Math.abs(a - b) < 0.02, String(a) + ' != ' + String(b)); }
 
@@ -74,4 +74,23 @@ test('undo can reactivate a photo with older applied settings', () => {
   assert.equal(sameImagePdfLayout(oldA4, letter), false);
   assert.equal(sameImagePdfLayout(null, letter), false);
   assert.equal(sameImagePdfLayout({ ...letter, imageSizing: 'cover' }, letter), false);
+});
+
+
+test('paper reflow excludes deleted Undo-only photos and unchanged visible images', () => {
+  const old = { ...IMAGE_PDF_LAYOUT_DEFAULT };
+  const target = { ...old, paper: 'letter' };
+  const active = new Set(['visible', 'already-applied']);
+  const visible = { id: 'visible', isImage: true, imageLayout: old };
+  const deleted = { id: 'deleted-for-undo', isImage: true, imageLayout: old };
+  const applied = { id: 'already-applied', isImage: true, imageLayout: target };
+  assert.equal(shouldReflowImageSource(visible, target, active), true);
+  assert.equal(shouldReflowImageSource(deleted, target, active), false);
+  assert.equal(shouldReflowImageSource(applied, target, active), false);
+  assert.equal(shouldReflowImageSource({ id: 'pdf', isImage: false }, target, active), false);
+  // Undo restores the deleted photo: it must be reflowed before exporting.
+  active.add('deleted-for-undo');
+  assert.equal(shouldReflowImageSource(deleted, target, active), true);
+  // Legacy/unfiltered callers can still reflow any source that needs it.
+  assert.equal(shouldReflowImageSource(deleted, target), true);
 });
