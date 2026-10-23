@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   movePage, movePageGroup, shiftPage, rotatePages, deletePages, parsePageRanges,
   chunkPageRanges, getRangePages, commitHistory, makeHistoryState, undoHistory, redoHistory,
-  MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources,
+  MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
   reversePages, sortPagesByFilename, duplicatePages, insertPageAfter, groupPagesBySource,
 } from '../../src/lib/pageOperations.mjs';
 
@@ -169,4 +169,25 @@ test('grouping 600 interleaved pages is order-preserving and linear-size', () =>
   assert.ok(groups.every(group => group.items.length === 50));
   assert.deepEqual(groups[0].items.map(item => item.index), Array.from({ length: 50 }, (_, i) => i * 12));
   assert.deepEqual(many.map(p => p.id), Array.from({ length: 600 }, (_, i) => 'page' + i));
+});
+
+
+test('expired Undo snapshots release orphaned sources but reachable Undo/Redo keep their files', () => {
+  const original = [pages[0], pages[1]];
+  const imported = makeHistoryState(original);
+  const deleted = commitHistory(imported, [pages[1]]);
+  assert.deepEqual([...historyReferencedSourceIds(deleted)].sort(), ['fileA', 'fileB']);
+  assert.deepEqual([...historyReferencedSourceIds(undoHistory(deleted))].sort(), ['fileA', 'fileB']);
+  let history = deleted;
+  for (let i = 0; i < 21; i++) history = commitHistory(history, rotatePages(history.present, ['b'], 90));
+  assert.deepEqual([...historyReferencedSourceIds(history)], ['fileB']);
+  const reset = makeHistoryState([]);
+  assert.deepEqual([...historyReferencedSourceIds(reset)], []);
+
+  // Branching after Undo discards files referenced by Redo-only history.
+  const withNewFile = commitHistory(imported, [...original, { id: 'z', sourceId: 'fileC', pageIndex: 0, rotation: 0 }]);
+  const rolledBack = undoHistory(withNewFile);
+  assert.equal(historyReferencedSourceIds(rolledBack).has('fileC'), true);
+  const branched = commitHistory(rolledBack, rotatePages(original, ['a'], 90));
+  assert.equal(historyReferencedSourceIds(branched).has('fileC'), false);
 });
