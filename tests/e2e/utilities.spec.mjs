@@ -484,6 +484,23 @@ test('Markdown technical comparisons survive an actual PDF download and TXT roun
   expect(text).toContain('Safe HTML text');
 });
 
+test('Markdown technical identifiers and arithmetic survive actual PDF and TXT round-trip', async ({ page }) => {
+  await page.goto('/markdown-to-pdf/');
+  await page.getByTestId('utility-text').fill(
+    '# Technical user_id\nIdentifiers: batch_run_2026 and c_d\nMath: a*b + x**2 + 4 * 5\nEmphasis: **bold** and *italic*',
+  );
+  const created = await generateTextPdfAndDownload(page);
+  expect((await PDFDocument.load(created.bytes)).getPageCount()).toBe(1);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, created.bytes);
+  const result = await getDownload(page, () => page.getByTestId('utility-run').click());
+  const extracted = result.bytes.toString('utf8');
+  expect(extracted).toContain('Technical user_id');
+  expect(extracted).toContain('batch_run_2026 and c_d');
+  expect(extracted).toContain('a*b + x**2 + 4 * 5');
+  expect(extracted).toContain('Emphasis: bold and italic');
+});
+
 test('page numbering on rotated cropped PDFs preserves page rotations and searchable digits', async ({ page }) => {
   const { degrees } = await import('pdf-lib');
   const input = await PDFDocument.create();

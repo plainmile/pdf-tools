@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  formatBytes, compressionStats, requestedPages, normalizeText, parseTextBlocks,
+  formatBytes, compressionStats, requestedPages, normalizeText, parseTextBlocks, stripMarkdownInline,
   textContentToLines, linesToReadableText, summarizeTextCoverage, sanitizeFilename, workspaceFilenameStem,
   UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
@@ -36,6 +36,18 @@ test('Markdown PDF parser preserves comparison operators instead of mistaking th
   assert.equal(blocks[2].text, 'Bounds: x <= 40 && y >= 8');
   assert.equal(blocks[3].text, 'Code: value < 5 && size > 1');
   assert.equal(blocks[4].text, 'Safe bold  text');
+});
+
+test('Markdown inline formatting preserves identifiers, arithmetic and unmatched markers', () => {
+  const literal = 'user_id, batch_run_2026, a*b, x**2, C*x, a_b_c, 4 * 5, and a lone * or _';
+  assert.equal(stripMarkdownInline(literal), literal);
+  assert.equal(stripMarkdownInline('**bold**, *italic*, _em_, __strong__, ~~old~~, and \`code_var\`'),
+    'bold, italic, em, strong, old, and code_var');
+  assert.equal(stripMarkdownInline('See [docs](https://example.com) and <strong>marked</strong> text'),
+    'See docs and marked text');
+  const headings = parseTextBlocks('# Technical user_id\nResult: a*b + x**2 and c_d', true);
+  assert.equal(headings[0].text, 'Technical user_id');
+  assert.equal(headings[1].text, 'Result: a*b + x**2 and c_d');
 });
 
 test('PDF positioned text is approximately sorted by vertical position then X', () => {
