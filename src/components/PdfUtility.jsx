@@ -17,6 +17,7 @@ const COPY = {
     noSavingEarly: 'Stopped early: JPEG data already exceeds the original size. Keep the original or lower the resolution.',
     compressionLowerBound: 'At least', previewAction: 'Generate PDF preview', previewTitle: 'Generated PDF preview', previewFirst: 'Previewing page 1 of {pages}', previewFailed: 'Preview unavailable; you can still download the PDF.', downloadPdf: 'Download PDF',
     textWarning: 'Extracts existing selectable PDF text only, not OCR. Columns, tables and heading formatting may not be preserved. Check the exported text.',
+    missingTextPages: 'Important: {missing} of {total} pages have no selectable text (pages {pages}). Those pages may be blank or scanned images. Their content was not extracted; OCR would be required for scanned text. Check your original PDF.',
     markdownWarning: 'Markdown conversion is approximate; headings are inferred from font size. Complex PDF layout cannot be faithfully recovered.',
     textLabel: 'Text to convert', textPlaceholder: 'Paste text here or import a .txt / .md file…',
     textInputHint: 'Plain text is exported as selectable PDF text where the built-in font supports it. Chinese and other unsupported characters are rendered with local browser fonts as image pages (not searchable).',
@@ -39,6 +40,7 @@ const COPY = {
     noSavingEarly: '已提前停止：JPEG 数据已不小于原文件，继续转换也不能节省空间。请保留原文件或降低清晰度。',
     compressionLowerBound: '至少', previewAction: '生成 PDF 预览', previewTitle: '生成的 PDF 预览', previewFirst: '第 1 页预览（共 {pages} 页）', previewFailed: '无法生成预览，但仍可下载 PDF。', downloadPdf: '下载 PDF',
     textWarning: '只提取 PDF 中已有的可选择文字，不具备 OCR。多栏、表格和段落顺序可能不准确，请核对导出内容。',
+    missingTextPages: '重要提示：共 {total} 页中有 {missing} 页未检测到可选择文字（第 {pages} 页）。这些页可能是空白页或扫描图片，其内容未被提取；扫描文字需要 OCR。请对照原始 PDF 核查。',
     markdownWarning: 'Markdown 为近似转换：根据字号推测标题，复杂 PDF 的版式无法完整还原。',
     textLabel: '需要转换的文本', textPlaceholder: '粘贴文字，或选择 .txt / .md 文件……',
     textInputHint: '支持浏览器本地转换。拉丁文字尽量保留可选中内容；中文等字符会使用本地字体渲染为图片页，输出不支持文字搜索。',
@@ -129,13 +131,14 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const [notice, setNotice] = useState('');
   const [output, setOutput] = useState(null);
   const [preview, setPreview] = useState('');
+  const [extractionWarning, setExtractionWarning] = useState('');
   const [showCompressionPreview, setShowCompressionPreview] = useState(false);
   const [progress, setProgress] = useState(null);
   const [dragging, setDragging] = useState(false);
   const [textFileName, setTextFileName] = useState('');
   const [batchIndex, setBatchIndex] = useState(0);
 
-  function clearOutput() { setOutput(null); setNotice(''); setError(''); setPreview(''); setProgress(null); setShowCompressionPreview(false); setNotDownloaded(true); }
+  function clearOutput() { setOutput(null); setNotice(''); setError(''); setPreview(''); setExtractionWarning(''); setProgress(null); setShowCompressionPreview(false); setNotDownloaded(true); }
   function reset() { if (operationRef.current) return; setPdf(null); setSourceText(''); setPages(''); setTextFileName(''); setTextEdited(false); setBatchIndex(0); clearOutput(); setNotDownloaded(false); }
   async function acceptFile(file) {
     if (!file || operationRef.current) return;
@@ -220,8 +223,19 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         setNotice(candidate.stats.smaller ? t.compressionReady : candidate.stats.lowerBound ? t.noSavingEarly : t.noSaving);
       } else if (isTextOutput) {
         const markdown = mode === 'pdf-to-markdown';
-        const value = await extractPdfText(pdf, markdown, report, controller.signal);
+        let textCoverage = null;
+        const value = await extractPdfText(pdf, markdown, report, controller.signal,
+          coverage => { textCoverage = coverage; });
         ensureNotCancelled();
+        if (textCoverage?.missingPages.length) {
+          const { missingPages, total } = textCoverage;
+          const previewPages = missingPages.slice(0, 6).join(', ') +
+            (missingPages.length > 6 ? ', …' : '');
+          setExtractionWarning(t.missingTextPages
+            .replace('{missing}', missingPages.length)
+            .replace('{total}', total)
+            .replace('{pages}', previewPages));
+        }
         setPreview(value.slice(0, 1600));
         result = { bytes: new TextEncoder().encode(value), mime: 'text/plain;charset=utf-8', name: `${pdfName}.${markdown ? 'md' : 'txt'}` };
         save(result);
@@ -342,6 +356,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         </div>}
         {error && <div className="notice notice-error" role="alert">{error}</div>}
         {notice && <div className="notice notice-success" role="status">{notice}</div>}
+        {extractionWarning && <div className="utility-note" role="alert"
+          data-testid="text-extraction-warning">{extractionWarning}</div>}
         {notice && <p className="utility-note" data-testid="utility-next-step"><a href={locale === 'zh' ? '/zh/#all-tools' : '/#all-tools'}>{t.nextStep} →</a></p>}
         {isTextOutput && preview && <div className="utility-preview"><label className="utility-field-label" htmlFor="utility-preview">{t.resultPreview}</label><textarea id="utility-preview" readOnly rows={8} value={preview} /></div>}
       </div>
