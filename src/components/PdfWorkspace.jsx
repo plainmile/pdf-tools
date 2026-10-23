@@ -8,7 +8,7 @@ import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, chunkPageRanges,
-  getRangePages, reversePages, sortPagesByFilename, groupPagesBySource, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources,
+  getRangePages, reversePages, sortPagesByFilename, groupPagesBySource, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
 function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview }) {
@@ -191,6 +191,23 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     previewDocuments.current.clear();
   }, []);
   useEffect(() => () => { splitAbortRef.current?.abort(); exportAbortRef.current?.abort(); releasePreviewDocuments(); }, [releasePreviewDocuments]);
+
+  // The 20-step history cap must also cap retained source bytes. Otherwise a
+  // deleted PDF or photo that can no longer be restored remains in sources and
+  // occupies the real 200 MiB workspace budget until Clear/reload.
+  useEffect(() => {
+    const referenced = historyReferencedSourceIds(history);
+    for (const [id, entry] of previewDocuments.current) {
+      if (referenced.has(id)) continue;
+      entry.cancelled = true;
+      entry.task?.destroy().catch(() => {});
+      previewDocuments.current.delete(id);
+    }
+    setSources(previous => {
+      const retained = previous.filter(source => referenced.has(source.id));
+      return retained.length === previous.length ? previous : retained;
+    });
+  }, [history]);
 
   const resetSelection = () => { setSelected(new Set()); lastSelectedIndex.current = null; lastGroupedSelection.current = null; };
   const commit = (operation, preserveSelection = false) => {

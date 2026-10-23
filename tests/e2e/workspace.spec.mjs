@@ -1022,3 +1022,31 @@ test('photo paper reflow skips deleted Undo-only images until they are restored'
   expect(restored.getPageCount()).toBe(2);
   expect(restored.getPages().map(p => Math.round(p.getWidth()))).toEqual([612, 612]);
 });
+
+
+test('expired 20-step Undo history frees deleted PDF bytes without affecting active export', async ({ page }) => {
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles([
+    { name: 'expired.pdf', mimeType: 'application/pdf', buffer: await makePdf([300]) },
+    { name: 'kept.pdf', mimeType: 'application/pdf', buffer: await makePdf([320]) },
+  ]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  const retainedBytes = async () => Number(await page.locator('.file-count').getAttribute('data-retained-bytes'));
+  const originalBytes = await retainedBytes();
+  expect(originalBytes).toBeGreaterThan(0);
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  await page.getByRole('button', { name: 'Delete selected pages' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  // Removing a page is reversible, so the deleted source is initially retained.
+  expect(await retainedBytes()).toBe(originalBytes);
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  for (let step = 0; step < 21; step++) {
+    await page.getByRole('button', { name: 'Rotate clockwise' }).click();
+  }
+  // The old source is no longer reachable from any of the last 20 edits.
+  await expect.poll(retainedBytes).toBeLessThan(originalBytes);
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  const exported = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(exported.getPageCount()).toBe(1);
+  expect(exported.getPage(0).getWidth()).toBeCloseTo(320, 1);
+});
