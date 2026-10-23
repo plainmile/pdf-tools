@@ -788,3 +788,94 @@ test('Chinese typed-only unsaved draft can be cleared only after explicit confir
   const box = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth }));
   expect(box.scroll).toBeLessThanOrEqual(box.viewport + 2);
 });
+
+
+test('Chinese text-to-PDF replacement protects edited text and an undownloaded real PDF preview', async ({ page }) => {
+  test.setTimeout(45000);
+  await page.goto('/zh/txt-to-pdf/');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'original.txt', mimeType: 'text/plain', buffer: Buffer.from('Original editable report'),
+  });
+  await expect(page.getByTestId('text-file-summary')).toContainText('original.txt');
+  await page.getByTestId('utility-text').fill('Edited important report 2026');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible({ timeout: 15000 });
+
+  const replacement = { name: 'replacement.txt', mimeType: 'text/plain', buffer: Buffer.from('Different replacement text') };
+  await page.getByTestId('utility-file-input').setInputFiles(replacement);
+  await expect(page.getByTestId('utility-replace-confirm')).toContainText('replacement.txt');
+  await expect(page.getByTestId('utility-replace-confirm')).toContainText('尚未下载');
+  await expect(page.getByTestId('text-file-summary')).toContainText('original.txt');
+  await expect(page.getByTestId('utility-text')).toHaveValue('Edited important report 2026');
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible();
+  await expect(page.getByTestId('utility-file-input')).toBeDisabled();
+  await expect(page.getByTestId('utility-run')).toBeDisabled();
+
+  await page.getByTestId('utility-replace-keep').click();
+  await expect(page.getByTestId('utility-replace-confirm')).toHaveCount(0);
+  await expect(page.getByTestId('utility-text')).toHaveValue('Edited important report 2026');
+  const oldPdf = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
+  expect((await PDFDocument.load(oldPdf.bytes)).getPageCount()).toBe(1);
+
+  // The user still edited the imported text, even after downloading a PDF.
+  // A second replacement must not discard this draft without consent.
+  await page.getByTestId('utility-file-input').setInputFiles(replacement);
+  await expect(page.getByTestId('utility-replace-confirm')).toBeVisible();
+  await page.getByTestId('utility-replace-accept').click();
+  await expect(page.getByTestId('text-file-summary')).toContainText('replacement.txt');
+  await expect(page.getByTestId('utility-text')).toHaveValue('Different replacement text');
+  await expect(page.getByTestId('text-pdf-result')).toHaveCount(0);
+  await expect(page.getByTestId('utility-replace-confirm')).toHaveCount(0);
+  await expect(page.getByTestId('utility-run')).toBeEnabled();
+});
+
+test('unsaved compressed PDF survives accidental replacement drop, but a downloaded result does not add friction', async ({ page }) => {
+  test.setTimeout(65000);
+  await page.goto('/compress-pdf/');
+  const rawPng = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 620; canvas.height = 620;
+    const ctx = canvas.getContext('2d');
+    const image = ctx.createImageData(620, 620);
+    let n = 1234567;
+    for (let k = 0; k < image.data.length; k += 4) {
+      n ^= n << 13; n ^= n >>> 17; n ^= n << 5;
+      image.data[k] = n & 255; image.data[k + 1] = (n >>> 8) & 255;
+      image.data[k + 2] = (n >>> 16) & 255; image.data[k + 3] = 255;
+    }
+    ctx.putImageData(image, 0, 0);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  const source = await PDFDocument.create();
+  const image = await source.embedPng(Buffer.from(rawPng, 'base64'));
+  source.addPage([595, 842]).drawImage(image, { x: 0, y: 0, width: 595, height: 842 });
+  const input = Buffer.from(await source.save());
+  await upload(page, input);
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('compression-download')).toBeEnabled({ timeout: 30000 });
+
+  const nextPdf = (await fixturePdf('Next PDF', 2)).toString('base64');
+  async function dropNewPdf() {
+    await page.evaluate(base64 => {
+      const data = Uint8Array.from(atob(base64), value => value.charCodeAt(0));
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([data], 'replacement.pdf', { type: 'application/pdf' }));
+      document.querySelector('[data-testid="utility-dropzone"]').dispatchEvent(
+        new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    }, nextPdf);
+  }
+  await dropNewPdf();
+  await expect(page.getByTestId('utility-replace-confirm')).toContainText('replacement.pdf');
+  await expect(page.getByTestId('utility-file-summary')).toContainText('fixture.pdf');
+  await expect(page.getByTestId('compression-download')).toBeEnabled();
+  await page.getByTestId('utility-replace-keep').click();
+  const old = await getDownload(page, () => page.getByTestId('compression-download').click());
+  expect((await PDFDocument.load(old.bytes)).getPageCount()).toBe(1);
+  expect(old.bytes.length).toBeLessThan(input.length);
+
+  await dropNewPdf();
+  await expect(page.getByTestId('utility-replace-confirm')).toHaveCount(0);
+  await expect(page.getByTestId('utility-file-summary')).toContainText('replacement.pdf');
+  await expect(page.getByTestId('compression-result')).toHaveCount(0);
+  await expect(page.getByTestId('utility-run')).toBeEnabled();
+});

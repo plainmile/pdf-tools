@@ -7,7 +7,7 @@ import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 const COPY = {
   en: {
     label: 'Browser-local processing', file: 'Choose a PDF', textFile: 'Import TXT / Markdown', uploaded: 'Loaded', pages: 'pages', choose: 'Choose file', start: 'Process file', run: 'Convert and download', busy: 'Working on your device…',
-    privacy: 'No files are uploaded. Processing may use significant device memory on large documents.', clear: 'Clear', clearConfirmTitle: 'Discard unsaved conversion?', clearConfirmHint: 'The generated PDF preview or edited text has not been safely saved. Clearing now will remove it from this browser.', clearKeep: 'Keep my work', clearConfirm: 'Discard and clear',
+    privacy: 'No files are uploaded. Processing may use significant device memory on large documents.', clear: 'Clear', replaceConfirmTitle: 'Replace the current file?', replaceConfirmHint: 'Opening {name} will discard your unsaved PDF result or edited text. Download or copy your current work first, or cancel this replacement.', replaceKeep: 'Keep current work', replaceAccept: 'Replace file', clearConfirmTitle: 'Discard unsaved conversion?', clearConfirmHint: 'The generated PDF preview or edited text has not been safely saved. Clearing now will remove it from this browser.', clearKeep: 'Keep my work', clearConfirm: 'Discard and clear',
     pageRange: 'Pages (blank selects all if ≤60)', rangeHint: 'Example: 301-360. Long PDFs start with pages 1-60; use Next pages for later batches.', imageType: 'Image format', quality: 'Render resolution',
     low: 'Smaller (72 DPI)', medium: 'Balanced (108 DPI)', high: 'Sharper (144 DPI)',
     download: 'Download result', compressionMethod: 'Compression level', compressionLow: 'Smaller size (lossier)', compressionMid: 'Balanced', compressionHigh: 'Clearer (larger)',
@@ -30,7 +30,7 @@ const COPY = {
   },
   zh: {
     label: '仅在浏览器本地处理', file: '选择 PDF 文件', textFile: '导入 TXT / Markdown', uploaded: '已读取', pages: '页', choose: '选择文件', start: '开始处理', run: '转换并下载', busy: '正在本机处理…',
-    privacy: '文件不上传服务器。大文件可能消耗较多设备内存。', clear: '清空', clearConfirmTitle: '确定丢弃未保存的转换结果？', clearConfirmHint: '当前生成的 PDF 预览或编辑后的文字尚未妥善保存。清空将从浏览器删除这些内容。', clearKeep: '继续编辑', clearConfirm: '丢弃并清空',
+    privacy: '文件不上传服务器。大文件可能消耗较多设备内存。', clear: '清空', replaceConfirmTitle: '确定替换当前文件？', replaceConfirmHint: '打开 {name} 将丢弃尚未下载的 PDF 结果或未保存的文字修改。请先下载或复制当前内容，也可以取消替换。', replaceKeep: '保留当前工作', replaceAccept: '确认替换文件', clearConfirmTitle: '确定丢弃未保存的转换结果？', clearConfirmHint: '当前生成的 PDF 预览或编辑后的文字尚未妥善保存。清空将从浏览器删除这些内容。', clearKeep: '继续编辑', clearConfirm: '丢弃并清空',
     pageRange: '选择页码（总页数不超过 60 时可留空）', rangeHint: '例如 301-360。长 PDF 默认选前 60 页，可用“下一批”继续。', imageType: '图片格式', quality: '渲染清晰度',
     low: '更小（72 DPI）', medium: '平衡（108 DPI）', high: '高清（144 DPI）',
     download: '下载结果', compressionMethod: '压缩强度', compressionLow: '更小体积（画质较低）', compressionMid: '平衡', compressionHigh: '画质较清晰（体积较大）',
@@ -113,6 +113,10 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   // React busy state is a display flag, NOT an admission lock. Two same-tick
   // native drops or Run events can otherwise both start asynchronous work.
   const operationRef = useRef(false);
+  // Keep a replacement in RAM until the user chooses to discard unsaved work.
+  // Ref synchronously reserves the slot against duplicate same-tick drops.
+  const pendingReplacementRef = useRef(null);
+  const [pendingReplacementName, setPendingReplacementName] = useState('');
   const [textEdited, setTextEdited] = useState(false);
   const [notDownloaded, setNotDownloaded] = useState(false);
   const [pdf, setPdf] = useState(null);
@@ -142,6 +146,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   // not be discarded via an unconfirmed Clear click.
   const hasUnsavedUtilityWork = Boolean((output?.bytes && notDownloaded) ||
     (isTextInput && sourceText.trim() && (!textFileName || textEdited)));
+  const inputLocked = busy || Boolean(pendingReplacementName);
 
 
   function clearOutput() { setClearConfirm(false); setOutput(null); setNotice(''); setError(''); setPreview(''); setExtractionWarning(''); setProgress(null); setShowCompressionPreview(false); setNotDownloaded(true); }
@@ -152,9 +157,44 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     clearOutput(); setNotDownloaded(false);
   }
   function reset() {
-    if (operationRef.current) return;
+    if (operationRef.current || pendingReplacementRef.current) return;
     if (hasUnsavedUtilityWork) { setClearConfirm(true); return; }
     clearSession();
+  }
+  function requestFile(file) {
+    if (!file || operationRef.current || pendingReplacementRef.current) return;
+    // An obviously unsupported/empty/oversized input must be rejected right
+    // away, WITHOUT asking the user to abandon a valuable unsaved result.
+    // PDF content corruption is checked by the existing parser after consent.
+    const validType = isTextInput ? /\.(?:txt|md|markdown)$/i.test(file.name)
+      : /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
+    const maximum = isTextInput ? UTILITY_LIMITS.maxTextBytes : UTILITY_LIMITS.maxPdfBytes;
+    if (!validType || !file.size || file.size > maximum) {
+      const message = !validType
+        ? isTextInput ? t.invalidFile : locale === 'zh' ? '请选择 PDF 文件。' : 'Choose a PDF file.'
+        : isTextInput ? t.invalidFile : locale === 'zh'
+          ? 'PDF 文件大小须在 1 字节至 100 MB 之间。' : 'PDF must be between 1 byte and 100 MB.';
+      const existing = pdf?.name || textFileName;
+      setError(message + (existing ? ' ' + t.replacedFailed.replace('{name}', existing) : ''));
+      return;
+    }
+    if (hasUnsavedUtilityWork) {
+      pendingReplacementRef.current = file;
+      setPendingReplacementName(file.name || t.file);
+      setDragging(false);
+      setClearConfirm(false);
+      return;
+    }
+    void acceptFile(file);
+  }
+  function cancelReplacement() {
+    pendingReplacementRef.current = null;
+    setPendingReplacementName('');
+  }
+  function confirmReplacement() {
+    const file = pendingReplacementRef.current;
+    cancelReplacement();
+    if (file) void acceptFile(file);
   }
   async function acceptFile(file) {
     if (!file || operationRef.current) return;
@@ -187,16 +227,16 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   async function chooseFile(event) {
     const file = event.target.files?.[0];
     event.target.value = '';
-    await acceptFile(file);
+    requestFile(file);
   }
   function chooseBatch(index) {
-    if (!pdf || operationRef.current) return;
+    if (!pdf || operationRef.current || pendingReplacementRef.current) return;
     setBatchIndex(index);
     setPages(imagePageBatch(pdf.count, index).range);
     clearOutput();
   }
   function resumeImageBatches() {
-    if (!pdf || operationRef.current) return;
+    if (!pdf || operationRef.current || pendingReplacementRef.current) return;
     const index = batchIndexFromCustomPages(pages, pdf.count, batchIndex);
     chooseBatch(index);
   }
@@ -205,7 +245,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     setNotDownloaded(false);
   }
   async function processFile() {
-    if (operationRef.current) return;
+    if (operationRef.current || pendingReplacementRef.current) return;
     operationRef.current = true; // Prevent a second Run during the same event turn.
     clearOutput(); setBusy(true); setProcessing(true); setCancelling(false);
     const controller = new AbortController();
@@ -292,7 +332,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           onDragOver={(event) => {
             if (!Array.from(event.dataTransfer.types || []).includes('Files')) return;
             event.preventDefault();
-            if (!busy) setDragging(true);
+            if (!inputLocked) setDragging(true);
           }}
           onDragLeave={() => setDragging(false)}
           onDrop={(event) => {
@@ -300,24 +340,34 @@ export default function PdfUtility({ mode, locale = 'en' }) {
             event.preventDefault();
             event.stopPropagation();
             setDragging(false);
-            if (operationRef.current) return;
+            if (operationRef.current || pendingReplacementRef.current) return;
             if (event.dataTransfer.files.length > 1) {
               // Reject without erasing a valid, possibly undownloaded result.
               setError(t.multipleFiles);
               return;
             }
-            void acceptFile(event.dataTransfer.files[0]);
+            requestFile(event.dataTransfer.files[0]);
           }}>
           <label className="utility-file">
             <span className="utility-field-label">{isTextInput ? t.textFile : t.file}</span>
             <input data-testid="utility-file-input" type="file"
               accept={isTextInput ? '.txt,.md,.markdown,text/plain,text/markdown' : '.pdf,application/pdf'}
-              disabled={busy} onChange={chooseFile} />
+              disabled={inputLocked} onChange={chooseFile} />
           </label>
           <span className="utility-drop-hint">{t.dropHint}</span>
         </div>
-        {isTextInput && textFileName && <div className="utility-file-summary" data-testid="text-file-summary"><strong>{t.imported}: {textFileName}{textEdited ? ` · ${t.modified}` : ''}</strong><button type="button" disabled={busy} onClick={reset}>{t.clear}</button></div>}
-        {pdf && <div className="utility-file-summary" data-testid="utility-file-summary"><strong>{pdf.name}</strong><span>{formatBytes(pdf.size)} · {pdf.count} {t.pages}</span><button type="button" onClick={reset} disabled={busy}>{t.clear}</button></div>}
+        {isTextInput && textFileName && <div className="utility-file-summary" data-testid="text-file-summary"><strong>{t.imported}: {textFileName}{textEdited ? ` · ${t.modified}` : ''}</strong><button type="button" disabled={inputLocked} onClick={reset}>{t.clear}</button></div>}
+        {pdf && <div className="utility-file-summary" data-testid="utility-file-summary"><strong>{pdf.name}</strong><span>{formatBytes(pdf.size)} · {pdf.count} {t.pages}</span><button type="button" onClick={reset} disabled={inputLocked}>{t.clear}</button></div>}
+        {pendingReplacementName && !busy && <div className="workspace-clear-confirm" role="group"
+          aria-label={t.replaceConfirmTitle} data-testid="utility-replace-confirm">
+          <p>{t.replaceConfirmHint.replace('{name}', pendingReplacementName)}</p>
+          <div className="workspace-clear-buttons">
+            <button type="button" className="button button-secondary button-small" data-testid="utility-replace-keep"
+              onClick={cancelReplacement}>{t.replaceKeep}</button>
+            <button type="button" className="button button-secondary button-small muted-danger" data-testid="utility-replace-accept"
+              onClick={confirmReplacement}>{t.replaceAccept}</button>
+          </div>
+        </div>}
         {clearConfirm && !busy && <div className="workspace-clear-confirm" role="group"
           aria-label={t.clearConfirmTitle} data-testid="utility-clear-confirm">
           <p>{t.clearConfirmHint}</p>
@@ -329,14 +379,14 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           </div>
         </div>}
         {pdf && (pdf.count >= 250 || pdf.size >= 75 * 1024 * 1024) && <p className="utility-note" data-testid="large-document-note">{t.heavyWarning}</p>}
-        {isTextInput && <label className="utility-text-input"><span className="utility-field-label">{t.textLabel}</span><textarea data-testid="utility-text" rows={10} maxLength={UTILITY_LIMITS.maxTextBytes} placeholder={t.textPlaceholder} value={sourceText} onChange={e => { setSourceText(e.target.value); setTextEdited(Boolean(textFileName)); clearOutput(); }} disabled={busy} /></label>}
+        {isTextInput && <label className="utility-text-input"><span className="utility-field-label">{t.textLabel}</span><textarea data-testid="utility-text" rows={10} maxLength={UTILITY_LIMITS.maxTextBytes} placeholder={t.textPlaceholder} value={sourceText} onChange={e => { setSourceText(e.target.value); setTextEdited(Boolean(textFileName)); clearOutput(); }} disabled={inputLocked} /></label>}
         {isTextInput && !textFileName && sourceText.trim() && <button type="button"
           className="button button-secondary button-small" data-testid="utility-text-clear"
-          disabled={busy} onClick={reset}>{t.clear}</button>}
+          disabled={inputLocked} onClick={reset}>{t.clear}</button>}
         {mode === 'pdf-to-images' && <div className="utility-options">
-          <label><span>{t.imageType}</span><select aria-label={t.imageType} value={format} disabled={busy} onChange={e => { setFormat(e.target.value); clearOutput(); }}><option value="jpg">JPG</option><option value="png">PNG</option></select></label>
-          <label><span>{t.quality}</span><select aria-label={t.quality} value={scale} disabled={busy} onChange={e => { setScale(e.target.value); clearOutput(); }}><option value="1">{t.low}</option><option value="1.5">{t.medium}</option><option value="2">{t.high}</option></select></label>
-          <label><span>{t.pageRange}</span><input data-testid="utility-page-ranges" value={pages} disabled={busy} onChange={e => { setPages(e.target.value); clearOutput(); }} placeholder="1-3, 5" /></label>
+          <label><span>{t.imageType}</span><select aria-label={t.imageType} value={format} disabled={inputLocked} onChange={e => { setFormat(e.target.value); clearOutput(); }}><option value="jpg">JPG</option><option value="png">PNG</option></select></label>
+          <label><span>{t.quality}</span><select aria-label={t.quality} value={scale} disabled={inputLocked} onChange={e => { setScale(e.target.value); clearOutput(); }}><option value="1">{t.low}</option><option value="1.5">{t.medium}</option><option value="2">{t.high}</option></select></label>
+          <label><span>{t.pageRange}</span><input data-testid="utility-page-ranges" value={pages} disabled={inputLocked} onChange={e => { setPages(e.target.value); clearOutput(); }} placeholder="1-3, 5" /></label>
         </div>}
         {isImages && <p className="utility-helper">{t.rangeHint}</p>}
         {imageBatch && <div className="utility-batch-nav" data-testid="utility-batch-nav">
@@ -344,26 +394,26 @@ export default function PdfUtility({ mode, locale = 'en' }) {
             ? t.batchCustom
             : t.batchLabel.replace('{current}', batchIndex + 1).replace('{total}', imageBatch.total)}</span>
           <div role="group" aria-label={customImageRange ? t.batchCustom : t.batchLabel.replace('{current}', batchIndex + 1).replace('{total}', imageBatch.total)}>
-            <button type="button" data-testid="utility-batch-prev" disabled={busy || customImageRange || batchIndex === 0}
+            <button type="button" data-testid="utility-batch-prev" disabled={inputLocked || customImageRange || batchIndex === 0}
               onClick={() => chooseBatch(batchIndex - 1)}>← {t.batchPrev}</button>
-            <button type="button" data-testid="utility-batch-next" disabled={busy || customImageRange || batchIndex >= imageBatch.total - 1}
+            <button type="button" data-testid="utility-batch-next" disabled={inputLocked || customImageRange || batchIndex >= imageBatch.total - 1}
               onClick={() => chooseBatch(batchIndex + 1)}>{t.batchNext} →</button>
           </div>
           {customImageRange && <div className="utility-batch-custom" data-testid="utility-batch-custom">
             <p className="utility-note">{t.batchCustomHint}</p>
             <button type="button" className="button button-secondary button-small"
-              data-testid="utility-batch-resume" onClick={resumeImageBatches} disabled={busy}>{t.batchResume}</button>
+              data-testid="utility-batch-resume" onClick={resumeImageBatches} disabled={inputLocked}>{t.batchResume}</button>
           </div>}
         </div>}
-        {isCompress && <div className="utility-options"><label><span>{t.compressionMethod}</span><select aria-label={t.compressionMethod} value={compressMode} disabled={busy} onChange={e => { setCompressMode(e.target.value); clearOutput(); }}><option value="compact">{t.compressionLow}</option><option value="balanced">{t.compressionMid}</option><option value="clearer">{t.compressionHigh}</option></select></label></div>}
+        {isCompress && <div className="utility-options"><label><span>{t.compressionMethod}</span><select aria-label={t.compressionMethod} value={compressMode} disabled={inputLocked} onChange={e => { setCompressMode(e.target.value); clearOutput(); }}><option value="compact">{t.compressionLow}</option><option value="balanced">{t.compressionMid}</option><option value="clearer">{t.compressionHigh}</option></select></label></div>}
         {mode === 'add-page-numbers' && <div className="utility-options">
-          <label><span>{t.pageStart}</span><input data-testid="number-start" type="number" min="1" max="99999" value={start} disabled={busy} onChange={e => { setStart(e.target.value); clearOutput(); }} /></label>
-          <label><span>{t.pagePosition}</span><select aria-label={t.pagePosition} value={position} disabled={busy} onChange={e => { setPosition(e.target.value); clearOutput(); }}><option value="bottom-center">{t.bottomCenter}</option><option value="bottom-right">{t.bottomRight}</option><option value="top-right">{t.topRight}</option></select></label>
-          <label><span>{t.pageSize}</span><select aria-label={t.pageSize} value={fontSize} disabled={busy} onChange={e => { setFontSize(e.target.value); clearOutput(); }}><option value="10">10</option><option value="12">12</option><option value="16">16</option></select></label>
+          <label><span>{t.pageStart}</span><input data-testid="number-start" type="number" min="1" max="99999" value={start} disabled={inputLocked} onChange={e => { setStart(e.target.value); clearOutput(); }} /></label>
+          <label><span>{t.pagePosition}</span><select aria-label={t.pagePosition} value={position} disabled={inputLocked} onChange={e => { setPosition(e.target.value); clearOutput(); }}><option value="bottom-center">{t.bottomCenter}</option><option value="bottom-right">{t.bottomRight}</option><option value="top-right">{t.topRight}</option></select></label>
+          <label><span>{t.pageSize}</span><select aria-label={t.pageSize} value={fontSize} disabled={inputLocked} onChange={e => { setFontSize(e.target.value); clearOutput(); }}><option value="10">10</option><option value="12">12</option><option value="16">16</option></select></label>
         </div>}
         <p className="utility-note">{description}</p>
         {mode === 'add-page-numbers' && <p className="utility-note" data-testid="page-overlap-warning">{t.overlap}</p>}
-        <div className="utility-actions"><button type="button" className="button button-primary" data-testid="utility-run" onClick={processFile} disabled={busy || (isTextInput ? !sourceText.trim() : !pdf)}>{busy ? t.busy : isCompress ? t.start : isTextInput ? t.previewAction : t.run}{isTextInput || isCompress ? '' : ' ↓'}</button><span>{limitHint}</span></div>
+        <div className="utility-actions"><button type="button" className="button button-primary" data-testid="utility-run" onClick={processFile} disabled={inputLocked || (isTextInput ? !sourceText.trim() : !pdf)}>{busy ? t.busy : isCompress ? t.start : isTextInput ? t.previewAction : t.run}{isTextInput || isCompress ? '' : ' ↓'}</button><span>{limitHint}</span></div>
         {busy && processing && <button type="button" className="button button-secondary" data-testid="utility-cancel" disabled={cancelling} onClick={() => { setCancelling(true); taskRef.current?.abort(); }}>{cancelling ? t.cancelling : t.cancel}</button>}
         {progress && (busy || notice) && <p className="utility-note" data-testid="utility-progress" aria-live="polite">{'packaging' in progress ? t.packaging.replace('{percent}', progress.packaging) : t.progressLabel.replace('{done}', progress.done).replace('{total}', progress.total)}</p>}
         {isCompress && output && <div className="utility-result" data-testid="compression-result">
