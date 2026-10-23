@@ -68,6 +68,10 @@ Use the visible **Report an issue / 反馈问题** link in the website footer, o
 
 The PDF.js Worker lives at the stable path `/pdfjs/pdf.worker.min.mjs`, while Astro application chunks have versioned filenames. Nginx requires the Worker to be revalidated (`Cache-Control: no-cache`) on each navigation to prevent a stale Worker from becoming incompatible with the updated PDF.js client after an upgrade. Versioned JS/CSS assets continue to use short-lived normal caching. The Docker CI smoke test verifies the Worker MIME type and cache response headers.
 
+## Leaving an active browser-local document
+
+Imported PDFs/photos and typed text are kept only in the current browser tab. When leaving with unexported work, normal same-tab links (including tools and language changes) open a localized confirmation offering **Keep editing** or **Leave without saving**. A completed full PDF export, text/PDF download, or explicit Clear releases the guard; subsequent changes reactivate it. Browser Reload/Back/Close use the standard `beforeunload` warning where supported; browsers may suppress these native prompts without prior user interaction and their warning text cannot be customized. The feature does not persist file contents in localStorage, IndexedDB, cookies, or any server.
+
 ## Workbench reset and exported PDF metadata
 
 - **Clear requires confirmation:** The workspace's irreversible reset explicitly asks before removing imported files, page edits and Undo/Redo history. Cancel keeps the entire edited document and its settings intact; confirming also resets image-to-PDF settings to the original A4 portrait, 30 pt margin, full-image contain defaults (preventing previously chosen crop behavior from leaking into a new document). This is different from Delete selected pages, which remains Undo-able.

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { loadPdf, convertPdfToImages, compressPdfRaster, extractPdfText, textToPdf, addPageNumbers } from '../lib/pdfUtilities.mjs';
 import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, translateUtilityError } from '../lib/utilityCore.mjs';
 import { saveDownload } from '../lib/pdfEngine.mjs';
+import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 
 const COPY = {
   en: {
@@ -108,6 +109,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const isCompress = mode === 'compress-pdf';
   const taskRef = useRef(null);
   const [textEdited, setTextEdited] = useState(false);
+  const [notDownloaded, setNotDownloaded] = useState(false);
   const [pdf, setPdf] = useState(null);
   const [sourceText, setSourceText] = useState('');
   const [pages, setPages] = useState('');
@@ -130,8 +132,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const [textFileName, setTextFileName] = useState('');
   const [batchIndex, setBatchIndex] = useState(0);
 
-  function clearOutput() { setOutput(null); setNotice(''); setError(''); setPreview(''); setProgress(null); setShowCompressionPreview(false); }
-  function reset() { if (busy) return; setPdf(null); setSourceText(''); setPages(''); setTextFileName(''); setTextEdited(false); setBatchIndex(0); clearOutput(); }
+  function clearOutput() { setOutput(null); setNotice(''); setError(''); setPreview(''); setProgress(null); setShowCompressionPreview(false); setNotDownloaded(true); }
+  function reset() { if (busy) return; setPdf(null); setSourceText(''); setPages(''); setTextFileName(''); setTextEdited(false); setBatchIndex(0); clearOutput(); setNotDownloaded(false); }
   async function acceptFile(file) {
     if (!file || busy) return;
     clearOutput();
@@ -166,6 +168,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   }
   function save(outputFile) {
     saveDownload(outputFile.bytes, outputFile.name, outputFile.mime || 'application/pdf');
+    setNotDownloaded(false);
   }
   async function processFile() {
     if (busy) return;
@@ -233,6 +236,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const description = isCompress ? t.compressionWarning : isTextOutput ? `${t.textWarning} ${mode === 'pdf-to-markdown' ? t.markdownWarning : ''}` : isTextInput ? mode === 'markdown-to-pdf' ? t.markdownInputHint : t.textInputHint : mode === 'add-page-numbers' ? t.numbersHint : t.privacy;
   return (
     <section className="pdf-workspace pdf-utility" data-testid="pdf-utility">
+      <UnsavedNavigationGuard active={Boolean(notDownloaded && (pdf || textFileName || sourceText.trim()))} locale={locale} />
       <div className="workspace-bar"><div className="workspace-heading"><span className="workspace-app-icon" aria-hidden="true">▤</span><div><strong>{t.label}</strong><span>{t.privacy}</span></div></div></div>
       <div className="utility-main">
         <div className={`utility-dropzone${dragging ? ' is-dragging-over' : ''}`} data-testid="utility-dropzone"
