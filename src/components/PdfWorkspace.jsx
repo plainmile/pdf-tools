@@ -639,7 +639,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           </div>
         </details>
         <p className="utility-note" data-testid="workspace-export-filename">{t.outputName}: <strong>{filename}</strong> · {pages.length} {t.pages}</p>
-      </section>
+      </section>}
       <div className="workspace-content" onDragOver={(event) => { if (Array.from(event.dataTransfer.types ?? []).includes('Files')) event.preventDefault(); }} onDrop={(event) => { if (event.dataTransfer.files?.length) { event.preventDefault(); void addFiles(event.dataTransfer.files); } }}>
         {error && <div className="notice notice-error" role="alert">{error}<button type="button" aria-label={t.dismiss} onClick={() => setError('')}>×</button></div>}
         {notice && <div className="notice notice-success" role="status">{notice}<button type="button" aria-label={t.dismiss} onClick={() => setNotice('')}>×</button></div>}
