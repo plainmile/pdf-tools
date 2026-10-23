@@ -528,6 +528,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   // Keep the single tested workspace/engine, but make the entry tool's
   // intended task immediately available. Secondary actions remain accessible
   // in a native disclosure instead of overwhelming first-time users.
+  const fullDocumentExportIsSecondary = mode === 'extract-pages' || tab === 'split';
   const focusedActionKeys = ({
     'rotate-pdf': ['rotateLeft', 'rotateRight'],
     'delete-pages': ['delete'],
@@ -564,10 +565,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           <input ref={inputRef} data-testid="file-input" aria-label={t.add} className="hidden-input" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.bmp,.avif,application/pdf,image/jpeg,image/png,image/webp,image/bmp,image/avif" onChange={(event) => { void addFiles(event.target.files); event.target.value = ''; }} />
           <button className="button button-secondary button-small" type="button" disabled={busy} onClick={() => inputRef.current?.click()}>＋ {t.add}</button>
           {pages.length > 0 && <button className="button button-secondary button-small" type="button" disabled={busy} onClick={() => setExportSettingsOpen((value) => !value)} aria-expanded={exportSettingsOpen} aria-controls="export-options-panel" data-testid="export-options-button">{t.exportOptions}{watermarkEnabled ? ` \u00b7 ${t.watermarkOn}` : ""}</button>}
-          <button className={`button ${mode === 'extract-pages' ? 'button-secondary' : 'button-primary'} button-small`} type="button"
+          <button className={`button ${fullDocumentExportIsSecondary ? 'button-secondary' : 'button-primary'} button-small`} type="button"
             disabled={!pages.length || busy || imageLayoutDirty} onClick={exportAll}
-            aria-label={mode === 'extract-pages' ? t.exportAllPages : t.export}>
-            {busy ? t.working : mode === 'extract-pages' ? t.exportAllPages : t.export} ↓
+            aria-label={fullDocumentExportIsSecondary ? t.exportAllPages : t.export}>
+            {busy ? t.working : fullDocumentExportIsSecondary ? t.exportAllPages : t.export} ↓
           </button>
         </div>
       </div>
