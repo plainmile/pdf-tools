@@ -242,6 +242,8 @@ main { flex: 1; }
 .selection-range-form input { display: block; width: 100%; min-width: 0; margin-top: 6px; padding: 9px 10px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
 .selection-range-form .input-note { flex-basis: 100%; margin: 0; }
 .selection-range-form button { flex: 0 0 auto; }
+.selection-pattern-buttons { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: center; gap: 7px; }
+.selection-pattern-buttons button { min-width: 0; max-width: 100%; font-size: 11px; padding: 8px 10px; }
 .page-jump-panel { width: fit-content; max-width: 100%; border: 1px solid var(--border); border-radius: 6px; margin: -4px 0 16px; background: var(--surface); }
 .page-jump-panel > summary { padding: 9px 12px; cursor: pointer; color: var(--accent); font-size: 12px; font-weight: 650; }
 .page-jump-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 9px; padding: 0 12px 11px; }
