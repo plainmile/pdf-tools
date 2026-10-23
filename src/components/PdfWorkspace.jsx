@@ -382,7 +382,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         <p>{t.clearConfirmDescription}</p>
         <div className="workspace-clear-buttons">
           <button type="button" className="button button-secondary button-small" data-testid="cancel-clear" onClick={() => setClearConfirm(false)}>{t.cancelClear}</button>
-          <button type="button" className="button button-small muted-danger" data-testid="confirm-clear" onClick={clearAll}>{t.confirmClear}</button>
+          <button type="button" className="button button-secondary button-small muted-danger" data-testid="confirm-clear" onClick={clearAll}>{t.confirmClear}</button>
         </div>
       </div>}
       {busy && exportProgress && <div className="export-progress-row" data-testid="export-progress-row">
