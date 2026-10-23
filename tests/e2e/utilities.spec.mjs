@@ -543,3 +543,18 @@ test('follow-up link is honest about file handoff and leads to the full tool cat
     await expect(action).toHaveAttribute('href', catalog);
   }
 });
+
+
+test('large page numbering can be cancelled from the browser without a partial download', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/add-page-numbers/');
+  await upload(page, await fixturePdf('Long numbered report', 700));
+  const downloads = [];
+  page.on('download', download => downloads.push(download.suggestedFilename()));
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('utility-cancel')).toBeVisible();
+  await page.getByTestId('utility-cancel').click();
+  await expect(page.getByRole('alert')).toContainText(/cancelled/i, { timeout: 30000 });
+  await expect(page.getByTestId('utility-run')).toBeEnabled();
+  expect(downloads).toHaveLength(0);
+});
