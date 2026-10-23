@@ -447,6 +447,33 @@ test('batch-drag selected pages together across documents in the exported PDF', 
   expect(output.getPages().map((p) => p.getWidth())).toEqual([300, 320, 310]);
 });
 
+test('same-turn grouped drag/drop preserves selected page IDs even without native payload', async ({ page }) => {
+  await loadInput(page);
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  await page.getByRole('checkbox', { name: 'Select page 3' }).check();
+  // Both events occur in one JavaScript turn, BEFORE React has committed the
+  // dragged visual state. An empty drop payload simulates browser variance.
+  await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('[data-testid="page-tile"]')];
+    const original = new DataTransfer();
+    cards[0].dispatchEvent(new DragEvent('dragstart', {
+      bubbles: true, cancelable: true, dataTransfer: original,
+    }));
+    const empty = new DataTransfer();
+    cards[1].dispatchEvent(new DragEvent('dragover', {
+      bubbles: true, cancelable: true, dataTransfer: empty,
+    }));
+    cards[1].dispatchEvent(new DragEvent('drop', {
+      bubbles: true, cancelable: true, dataTransfer: empty,
+    }));
+    cards[0].dispatchEvent(new DragEvent('dragend', {
+      bubbles: true, cancelable: true, dataTransfer: original,
+    }));
+  });
+  const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(output.getPages().map(p => p.getWidth())).toEqual([300, 320, 310]);
+});
+
 test('Chinese split tool exports current pages without uploading the document', async ({ page }) => {
   await page.goto('/zh/split-pdf/');
   await page.getByTestId('file-input').setInputFiles(await inputDocuments());
