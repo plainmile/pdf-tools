@@ -50,6 +50,19 @@ export function shiftPage(pages, pageId, delta) {
   return next;
 }
 
+/** Explicit image-batch actions; never silently reorder on import. */
+export function reversePages(pages) {
+  return pages.length < 2 ? pages : [...pages].reverse();
+}
+
+export function sortPagesByFilename(pages, sources, locale = 'en') {
+  const names = new Map(sources.map((source) => [source.id, source.name]));
+  const compare = new Intl.Collator(locale === 'zh' ? 'zh' : 'en', { numeric: true, sensitivity: 'base' });
+  return pages.map((page, index) => ({ page, index }))
+    .sort((a, b) => compare.compare(names.get(a.page.sourceId) || '', names.get(b.page.sourceId) || '') || a.index - b.index)
+    .map(({ page }) => page);
+}
+
 export function rotatePages(pages, ids, degrees) {
   const selected = new Set(ids);
   return pages.map((page) => selected.has(page.id)
