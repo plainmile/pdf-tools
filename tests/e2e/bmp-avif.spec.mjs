@@ -67,7 +67,7 @@ test('real BMP and genuine static AVIF combine in PDF, preserve raster pixels an
 test('Chinese mobile interface safely imports BMP and still AVIF', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/zh/image-to-pdf/');
-  await expect(page.getByText('静态 AVIF')).toBeVisible();
+  await expect(page.locator('.drop-limits')).toContainText('静态 AVIF');
   await page.getByTestId('file-input').setInputFiles([
     { name: 'bitmap.bmp', mimeType: 'image/x-ms-bmp', buffer: makeBmp() },
     { name: 'modern.avif', mimeType: 'image/avif', buffer: Buffer.from(AVIF_BASE64, 'base64') },
