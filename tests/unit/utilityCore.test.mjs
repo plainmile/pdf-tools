@@ -26,6 +26,18 @@ test('basic Markdown headings and list semantics without inserting remote HTML',
   assert.equal(blocks.at(-1).kind, 'code');
   assert.equal(normalizeText('a\r\nb\rc'), 'a\nb\nc');
 });
+test('Markdown PDF parser preserves comparison operators instead of mistaking them for HTML', () => {
+  const blocks = parseTextBlocks(
+    '# Report\nLogic: a < 3 && b > 2\nBounds: x <= 40 && y >= 8\nCode: \`value < 5 && size > 1\`\nSafe <strong>bold</strong> <!-- hidden --> text',
+    true,
+  );
+  assert.deepEqual(blocks.map(({ kind }) => kind), ['heading', 'paragraph', 'paragraph', 'paragraph', 'paragraph']);
+  assert.equal(blocks[1].text, 'Logic: a < 3 && b > 2');
+  assert.equal(blocks[2].text, 'Bounds: x <= 40 && y >= 8');
+  assert.equal(blocks[3].text, 'Code: value < 5 && size > 1');
+  assert.equal(blocks[4].text, 'Safe bold  text');
+});
+
 test('PDF positioned text is approximately sorted by vertical position then X', () => {
   const items = [
     { str: 'right', transform: [1,0,0,12, 100, 300], height: 12, width: 25 },
