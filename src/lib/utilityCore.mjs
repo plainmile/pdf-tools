@@ -139,6 +139,21 @@ export function requestedPages(input, count) {
   }
   return output;
 }
+/** A deterministic ASCII download label for user-chosen page ranges, even
+ * when the accepted input used Chinese punctuation or fullwidth digits.
+ * Long noncontiguous lists get a truthful compact selection label.
+ */
+export function imagePageSelectionLabel(input, count) {
+  if (!input?.trim()) return '';
+  const ranges = parsePageRanges(input, count, UTILITY_LIMITS.maxImagePagesPerRun);
+  const label = ranges.map(({ start, end }) =>
+    start === end ? String(start) : `${start}-${end}`).join('_');
+  if (label.length <= 45) return label;
+  const selected = requestedPages(input, count);
+  const first = selected[0], last = selected[selected.length - 1];
+  return `selection-first${first}-last${last}-${selected.length}pages`;
+}
+
 export function normalizeText(source) {
   return source.replace(/\r\n?/g, '\n').replace(/\0/g, '').replace(/\t/g, '    ');
 }

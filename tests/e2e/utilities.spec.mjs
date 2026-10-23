@@ -42,6 +42,21 @@ async function getDownload(page, action, timeout = 6000) {
   return { name: download.suggestedFilename(), bytes: await readFile(await download.path()) };
 }
 
+test('localized image page range downloads named ZIP containing the correct images', async ({ page }) => {
+  await page.goto('/zh/pdf-to-images/');
+  await upload(page, await fixturePdf('Localized range source', 8));
+  await page.getByRole('combobox', { name: '图片格式' }).selectOption('png');
+  await page.getByTestId('utility-page-ranges').fill('２－３，５');
+  const output = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+  expect(output.name).toMatch(/fixture-pages-2-3_5\.zip$/);
+  const archive = await JSZip.loadAsync(output.bytes);
+  expect(Object.keys(archive.files).sort()).toEqual(['page-002.png', 'page-003.png', 'page-005.png']);
+  for (const name of Object.keys(archive.files)) {
+    const bytes = await archive.files[name].async('uint8array');
+    expect(Array.from(bytes.slice(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+  }
+});
+
 test('PDF to image PNG selected pages ZIP has valid images, JPG single page valid JPEG', async ({ page }) => {
   await page.goto('/pdf-to-images/');
   await upload(page, await fixturePdf());

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { loadPdf, convertPdfToImages, compressPdfRaster, extractPdfText, textToPdf, addPageNumbers } from '../lib/pdfUtilities.mjs';
-import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, translateUtilityError } from '../lib/utilityCore.mjs';
+import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, translateUtilityError } from '../lib/utilityCore.mjs';
 import { saveDownload } from '../lib/pdfEngine.mjs';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 
@@ -197,7 +197,9 @@ export default function PdfUtility({ mode, locale = 'en' }) {
       if (mode === 'pdf-to-images') {
         result = await convertPdfToImages(pdf, { format, scale: Number(scale), pages, locale, signal: controller.signal, onPackagingProgress: percent => setProgress({ packaging: percent }) }, report);
         ensureNotCancelled();
-        const selectedRange = pages.trim().replace(/[^0-9,\-]/g, '').replace(/,/g, '_').slice(0, 45);
+        // Reuse the validated range parser; a fullwidth input like ３０１－３０６
+        // must not collapse to an anonymous images.zip with ambiguous naming.
+        const selectedRange = imagePageSelectionLabel(pages, pdf.count);
         result.name = result.count === 1 ? `${pdfName}-${result.name}` : selectedRange ? `${pdfName}-pages-${selectedRange}.zip` : `${pdfName}-images.zip`;
         save(result);
         setNotice(`${t.ready}: ${result.count} ${t.pages} · ${formatBytes(result.bytes.length)}`);
