@@ -197,6 +197,22 @@ export function pageIdsForRanges(pages, input) {
   return chosen;
 }
 
+/** Odd/even refer to the CURRENT one-based export position, never an original
+ * PDF source-page label. These operations avoid the 50-range input limit and
+ * create no document edit/history entry.
+ */
+export function pageIdsForParity(pages, parity) {
+  if (parity !== 'odd' && parity !== 'even') throw new Error('Choose odd or even output pages.');
+  const target = parity === 'odd' ? 0 : 1;
+  return new Set(pages.filter((_, index) => index % 2 === target).map(page => page.id));
+}
+
+/** Invert only the IDs currently present, even if history retains old pages. */
+export function invertPageIdSelection(pages, selectedIds) {
+  const selected = new Set(selectedIds);
+  return new Set(pages.filter(page => !selected.has(page.id)).map(page => page.id));
+}
+
 export function chunkPageRanges(pageCount, chunkSize) {
   const n = Number(chunkSize);
   if (!Number.isSafeInteger(n) || n < 1 || n > pageCount) throw new Error('Choose a valid pages-per-file value.');
