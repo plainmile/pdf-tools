@@ -1646,3 +1646,109 @@ test('moving pages preserves chosen page IDs but clears stale Shift-range anchor
   const saved = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
   expect(saved.getPages().map(p => p.getWidth())).toEqual([301,303,305,302,304,306]);
 });
+
+
+test('larger one-page preview follows original crop/rotation, uses bounded bitmap, and never edits output', async ({ page }) => {
+  test.setTimeout(50000);
+  const first = await PDFDocument.create();
+  const font = await first.embedFont(StandardFonts.Helvetica);
+  const cover = first.addPage([430, 610]);
+  cover.drawRectangle({ x: 44, y: 85, width: 130, height: 125, color: rgb(.1, .5, .85) });
+  cover.drawText('First inspection page', { x: 35, y: 300, font, size: 19 });
+  const turned = first.addPage([430, 610]);
+  turned.setCropBox(20, 40, 345, 480);
+  turned.setRotation(degrees(90));
+  turned.drawRectangle({ x: 40, y: 63, width: 180, height: 90, color: rgb(.85, .2, .12) });
+  turned.drawText('ROTATED DETAILS', { x: 50, y: 300, font, size: 18 });
+  const second = await PDFDocument.create();
+  const landscape = second.addPage([750, 475]);
+  landscape.drawRectangle({ x: 30, y: 50, width: 290, height: 170, color: rgb(.1, .7, .2) });
+  await page.goto('/organize-pdf/');
+  await page.getByTestId('file-input').setInputFiles([
+    { name: 'invoice-source.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await first.save()) },
+    { name: 'landscape-source.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await second.save()) },
+  ]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(3);
+  await page.getByRole('checkbox', { name: 'Select page 1', exact: true }).check();
+  const tile = page.getByTestId('page-tile').nth(1);
+  const openingButton = tile.getByTestId('page-preview-open');
+  await expect(openingButton).toHaveAttribute('aria-label', 'Enlarge output page 2');
+  await openingButton.click();
+  const dialog = page.getByTestId('page-zoom-dialog');
+  await expect(dialog).toHaveAttribute('aria-modal', 'true');
+  await expect(dialog).toContainText('Output page 2 of 3');
+  await expect(dialog).toContainText('invoice-source.pdf');
+  const canvas = page.getByTestId('page-zoom-canvas');
+  await expect(canvas).toHaveCSS('visibility', 'visible', { timeout: 25000 });
+  const original = await canvas.evaluate(el => {
+    const pixels = el.getContext('2d').getImageData(0, 0, el.width, el.height).data;
+    let colored = 0;
+    for (let n = 0; n < pixels.length; n += 4) {
+      if (pixels[n] < 225 || pixels[n + 1] < 225 || pixels[n + 2] < 225) colored++;
+    }
+    return { width: el.width, height: el.height, colored };
+  });
+  expect(original.width).toBeGreaterThan(original.height); // Native 90-degree CropBox rotation.
+  expect(original.colored).toBeGreaterThan(200);
+  expect(original.width * original.height).toBeLessThanOrEqual(8_000_000);
+  await page.getByTestId('page-zoom-in').click();
+  await expect(page.getByTestId('page-zoom-reset')).toHaveText('150%');
+  await expect(canvas).toHaveCSS('visibility', 'visible', { timeout: 25000 });
+  const zoomed = await canvas.evaluate(el => ({ width: el.width, height: el.height }));
+  expect(zoomed.width).toBeGreaterThan(original.width);
+  expect(zoomed.width * zoomed.height).toBeLessThanOrEqual(8_000_000);
+
+  await page.keyboard.press('ArrowRight');
+  await expect(dialog).toContainText('Output page 3 of 3');
+  await expect(dialog).toContainText('landscape-source.pdf');
+  await expect(page.getByTestId('page-zoom-next')).toBeDisabled();
+  await expect(page.getByTestId('page-zoom-reset')).toHaveText('100%');
+  await expect(canvas).toHaveCSS('visibility', 'visible', { timeout: 25000 });
+  await page.evaluate(() => { window.__zoomCanvasForCleanup = document.querySelector('[data-testid="page-zoom-canvas"]'); });
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => window.__zoomCanvasForCleanup.width)).toBe(0);
+  await expect(openingButton).toBeFocused();
+  await expect(page.getByRole('checkbox', { name: 'Select page 1', exact: true })).toBeChecked();
+  await expect(page.locator('.selection-info strong')).toContainText('1 page selected');
+  const pdf = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(pdf.getPages().map(p => p.getWidth())).toEqual([430,430,750]);
+  expect(pdf.getPages().map(p => p.getRotation().angle)).toEqual([0,90,0]);
+  expect(pdf.getPage(1).getCropBox()).toMatchObject({ x: 20, y: 40, width: 345, height: 480 });
+});
+
+test('Chinese mobile and grouped source preview are accessible without horizontal page overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  const source = await PDFDocument.create();
+  const pg = source.addPage([520, 720]);
+  pg.drawRectangle({ x: 80, y: 150, width: 180, height: 290, color: rgb(.35, .5, .9) });
+  const second = await PDFDocument.create();
+  const pg2 = second.addPage([480, 600]);
+  pg2.drawRectangle({ x: 15, y: 15, width: 200, height: 100, color: rgb(.6, .3, .15) });
+  await page.goto('/zh/organize-pdf/');
+  await page.getByTestId('file-input').setInputFiles([
+    { name: '第一份.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await source.save()) },
+    { name: '第二份.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await second.save()) },
+  ]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await page.getByTestId('workspace-view-grouped').click();
+  await expect(page.getByTestId('source-group')).toHaveCount(2);
+  await page.getByTestId('source-group').nth(1).getByTestId('page-preview-open').click();
+  await expect(page.getByTestId('page-zoom-dialog')).toContainText('导出第 2 / 2 页');
+  await expect(page.getByTestId('page-zoom-dialog')).toContainText('第二份.pdf');
+  await expect(page.getByTestId('page-zoom-canvas')).toHaveCSS('visibility', 'visible', { timeout: 25000 });
+  await expect(page.getByTestId('page-zoom-previous')).toBeEnabled();
+  await page.getByTestId('page-zoom-previous').click();
+  await expect(page.getByTestId('page-zoom-dialog')).toContainText('导出第 1 / 2 页');
+  await expect(page.getByTestId('page-zoom-previous')).toBeDisabled();
+  await page.getByTestId('page-zoom-close').click();
+  await expect(page.getByTestId('page-zoom-dialog')).toHaveCount(0);
+  await expect(page.getByTestId('source-group')).toHaveCount(2);
+  const browserSize = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    client: document.documentElement.clientWidth,
+    canvasCount: document.querySelectorAll('[data-testid="page-zoom-canvas"]').length,
+  }));
+  expect(browserSize.canvasCount).toBe(0);
+  expect(browserSize.scroll).toBeLessThanOrEqual(browserSize.client + 2);
+});
