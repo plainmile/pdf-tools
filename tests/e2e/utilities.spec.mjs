@@ -150,6 +150,49 @@ test('PDF to TXT and Markdown extract actual text, reject empty scanned pages', 
   await expect(page.getByRole('alert')).toContainText('No selectable text');
 });
 
+test('UTF-16 LE TXT import preserves text through real PDF and TXT downloads', async ({ page }) => {
+  const value = 'Pay period: 2026-10-01 to 2026-10-15\nHours paid: 40';
+  const binary = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(value, 'utf16le')]);
+  await page.goto('/txt-to-pdf/');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'windows-unicode.txt', mimeType: 'text/plain', buffer: binary,
+  });
+  await expect(page.getByTestId('utility-text')).toHaveValue(value);
+  const generated = await generateTextPdfAndDownload(page);
+  expect((await PDFDocument.load(generated.bytes)).getPageCount()).toBe(1);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, generated.bytes);
+  const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
+  expect(extracted.bytes.toString('utf8')).toContain('Hours paid: 40');
+  expect(extracted.bytes.toString('utf8')).toContain('Pay period: 2026-10-01 to 2026-10-15');
+});
+
+test('UTF-16 BE Markdown imports Chinese correctly; malformed text preserves old PDF', async ({ page }) => {
+  const content = '# Chapter 1\nReport 中文';
+  const le = Buffer.from(content, 'utf16le');
+  const be = Buffer.from(le);
+  for (let i = 0; i < be.length; i += 2) [be[i], be[i + 1]] = [be[i + 1], be[i]];
+  await page.goto('/markdown-to-pdf/');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'unicode.md', mimeType: 'text/markdown',
+    buffer: Buffer.concat([Buffer.from([0xfe, 0xff]), be]),
+  });
+  await expect(page.getByTestId('utility-text')).toHaveValue(content);
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible();
+  // Bad re-import must never discard the successfully generated PDF.
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'bad.txt', mimeType: 'text/plain', buffer: Buffer.from([0xc3, 0x28]),
+  });
+  await expect(page.getByTestId('utility-replace-confirm')).toBeVisible();
+  await page.getByTestId('utility-replace-accept').click();
+  await expect(page.getByRole('alert')).toContainText('not valid UTF-8');
+  await expect(page.getByTestId('utility-text')).toHaveValue(content);
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible();
+  const downloaded = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
+  expect((await PDFDocument.load(downloaded.bytes)).getPageCount()).toBe(1);
+});
+
 test('TXT to PDF yields selectable text after real download and re-import', async ({ page }) => {
   await page.goto('/txt-to-pdf/');
   await page.getByTestId('utility-text').fill('Hello selectable world');

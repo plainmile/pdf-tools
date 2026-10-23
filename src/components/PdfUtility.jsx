@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { loadPdf, convertPdfToImages, compressPdfRaster, extractPdfText, textToPdf, addPageNumbers } from '../lib/pdfUtilities.mjs';
-import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, translateUtilityError } from '../lib/utilityCore.mjs';
+import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, translateUtilityError, decodeImportedText } from '../lib/utilityCore.mjs';
 import { saveDownload } from '../lib/pdfEngine.mjs';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 
@@ -20,8 +20,8 @@ const COPY = {
     missingTextPages: 'Important: {missing} of {total} pages have no selectable text (pages {pages}). Those pages may be blank or scanned images. Their content was not extracted; OCR would be required for scanned text. Check your original PDF.',
     markdownWarning: 'Markdown conversion is approximate; headings are inferred from font size. Complex PDF layout cannot be faithfully recovered.',
     textLabel: 'Text to convert', textPlaceholder: 'Paste text here or import a .txt / .md file…',
-    textInputHint: 'Plain text is exported as selectable PDF text where the built-in font supports it. Chinese and other unsupported characters are rendered with local browser fonts as image pages (not searchable).',
-    markdownInputHint: 'Supports simple headings, paragraphs, lists, quotes and code blocks; does not render external images, HTML, full tables or complex Markdown. Non-Latin scripts are drawn as page images.',
+    textInputHint: 'Import UTF-8 or BOM-marked UTF-16 text. Built-in-font text stays selectable; Chinese and unsupported characters use local browser fonts as non-searchable image pages.',
+    markdownInputHint: 'Import UTF-8 or BOM-marked UTF-16 text. Supports simple headings, lists, quotes and code blocks, not external images, HTML, full tables or complex Markdown. Non-Latin scripts become image pages.',
     pageStart: 'Starting number', pagePosition: 'Position', pageSize: 'Font size', bottomCenter: 'Bottom center', bottomRight: 'Bottom right', topRight: 'Top right',
     numbersHint: 'Adds selectable numbers to every page and preserves page size. Review annotations and digital signatures before using this modified file.',
     ready: 'Ready to download', noPdf: 'Select a PDF first.', noText: 'Enter text to convert.', sizeLimit: 'PDF up to 100 MB / 1,000 pages; TXT / Markdown up to 5 MB.', limitText: 'TXT / Markdown up to 5 MB; PDF output: up to 1,000 pages (300 image-based pages for CJK).', limitImages: 'PDF up to 100 MB / 1,000 pages; up to 60 selected image pages per batch.', limitCompression: 'PDF up to 100 MB / 120 pages; JPEG output safety budget 96 MB.', limitGeneral: 'PDF up to 100 MB / 1,000 pages.', heavyWarning: 'Large document: processing hundreds of pages may take time and require substantial device memory. Close other heavy tabs if necessary.', progressLabel: 'Processed {done} of {total} pages', tooMuchText: 'Text exceeds 5 MB.',
@@ -44,8 +44,8 @@ const COPY = {
     missingTextPages: '重要提示：共 {total} 页中有 {missing} 页未检测到可选择文字（第 {pages} 页）。这些页可能是空白页或扫描图片，其内容未被提取；扫描文字需要 OCR。请对照原始 PDF 核查。',
     markdownWarning: 'Markdown 为近似转换：根据字号推测标题，复杂 PDF 的版式无法完整还原。',
     textLabel: '需要转换的文本', textPlaceholder: '粘贴文字，或选择 .txt / .md 文件……',
-    textInputHint: '支持浏览器本地转换。拉丁文字尽量保留可选中内容；中文等字符会使用本地字体渲染为图片页，输出不支持文字搜索。',
-    markdownInputHint: '支持基础标题、段落、列表、引用和代码块；不支持远程图片、HTML、完整表格或复杂 Markdown。中文会渲染为图片页。',
+    textInputHint: '支持 UTF-8 或带 BOM 的 UTF-16 文本。拉丁文字尽量保留可选中内容；中文等文字使用本地字体输出为不可搜索的图片页。',
+    markdownInputHint: '导入支持 UTF-8 或带 BOM 的 UTF-16。支持基础标题、列表、引用和代码块；不支持远程图片、HTML、完整表格或复杂 Markdown。中文会输出为图片页。',
     pageStart: '起始页码', pagePosition: '页码位置', pageSize: '字号', bottomCenter: '底部居中', bottomRight: '右下角', topRight: '右上角',
     numbersHint: '在每页添加可选择的数字，保持纸张尺寸。重要文件请检查注释、数字签名等内容。',
     ready: '文件已经生成', noPdf: '请先选择 PDF 文件。', noText: '请输入待转换的文字。', sizeLimit: 'PDF 最多 100 MB / 1000 页；TXT / Markdown 最多 5 MB。', limitText: 'TXT / Markdown 最多 5 MB；输出最多 1000 页（中文等图片化内容最多 300 页）。', limitImages: 'PDF 最多 100 MB / 1000 页；每批最多导出选定的 60 页图片。', limitCompression: 'PDF 最多 100 MB / 120 页；JPEG 数据累计上限 96 MB。', limitGeneral: 'PDF 最多 100 MB / 1000 页。', heavyWarning: '大文档提示：处理数百页时可能占用较多设备内存，并需要更长时间。建议关闭其他高负载标签页。', progressLabel: '已处理 {done} / {total} 页', tooMuchText: '文本内容超过 5 MB。',
@@ -211,7 +211,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     try {
       if (isTextInput) {
         if (!/\.(?:txt|md|markdown)$/i.test(file.name) || !file.size || file.size > UTILITY_LIMITS.maxTextBytes) throw new Error(t.invalidFile);
-        const content = await file.text();
+        const content = decodeImportedText(new Uint8Array(await file.arrayBuffer()), locale);
         clearOutput();
         setSourceText(content);
         setTextRevision(previous => previous + 1);
