@@ -7,7 +7,7 @@ import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLay
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
-  movePage, movePageGroup, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges,
+  movePage, movePageGroup, pageDropSide, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges,
   getRangePages, reversePages, sortPagesByFilename, groupPagesBySource, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
@@ -118,6 +118,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [dragged, setDragged] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
   const [pageView, setPageView] = useState('order');
   const [collapsedSources, setCollapsedSources] = useState(() => new Set());
   const [tab, setTab] = useState(mode === 'split-pdf' ? 'split' : 'organize');
@@ -484,6 +485,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
 
   const onMoveDrop = (event, targetId) => {
     event.preventDefault();
+    setDropTarget(null);
     if (event.dataTransfer.files?.length) { void addFiles(event.dataTransfer.files); return; }
     const text = event.dataTransfer.getData('application/x-plainmile-pages');
     let group = [];
@@ -746,13 +748,31 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   {pages.map((pageRef, index) => {
                     const source = sourceLookup.get(pageRef.sourceId);
                     return (
-                      <div className={`page-tile ${selected.has(pageRef.id) ? 'is-selected' : ''} ${dragged === pageRef.id ? 'is-dragging' : ''}`} key={pageRef.id} data-testid="page-tile" data-original-page={pageRef.pageIndex + 1}
+                      <div className={`page-tile ${selected.has(pageRef.id) ? 'is-selected' : ''} ${dragged === pageRef.id ? 'is-dragging' : ''} ${dropTarget?.id === pageRef.id ? 'is-drop-' + dropTarget.side : ''}`} key={pageRef.id} data-testid="page-tile" data-original-page={pageRef.pageIndex + 1}
+                        data-drop-side={dropTarget?.id === pageRef.id ? dropTarget.side : undefined}
                         draggable={!busy} onDragStart={(event) => {
                           const ids = selected.has(pageRef.id) ? pages.filter((page) => selected.has(page.id)).map((page) => page.id) : [pageRef.id];
                           event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-plainmile-pages', JSON.stringify(ids));
                           setDragged(pageRef.id);
                         }}
-                        onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }} onDrop={(event) => { event.stopPropagation(); onMoveDrop(event, pageRef.id); }} onDragEnd={() => setDragged(null)}>
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          if (busy || !dragged || Array.from(event.dataTransfer.types || []).includes('Files')) return;
+                          const movingIds = selected.has(dragged)
+                            ? pages.filter(page => selected.has(page.id)).map(page => page.id) : [dragged];
+                          const side = pageDropSide(pages, movingIds, pageRef.id);
+                          event.dataTransfer.dropEffect = side ? 'move' : 'none';
+                          setDropTarget(previous =>
+                            previous?.id === pageRef.id && previous.side === side ? previous :
+                              side ? { id: pageRef.id, side } : null);
+                        }}
+                        onDragLeave={(event) => {
+                          if (!event.currentTarget.contains(event.relatedTarget)) {
+                            setDropTarget(previous => previous?.id === pageRef.id ? null : previous);
+                          }
+                        }}
+                        onDrop={(event) => { event.stopPropagation(); onMoveDrop(event, pageRef.id); }}
+                        onDragEnd={() => { setDragged(null); setDropTarget(null); }}>
                         <label className="page-tile-checkbox"><input type="checkbox" checked={selected.has(pageRef.id)} disabled={busy} onChange={(event) => toggleSelection(pageRef.id, index, Boolean(event.nativeEvent?.shiftKey))} aria-label={locale === 'zh' ? `${t.selectPage} ${index + 1} 页` : `Select page ${index + 1}`} /></label>
                         <div className="tile-sequence">{String(index + 1).padStart(2, '0')}</div>
                         <PageThumbnail source={source} pageRef={pageRef} getPreviewDoc={getPreviewDoc} locale={locale} t={t} watermarkPreview={watermarkPreview} />
