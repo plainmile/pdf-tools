@@ -303,7 +303,9 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           // overwrite the prior valid PDF just because this retry is worse.
           // Keep its original stats, preview, bytes and undownloaded guard.
           setCompressionRetryKept(true);
-          setNotice(t.compressionRetryKept);
+          // The previous PDF remains valid; a green success toast would
+          // misdescribe this unsuccessful retry. The result banner explains it.
+          setNotice('');
         } else {
           setOutput({ bytes: null, mime: 'application/pdf',
             name: `${pdfName}-compressed.pdf`, stats: candidate.stats, compressionMode: compressMode });
