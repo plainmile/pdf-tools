@@ -3,8 +3,8 @@ export const tools = [
   {
     slug: 'workspace', title: 'PDF Workspace', short: 'One place for every page',
     headline: 'Your documents, exactly how you want them.',
-    description: 'Rearrange pages from multiple PDFs, rotate, remove, extract and export. All processing happens locally in your browser.',
-    details: 'Drop several PDF files or images, see every page as a thumbnail, and assemble a fresh PDF by dragging pages into the right order.',
+    description: 'Reorder, rotate, duplicate, insert blank pages, remove or extract PDF pages. All processing stays in your browser.',
+    details: 'Drop PDF files or images, reorder visible page thumbnails, duplicate selected pages or insert a blank page after your chosen page. Download a new PDF when finished.',
     steps: ['Choose PDFs or images', 'Drag pages into a new order', 'Export your finished PDF'],
   },
   {
@@ -24,8 +24,8 @@ export const tools = [
   {
     slug: 'organize-pdf', title: 'Organize PDF', short: 'Reorder by thumbnail',
     headline: 'Move any PDF page where it belongs.',
-    description: 'Visually reorder PDF pages by dragging thumbnails or using move buttons. Undo and redo changes before saving.',
-    details: 'Move pages across files; rotate or delete them with a clear visual overview. Keyboard-accessible move controls are included.',
+    description: 'Visually reorder, duplicate and insert blank PDF pages. Use thumbnails, move buttons and Undo/Redo before downloading.',
+    details: 'Move pages across PDFs, copy selected pages in place, insert blank pages that match adjacent page sizes, and rotate or delete unwanted pages. Keyboard-accessible controls are included.',
     steps: ['Add documents', 'Rearrange pages by thumbnail', 'Export with your preferred order'],
   },
   {
