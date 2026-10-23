@@ -6,6 +6,8 @@ on:
       - Publish Image
     types:
       - completed
+    # Ignore Publish workflow_run events associated with feature branches.
+    branches: [main]
 
 permissions:
   contents: read

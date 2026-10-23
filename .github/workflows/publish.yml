@@ -3,6 +3,8 @@ on:
   workflow_run:
     workflows: ['PDF Tools CI']
     types: [completed]
+    # Do not generate skipped releases for feature-branch or PR CI events.
+    branches: [main]
 permissions:
   contents: read
   packages: write
