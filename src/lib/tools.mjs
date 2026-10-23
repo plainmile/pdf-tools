@@ -17,9 +17,9 @@ export const tools = [
   {
     slug: 'split-pdf', title: 'Split PDF', short: 'Separate into smaller files',
     headline: 'Split a PDF into just the sections you need.',
-    description: 'Split a PDF by page ranges or every N pages. Download the results together as a ZIP file without uploading your documents.',
+    description: 'Split a PDF by page ranges or every N pages. Download a single result as PDF, or multiple PDFs together as ZIP, without uploads.',
     details: 'Enter ranges such as 1-3, 4-6 or choose a fixed number of pages for each file. Splitting follows the current page order.',
-    steps: ['Add your PDF', 'Enter page ranges or pages per file', 'Download the ZIP'],
+    steps: ['Add your PDF', 'Enter page ranges or pages per file', 'Download a PDF or ZIP'],
   },
   {
     slug: 'organize-pdf', title: 'Organize PDF', short: 'Reorder by thumbnail',

@@ -13,7 +13,7 @@ export const toolHelp = {
     ],
     'split-pdf': [
       ['Can I split a PDF into custom page ranges?', 'Yes. Enter ranges such as 1-3, 4-6, or choose a fixed number of pages per output file.'],
-      ['How are the split files downloaded?', 'The tool downloads the selected sections together as a ZIP. To avoid excessive output files, it supports up to 50 ranges or parts per operation.'],
+      ['How are the split files downloaded?', 'A single section downloads directly as PDF. Two or more sections are bundled into ZIP, with up to 50 parts per operation.'],
     ],
     'organize-pdf': [
       ['How do I move several pages together?', 'Select pages using their checkboxes, then drag the selection to its new position. Keyboard-accessible move controls are also provided.'],
@@ -83,7 +83,7 @@ export const toolHelp = {
     ],
     'split-pdf': [
       ['可以按自定义范围拆分吗？', '可以。输入 1-3、4-6 这样的页码范围，或者指定每份文件包含几页。'],
-      ['拆分结果怎么保存？', '输出会打包成 ZIP 下载。为防止一次创建过多文件，单次最多支持 50 个范围或拆分结果。'],
+      ['拆分结果怎么保存？', '拆出一份时直接下载 PDF；拆出多份时打包成 ZIP。单次最多生成 50 份。'],
     ],
     'organize-pdf': [
       ['如何一次移动多页？', '通过复选框选择多页，再拖动整组页面。也支持使用移动按钮调整顺序。'],

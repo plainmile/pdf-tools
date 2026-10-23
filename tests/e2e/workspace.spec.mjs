@@ -1050,3 +1050,37 @@ test('expired 20-step Undo history frees deleted PDF bytes without affecting act
   expect(exported.getPageCount()).toBe(1);
   expect(exported.getPage(0).getWidth()).toBeCloseTo(320, 1);
 });
+
+
+test('one split range downloads a real PDF directly, not a ZIP', async ({ page }) => {
+  await loadInput(page);
+  await page.getByRole('tab', { name: 'Split' }).click();
+  await page.getByRole('textbox', { name: 'Page ranges', exact: true }).fill('2-3');
+  await expect(page.locator('.split-estimate')).toContainText('1 PDF file(s)');
+  const action = page.getByRole('button', { name: 'Download PDF' });
+  await expect(action).toBeEnabled();
+  const pending = page.waitForEvent('download');
+  await action.click();
+  const download = await pending;
+  expect(download.suggestedFilename()).toBe('plainmile-2-files-pages-2-3.pdf');
+  const output = await PDFDocument.load(await readFile(await download.path()));
+  expect(output.getPages().map((p) => p.getWidth())).toEqual([310, 320]);
+  await expect(page.getByRole('status')).toContainText('No ZIP extraction needed');
+  await page.getByRole('textbox', { name: 'Page ranges', exact: true }).fill('1-2, 3');
+  await expect(page.getByRole('button', { name: 'Download split PDFs (ZIP)' })).toBeEnabled();
+});
+
+test('Chinese single-result split by pages per PDF is a direct full PDF export', async ({ page }) => {
+  await page.goto('/zh/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({ name: 'three.pdf', mimeType: 'application/pdf', buffer: await makePdf([301, 302, 303]) });
+  // /split-pdf/ starts on the Split tab; thumbnails only exist on Organize.
+  await expect(page.locator('.file-count')).toContainText('3 页');
+  await page.getByRole('tab', { name: '拆分文件' }).click();
+  await page.getByRole('radio', { name: '每 N 页拆分一次' }).check();
+  await page.getByRole('spinbutton', { name: '每个 PDF 的页数' }).fill('3');
+  const action = page.getByRole('button', { name: '下载 PDF' });
+  await expect(action).toBeEnabled();
+  const result = await downloadPdf(page, () => action.click());
+  expect(result.getPages().map(p => p.getWidth())).toEqual([301, 302, 303]);
+  await expect(page.getByRole('status')).toContainText('无需解压 ZIP');
+});
