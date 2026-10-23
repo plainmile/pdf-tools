@@ -749,3 +749,42 @@ test('fully searchable PDF text does not show an incomplete-extraction warning',
   expect(output.bytes.toString('utf8')).toContain('Everything searchable 3');
   await expect(page.getByTestId('text-extraction-warning')).toHaveCount(0);
 });
+
+test('Clear protects an undownloaded generated TXT PDF but not an already downloaded output', async ({ page }) => {
+  await page.goto('/txt-to-pdf/');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'draft.txt', mimeType: 'text/plain', buffer: Buffer.from('Original draft to keep'),
+  });
+  await expect(page.getByTestId('text-file-summary')).toContainText('draft.txt');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible();
+  const clear = page.getByTestId('text-file-summary').getByRole('button', { name: 'Clear' });
+  await clear.click();
+  await expect(page.getByTestId('utility-clear-confirm')).toContainText('not been safely saved');
+  await page.getByTestId('utility-clear-keep').click();
+  await expect(page.getByTestId('utility-clear-confirm')).toHaveCount(0);
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible();
+  await expect(page.getByTestId('utility-text')).toHaveValue('Original draft to keep');
+  const result = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
+  expect((await PDFDocument.load(result.bytes)).getPageCount()).toBe(1);
+  await clear.click();
+  await expect(page.getByTestId('utility-clear-confirm')).toHaveCount(0);
+  await expect(page.getByTestId('utility-text')).toHaveValue('');
+  await expect(page.getByTestId('utility-run')).toBeDisabled();
+});
+
+test('Chinese typed-only unsaved draft can be cleared only after explicit confirmation', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/markdown-to-pdf/');
+  await page.getByTestId('utility-text').fill('# 重要草稿\n待保存的内容');
+  await page.getByTestId('utility-text-clear').click();
+  await expect(page.getByTestId('utility-clear-confirm')).toContainText('尚未妥善保存');
+  await page.getByTestId('utility-clear-keep').click();
+  await expect(page.getByTestId('utility-text')).toContainText('待保存的内容');
+  await page.getByTestId('utility-text-clear').click();
+  await page.getByTestId('utility-clear-confirm-button').click();
+  await expect(page.getByTestId('utility-text')).toHaveValue('');
+  await expect(page.getByTestId('utility-run')).toBeDisabled();
+  const box = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth }));
+  expect(box.scroll).toBeLessThanOrEqual(box.viewport + 2);
+});
