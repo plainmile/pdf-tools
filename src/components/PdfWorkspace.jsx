@@ -7,7 +7,7 @@ import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, shiftPage, rotatePages, deletePages, parsePageRanges, chunkPageRanges,
-  getRangePages, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources,
+  getRangePages, reversePages, sortPagesByFilename, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources,
 } from '../lib/pageOperations.mjs';
 
 function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview }) {
@@ -126,7 +126,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const imageLayoutDirty = mode === 'image-to-pdf' && imageSourcesLoaded &&
     (imageLayout.paper !== appliedImageLayout.paper ||
       imageLayout.orientation !== appliedImageLayout.orientation ||
-      imageLayout.margin !== appliedImageLayout.margin);
+      imageLayout.margin !== appliedImageLayout.margin || imageLayout.imageSizing !== appliedImageLayout.imageSizing);
   const activeNames = useMemo(() => {
     const ids = new Set(pages.map(page => page.sourceId));
     return sources.filter(source => ids.has(source.id)).map(source => source.name);
@@ -135,6 +135,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     `plainmile-${activeNames.length}-files`;
   const filename = `${fileBase}-${mode === 'image-to-pdf' ? 'images' : 'organized'}.pdf`;
   const activeSourceCount = useMemo(() => countActiveSources(pages), [pages]);
+  const onlyImages = pages.length > 1 && pages.every(page => sourceLookup.get(page.sourceId)?.isImage);
   const splitNeedsInput = splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim();
   const splitEstimate = useMemo(() => {
     if (!pages.length || (splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim())) return null;
@@ -394,6 +395,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
               </select>
             </label>
           </div>
+          <div className="utility-options"><label><span>{t.imageSizing}</span><select data-testid="image-sizing" aria-label={t.imageSizing} disabled={busy || imageLayout.paper === "fit"} value={imageLayout.imageSizing} onChange={event => setImageLayout(value => ({ ...value, imageSizing: event.target.value }))}><option value="contain">{t.imageContain}</option><option value="cover">{t.imageCover}</option></select></label></div>
+          <p className="input-note" data-testid="image-sizing-hint">{imageLayout.paper === "fit" ? t.imageFitSizingHint : imageLayout.imageSizing === "cover" ? t.imageCoverHint : t.imageContainHint}</p>
           {imageLayoutDirty && <p className="utility-note" data-testid="image-layout-dirty">{t.imageLayoutDirty}</p>}
           {imageLayoutDirty && <button type="button" className="button button-secondary" data-testid="image-layout-apply"
             disabled={busy} onClick={applyImageLayout}>{busy ? t.working : t.imageApply}</button>}
@@ -419,6 +422,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       <div className="workspace-content" onDragOver={(event) => { if (Array.from(event.dataTransfer.types ?? []).includes('Files')) event.preventDefault(); }} onDrop={(event) => { if (event.dataTransfer.files?.length) { event.preventDefault(); void addFiles(event.dataTransfer.files); } }}>
         {error && <div className="notice notice-error" role="alert">{error}<button type="button" aria-label={t.dismiss} onClick={() => setError('')}>×</button></div>}
         {notice && <div className="notice notice-success" role="status">{notice}<button type="button" aria-label={t.dismiss} onClick={() => setNotice('')}>×</button></div>}
+        {pages.length > 0 && <p className="utility-note" data-testid="workspace-document-caution">{t.documentCaution}</p>}
         {largeWorkspace && <p className="utility-note" data-testid="workspace-large-warning">{t.bigDocWarning}</p>}
         {!pages.length ? (
           <div className="dropzone" data-testid="dropzone" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); void addFiles(event.dataTransfer.files); }}>
@@ -451,6 +455,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     <button type="button" disabled={!selectedCount || busy} className="muted-danger" onClick={() => commit((previous) => deletePages(previous, selected))} aria-label={locale === 'en' ? 'Delete selected pages' : t.del}>× {t.del}</button>
                   </div>
                 </div>
+                {onlyImages && <div className="page-action-buttons" data-testid="image-batch-actions"><button type="button" disabled={busy} onClick={() => commit(previous => sortPagesByFilename(previous, sources, locale))}>{t.sortFilename}</button><button type="button" disabled={busy} onClick={() => commit(reversePages)}>{t.reverseOrder}</button></div>}
                 <div className="page-grid" data-testid="page-grid">
                   {pages.map((pageRef, index) => {
                     const source = sourceLookup.get(pageRef.sourceId);
