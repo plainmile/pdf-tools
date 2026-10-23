@@ -65,10 +65,15 @@ test('native Back/Reload/Close warning is registered only for unsaved work', asy
   await page.getByTestId('file-input').setInputFiles({
     name: 'unsaved.pdf', mimeType: 'application/pdf', buffer: await syntheticPdf(),
   });
-  expect(await cancelled()).toBe(true);
+  // Reading and validating a PDF is asynchronous. The live-site network can
+  // make it slower than the local Docker runner, so never assert on a React
+  // guard before the source pages have finished importing.
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  await expect.poll(cancelled, { message: 'loaded PDF should register native leave protection' }).toBe(true);
   await page.getByRole('button', { name: 'Clear', exact: true }).click();
   await page.getByTestId('confirm-clear').click();
-  expect(await cancelled()).toBe(false);
+  await expect(page.getByTestId('page-tile')).toHaveCount(0);
+  await expect.poll(cancelled, { message: 'clear should remove native leave protection' }).toBe(false);
 });
 
 test('text-to-PDF draft in mobile Chinese requires explicit navigation choice', async ({ page }) => {
