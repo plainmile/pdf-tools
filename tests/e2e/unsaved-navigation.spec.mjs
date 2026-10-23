@@ -96,6 +96,39 @@ test('text-to-PDF draft in mobile Chinese requires explicit navigation choice', 
   await expect(page).toHaveURL(/\/txt-to-pdf\/$/);
 });
 
+test('emptying text cannot silently discard an undownloaded earlier PDF; downloading it then frees the guard', async ({ page }) => {
+  await page.goto('/txt-to-pdf/');
+  await page.getByTestId('utility-text').fill('Recoverable first draft PDF');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('utility-pdf-download')).toBeVisible();
+  // Clearing the ENTIRE input must not silently erase the only generated PDF.
+  await page.getByTestId('utility-text').fill('');
+  await expect(page.getByTestId('utility-pdf-download')).toBeVisible();
+  await expect(page.getByTestId('text-result-stale')).toContainText('previous text');
+  await expect(page.getByTestId('utility-run')).toBeDisabled();
+
+  const nativeGuard = () => page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  await expect.poll(nativeGuard).toBe(true);
+  await page.locator('.language-link').click();
+  await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
+  await page.getByTestId('unsaved-keep').click();
+
+  const event = page.waitForEvent('download');
+  await page.getByTestId('utility-pdf-download').click();
+  const dl = await event;
+  const saved = await PDFDocument.load(await (await import('node:fs/promises')).readFile(await dl.path()));
+  expect(saved.getPageCount()).toBe(1);
+  // Both the edited text and previous PDF are already gone/saved, so no
+  // further false positive "unsaved" warning is necessary.
+  await expect.poll(nativeGuard).toBe(false);
+  await page.locator('.language-link').click();
+  await expect(page).toHaveURL(/\/zh\/txt-to-pdf\/$/);
+});
+
 test('plain PDF utility after import protects its source; explicit Clear releases navigation', async ({ page }) => {
   await page.goto('/pdf-to-txt/');
   await page.getByTestId('utility-file-input').setInputFiles({
