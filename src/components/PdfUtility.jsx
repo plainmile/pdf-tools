@@ -108,6 +108,9 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const isTextOutput = TEXT_OUTPUT_MODES.has(mode);
   const isCompress = mode === 'compress-pdf';
   const taskRef = useRef(null);
+  // React busy state is a display flag, NOT an admission lock. Two same-tick
+  // native drops or Run events can otherwise both start asynchronous work.
+  const operationRef = useRef(false);
   const [textEdited, setTextEdited] = useState(false);
   const [notDownloaded, setNotDownloaded] = useState(false);
   const [pdf, setPdf] = useState(null);
@@ -133,9 +136,11 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const [batchIndex, setBatchIndex] = useState(0);
 
   function clearOutput() { setOutput(null); setNotice(''); setError(''); setPreview(''); setProgress(null); setShowCompressionPreview(false); setNotDownloaded(true); }
-  function reset() { if (busy) return; setPdf(null); setSourceText(''); setPages(''); setTextFileName(''); setTextEdited(false); setBatchIndex(0); clearOutput(); setNotDownloaded(false); }
+  function reset() { if (operationRef.current) return; setPdf(null); setSourceText(''); setPages(''); setTextFileName(''); setTextEdited(false); setBatchIndex(0); clearOutput(); setNotDownloaded(false); }
   async function acceptFile(file) {
-    if (!file || busy) return;
+    if (!file || operationRef.current) return;
+    // Reserve synchronously before awaiting PDF parsing or File.text().
+    operationRef.current = true;
     // A failed replacement must preserve the previously generated result,
     // preview and download button, not just the old input document.
     setError('');
@@ -158,7 +163,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
       }
     } catch (e) {
       setError(translateUtilityError(e, locale) + ((pdf || textFileName) ? ' ' + t.replacedFailed.replace('{name}', pdf?.name || textFileName) : ''));
-    } finally { setBusy(false); }
+    } finally { operationRef.current = false; setBusy(false); }
   }
   async function chooseFile(event) {
     const file = event.target.files?.[0];
@@ -166,13 +171,13 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     await acceptFile(file);
   }
   function chooseBatch(index) {
-    if (!pdf) return;
+    if (!pdf || operationRef.current) return;
     setBatchIndex(index);
     setPages(imagePageBatch(pdf.count, index).range);
     clearOutput();
   }
   function resumeImageBatches() {
-    if (!pdf || busy) return;
+    if (!pdf || operationRef.current) return;
     const index = batchIndexFromCustomPages(pages, pdf.count, batchIndex);
     chooseBatch(index);
   }
@@ -181,7 +186,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     setNotDownloaded(false);
   }
   async function processFile() {
-    if (busy) return;
+    if (operationRef.current) return;
+    operationRef.current = true; // Prevent a second Run during the same event turn.
     clearOutput(); setBusy(true); setProcessing(true); setCancelling(false);
     const controller = new AbortController();
     taskRef.current = controller;
@@ -238,7 +244,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         setNotice(`${t.ready}: ${pdf.count} ${t.pages}`);
       }
     } catch (e) { setError(translateUtilityError(e, locale)); }
-    finally { taskRef.current = null; setBusy(false); setProcessing(false); setCancelling(false); }
+    finally { taskRef.current = null; operationRef.current = false; setBusy(false); setProcessing(false); setCancelling(false); }
   }
 
   const isImages = mode === 'pdf-to-images';
@@ -264,6 +270,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
             event.preventDefault();
             event.stopPropagation();
             setDragging(false);
+            if (operationRef.current) return;
             if (event.dataTransfer.files.length > 1) {
               // Reject without erasing a valid, possibly undownloaded result.
               setError(t.multipleFiles);
@@ -284,9 +291,9 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         {pdf && (pdf.count >= 250 || pdf.size >= 75 * 1024 * 1024) && <p className="utility-note" data-testid="large-document-note">{t.heavyWarning}</p>}
         {isTextInput && <label className="utility-text-input"><span className="utility-field-label">{t.textLabel}</span><textarea data-testid="utility-text" rows={10} maxLength={UTILITY_LIMITS.maxTextBytes} placeholder={t.textPlaceholder} value={sourceText} onChange={e => { setSourceText(e.target.value); setTextEdited(Boolean(textFileName)); clearOutput(); }} disabled={busy} /></label>}
         {mode === 'pdf-to-images' && <div className="utility-options">
-          <label><span>{t.imageType}</span><select aria-label={t.imageType} value={format} onChange={e => { setFormat(e.target.value); clearOutput(); }}><option value="jpg">JPG</option><option value="png">PNG</option></select></label>
-          <label><span>{t.quality}</span><select aria-label={t.quality} value={scale} onChange={e => { setScale(e.target.value); clearOutput(); }}><option value="1">{t.low}</option><option value="1.5">{t.medium}</option><option value="2">{t.high}</option></select></label>
-          <label><span>{t.pageRange}</span><input data-testid="utility-page-ranges" value={pages} onChange={e => { setPages(e.target.value); clearOutput(); }} placeholder="1-3, 5" /></label>
+          <label><span>{t.imageType}</span><select aria-label={t.imageType} value={format} disabled={busy} onChange={e => { setFormat(e.target.value); clearOutput(); }}><option value="jpg">JPG</option><option value="png">PNG</option></select></label>
+          <label><span>{t.quality}</span><select aria-label={t.quality} value={scale} disabled={busy} onChange={e => { setScale(e.target.value); clearOutput(); }}><option value="1">{t.low}</option><option value="1.5">{t.medium}</option><option value="2">{t.high}</option></select></label>
+          <label><span>{t.pageRange}</span><input data-testid="utility-page-ranges" value={pages} disabled={busy} onChange={e => { setPages(e.target.value); clearOutput(); }} placeholder="1-3, 5" /></label>
         </div>}
         {isImages && <p className="utility-helper">{t.rangeHint}</p>}
         {imageBatch && <div className="utility-batch-nav" data-testid="utility-batch-nav">
@@ -305,11 +312,11 @@ export default function PdfUtility({ mode, locale = 'en' }) {
               data-testid="utility-batch-resume" onClick={resumeImageBatches} disabled={busy}>{t.batchResume}</button>
           </div>}
         </div>}
-        {isCompress && <div className="utility-options"><label><span>{t.compressionMethod}</span><select aria-label={t.compressionMethod} value={compressMode} onChange={e => { setCompressMode(e.target.value); clearOutput(); }}><option value="compact">{t.compressionLow}</option><option value="balanced">{t.compressionMid}</option><option value="clearer">{t.compressionHigh}</option></select></label></div>}
+        {isCompress && <div className="utility-options"><label><span>{t.compressionMethod}</span><select aria-label={t.compressionMethod} value={compressMode} disabled={busy} onChange={e => { setCompressMode(e.target.value); clearOutput(); }}><option value="compact">{t.compressionLow}</option><option value="balanced">{t.compressionMid}</option><option value="clearer">{t.compressionHigh}</option></select></label></div>}
         {mode === 'add-page-numbers' && <div className="utility-options">
-          <label><span>{t.pageStart}</span><input data-testid="number-start" type="number" min="1" max="99999" value={start} onChange={e => { setStart(e.target.value); clearOutput(); }} /></label>
-          <label><span>{t.pagePosition}</span><select aria-label={t.pagePosition} value={position} onChange={e => { setPosition(e.target.value); clearOutput(); }}><option value="bottom-center">{t.bottomCenter}</option><option value="bottom-right">{t.bottomRight}</option><option value="top-right">{t.topRight}</option></select></label>
-          <label><span>{t.pageSize}</span><select aria-label={t.pageSize} value={fontSize} onChange={e => { setFontSize(e.target.value); clearOutput(); }}><option value="10">10</option><option value="12">12</option><option value="16">16</option></select></label>
+          <label><span>{t.pageStart}</span><input data-testid="number-start" type="number" min="1" max="99999" value={start} disabled={busy} onChange={e => { setStart(e.target.value); clearOutput(); }} /></label>
+          <label><span>{t.pagePosition}</span><select aria-label={t.pagePosition} value={position} disabled={busy} onChange={e => { setPosition(e.target.value); clearOutput(); }}><option value="bottom-center">{t.bottomCenter}</option><option value="bottom-right">{t.bottomRight}</option><option value="top-right">{t.topRight}</option></select></label>
+          <label><span>{t.pageSize}</span><select aria-label={t.pageSize} value={fontSize} disabled={busy} onChange={e => { setFontSize(e.target.value); clearOutput(); }}><option value="10">10</option><option value="12">12</option><option value="16">16</option></select></label>
         </div>}
         <p className="utility-note">{description}</p>
         {mode === 'add-page-numbers' && <p className="utility-note" data-testid="page-overlap-warning">{t.overlap}</p>}
