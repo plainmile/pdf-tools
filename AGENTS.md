@@ -5,6 +5,7 @@
 - Self-hosted LAN users may open the site over HTTP on a private IP, where `crypto.randomUUID` is not exposed; use `getRandomValues` for temporary IDs as a fallback. Do not mistake HTTP compatibility for public-network security.
 - The site is a bilingual English / Simplified Chinese, privacy-first Astro + React static app with no user account or server-side PDF service. Public URLs are `/` and `/zh/` with parallel routes. English and Chinese content must be human-readable, not browser auto-translation.
 - Deploy via a Docker-built static site served by Nginx. No host-installed Node/npm. Keep the shared `edge` Docker network and preserve existing website routing.
+- The PDF.js Worker has an unversioned public path; keep it revalidated (`Cache-Control: no-cache`) on every deployment, while preserving asset caching for hashed JS chunks. CI must check MIME type and cache headers to prevent client/Worker version mismatch.
 - Use feature branches + PRs + CI. Never bypass main protection or merge while unit/build/E2E tests are failing.
 - Verify actual exported PDF pages using pdf-lib in E2E after drag, rotation, deletion, selection and splitting. UI-only success indicators are insufficient.
 - All indexable public pages must have unique localized titles/descriptions, canonical URLs, reciprocal hreflang `en`/`zh-CN`, meaningful prerendered content, internal links and inclusion in sitemap. The 404 page must return status 404 and be excluded from indexing.
