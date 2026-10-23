@@ -101,6 +101,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [history, setHistory] = useState(() => makeHistoryState());
   const [selected, setSelected] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
+  const [clearConfirm, setClearConfirm] = useState(false);
   const [splitProgress, setSplitProgress] = useState(null);
   const [splitCancelling, setSplitCancelling] = useState(false);
   const [exportProgress, setExportProgress] = useState(null);
@@ -180,12 +181,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     if (!preserveSelection) resetSelection();
     setNotice('');
     setError('');
+    setClearConfirm(false);
   };
 
   const addFiles = async (incoming) => {
     const items = [...(incoming ?? [])];
     if (!items.length || busy) return;
-    setError(''); setNotice(''); setBusy(true);
+    setError(''); setNotice(''); setClearConfirm(false); setBusy(true);
     // Once every page has been deleted, a successful new import starts a fresh
     // workspace. Keep the old undo history intact until that import succeeds.
     const replacingDeletedPages = pages.length === 0 && sources.length > 0;
@@ -234,7 +236,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
 
   const withBusy = async (task) => {
     if (busy) return;
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true); setError(''); setNotice(''); setClearConfirm(false);
     try { await task(); }
     catch (reason) { setError(translateProcessingError(reason instanceof Error ? reason.message : t.errorGeneric, locale)); }
     finally { setBusy(false); }
@@ -337,6 +339,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   };
 
   const clearAll = () => {
+    setClearConfirm(false);
     setWatermarkEnabled(false); setWatermarkText(''); setExportSettingsOpen(mode === 'watermark-pdf');
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
     setRanges(''); setChunkSize(''); setSplitMode('ranges');
@@ -375,6 +378,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           <button className="button button-primary button-small" type="button" disabled={!pages.length || busy || imageLayoutDirty} onClick={exportAll} aria-label={t.export}>{busy ? t.working : t.export} ↓</button>
         </div>
       </div>
+      {clearConfirm && sources.length > 0 && !busy && <div className="workspace-clear-confirm" role="group" aria-label={t.clearConfirmTitle} data-testid="clear-confirmation">
+        <p>{t.clearConfirmDescription}</p>
+        <div className="workspace-clear-buttons">
+          <button type="button" className="button button-secondary button-small" data-testid="cancel-clear" onClick={() => setClearConfirm(false)}>{t.cancelClear}</button>
+          <button type="button" className="button button-small muted-danger" data-testid="confirm-clear" onClick={clearAll}>{t.confirmClear}</button>
+        </div>
+      </div>}
       {busy && exportProgress && <div className="export-progress-row" data-testid="export-progress-row">
         <p className="utility-note" data-testid="export-progress" role="status" aria-live="polite">{interpolate(t.exportProgress, exportProgress)}</p>
         <button type="button" className="button button-secondary button-small" data-testid="export-cancel"
@@ -464,7 +474,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
             <p className="drop-limits">{t.limits}</p><div className="empty-privacy">✓ {t.private}</div>
             {sources.length > 0 && <p className="utility-note" data-testid="empty-history-hint">{t.emptyHistoryHint}</p>}
             {history.past.length > 0 && <button type="button" className="button button-secondary button-small" data-testid="undo-all-deleted" disabled={busy} onClick={() => { setHistory(undoHistory); resetSelection(); setError(''); setNotice(''); }}>{t.undo}</button>}
-            {sources.length > 0 && <button type="button" className="button button-secondary button-small" onClick={clearAll} disabled={busy}>{t.reset}</button>}
+            {sources.length > 0 && <button type="button" className="button button-secondary button-small" onClick={() => setClearConfirm(true)} disabled={busy}>{t.reset}</button>}
           </div>
         ) : (
           <>
@@ -473,7 +483,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
               <div className="history-buttons">
                 <button type="button" disabled={!history.past.length || busy} onClick={() => { setHistory(undoHistory); resetSelection(); }} aria-label={t.undo} title={t.undo}>↶ {t.undo}</button>
                 <button type="button" disabled={!history.future.length || busy} onClick={() => { setHistory(redoHistory); resetSelection(); }} aria-label={t.redo} title={t.redo}>↷ {t.redo}</button>
-                <button type="button" disabled={busy} className="muted-danger" onClick={clearAll}>{t.clear}</button>
+                <button type="button" disabled={busy} className="muted-danger" onClick={() => setClearConfirm(true)}>{t.clear}</button>
               </div>
             </div>
             {tab === 'organize' ? (
