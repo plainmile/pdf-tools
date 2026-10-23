@@ -559,7 +559,8 @@ test('empty workspace retains undo and a successful reimport does not inherit hi
   await page.getByTestId('file-input').setInputFiles({
     name: 'replacement.pdf', mimeType: 'application/pdf', buffer: await makePdf([501]),
   });
-  await expect(page.getByTestId('reimport-confirmation')).toContainText('last Undo history');
+  await expect(page.getByTestId('reimport-confirmation')).toHaveAttribute('aria-label', 'Discard the last Undo history?');
+  await expect(page.getByTestId('reimport-confirmation')).toContainText('permanently discard the deleted pages');
   await expect(page.getByTestId('undo-all-deleted')).toBeDisabled();
   await page.getByTestId('confirm-reimport').click();
   await expect(page.getByTestId('page-tile')).toHaveCount(1);
