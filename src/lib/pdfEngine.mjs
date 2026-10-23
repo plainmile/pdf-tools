@@ -4,7 +4,7 @@ import {
 } from 'pdf-lib';
 import { renderWatermarkPng, watermarkTextFromOptions, WATERMARK_OPACITY } from './watermark.mjs';
 import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement, stripJpegPrivateMetadata } from './jpegExif.mjs';
-import { imagePdfPageLayout, IMAGE_PDF_LAYOUT_DEFAULT } from './imagePdfLayout.mjs';
+import { imagePdfPageLayout, IMAGE_PDF_LAYOUT_DEFAULT, shouldReflowImageSource } from './imagePdfLayout.mjs';
 
 /**
  * Generate temporary IDs without depending on crypto.randomUUID(), which is
@@ -289,12 +289,15 @@ export async function createBlankPageSource(source, pageRef, name = 'blank-page.
   };
 }
 
-export async function reflowImageSources(sources, layout, report = () => {}, budgetError = 'Retained document data exceeds the 200 MiB workspace budget.') {
+export async function reflowImageSources(sources, layout, report = () => {}, budgetError = 'Retained document data exceeds the 200 MiB workspace budget.', activeImageIds = null) {
   const updated = [];
   let retainedBytes = 0;
   for (let index = 0; index < sources.length; index++) {
     const source = sources[index];
-    if (!source.isImage) {
+    // Avoid decoding photos that are no longer in the visible workspace (only
+    // stored for Undo), or photos that already match these paper settings.
+    // Retain their original bytes and include them in the true RAM budget.
+    if (!shouldReflowImageSource(source, layout, activeImageIds)) {
       updated.push(source);
     } else {
       if (!source.originalImageBytes || !source.originalImageType) {
