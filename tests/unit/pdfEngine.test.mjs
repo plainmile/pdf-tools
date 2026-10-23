@@ -135,3 +135,21 @@ test('temporary workspace IDs work on HTTP LAN origins without crypto.randomUUID
   assert.equal(temporaryWorkspaceId({ randomUUID: () => 'original-api' }), 'original-api');
   assert.throws(() => temporaryWorkspaceId({}), /generate unique page identifiers/);
 });
+
+test('page copying must not silently brand or inherit confidential PDF document metadata', async () => {
+  const original = await PDFDocument.create();
+  original.setTitle('PRIVATE REPORT - INTERNAL');
+  original.setCreator('Sensitive source application');
+  original.addPage([320, 420]);
+  const input = new Uint8Array(await original.save());
+  const output = await composePdf([
+    { id: 'source', bytes: input },
+  ], [{ id: 'page', sourceId: 'source', pageIndex: 0, rotation: 0 }]);
+  const generated = await PDFDocument.load(output, { updateMetadata: false });
+  assert.equal(generated.getPageCount(), 1);
+  assert.equal(generated.getTitle(), undefined);
+  assert.equal(generated.getCreator(), undefined);
+  assert.equal(generated.getProducer(), undefined);
+  const fileBytes = Buffer.from(output).toString('latin1');
+  assert.ok(!fileBytes.includes('PlainMile PDF'), 'No hidden project brand in exported document');
+});
