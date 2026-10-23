@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, parseTextBlocks,
-  textContentToLines, linesToReadableText, sanitizeFilename,
+  textContentToLines, linesToReadableText, sanitizeFilename, workspaceFilenameStem,
   UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
 
@@ -141,4 +141,15 @@ test('raster compression keeps a separate cumulative 96 MB JPEG safety budget', 
   assert.throws(() => enforceCompressionImageBytes(-1, 1), /96 MB/);
   assert.throws(() => enforceCompressionImageBytes(1, NaN, 'zh'), /96 MB/);
   assert.match(translateUtilityError(new Error('Compressed image data exceeds the 96 MB safety limit.'), 'zh'), /96 MB/);
+});
+
+test('custom PDF download stems are Unicode-safe, path-safe and optional', () => {
+  assert.equal(workspaceFilenameStem('', 'plainmile-2-files'), 'plainmile-2-files');
+  assert.equal(workspaceFilenameStem('  My report 2026.PDF  '), 'My-report-2026');
+  assert.equal(workspaceFilenameStem('../../Client Review.pdf'), 'Client-Review');
+  assert.equal(workspaceFilenameStem('客户报告.pdf'), '客户报告');
+  assert.equal(workspaceFilenameStem('ＡＢＣ－２０２６.pdf'), 'ABC-2026');
+  assert.equal(workspaceFilenameStem('??...///', 'unchanged'), 'unchanged');
+  assert.equal(workspaceFilenameStem('CON.pdf'), 'plainmile-CON');
+  assert.ok(workspaceFilenameStem('A'.repeat(200)).length <= 70);
 });

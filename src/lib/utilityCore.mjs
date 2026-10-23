@@ -225,6 +225,20 @@ export function linesToReadableText(pages, markdown = false) {
     return markdown && pages.length > 1 ? `<!-- Page ${index + 1} -->\n${body}` : body;
   }).join('\n\n');
 }
+/** Sanitize a user-supplied output stem locally, never treat it as a path.
+ * A missing or punctuation-only input leaves the suggested name untouched.
+ * Users can type ".pdf" once without accidentally generating ".pdf.pdf".
+ */
+export function workspaceFilenameStem(input, fallback = '') {
+  if (typeof input !== 'string' || !input.trim()) return fallback;
+  const withoutExtension = input.normalize('NFKC').trim().replace(/\.pdf$/i, '');
+  const stem = withoutExtension.replace(/[^\p{L}\p{N}._-]+/gu, '-')
+    .replace(/^[._-]+|[._-]+$/g, '').slice(0, 70);
+  if (!stem) return fallback;
+  // These names are reserved on Windows even when given a PDF extension.
+  return /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(stem)
+    ? `plainmile-${stem}` : stem;
+}
 export function sanitizeFilename(filename) {
   return (filename || 'document').replace(/\.[^.]+$/, '').replace(/[^\p{L}\p{N}._-]+/gu, '-').slice(0, 70) || 'document';
 }
