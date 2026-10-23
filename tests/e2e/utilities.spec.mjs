@@ -589,10 +589,10 @@ test('invalid replacement keeps previously generated undownloaded text PDF', asy
   await page.goto('/pdf-to-txt/');
   await upload(page, await fixturePdf('Retained extracted text', 1));
   await getDownload(page, () => page.getByTestId('utility-run').click());
-  await expect(page.getByTestId('utility-preview')).toContainText('Retained extracted text');
+  await expect(page.getByRole('textbox', { name: 'Extracted text preview' })).toHaveValue(/Retained extracted text/);
   await page.getByTestId('utility-file-input').setInputFiles({
     name: 'broken.pdf', mimeType: 'application/pdf', buffer: Buffer.from('corrupt pdf'),
   });
   await expect(page.getByRole('alert')).toContainText('Previous file remains: fixture.pdf');
-  await expect(page.getByTestId('utility-preview')).toContainText('Retained extracted text');
+  await expect(page.getByRole('textbox', { name: 'Extracted text preview' })).toHaveValue(/Retained extracted text/);
 });
