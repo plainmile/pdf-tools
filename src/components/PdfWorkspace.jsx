@@ -434,7 +434,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       });
       if (controller.signal.aborted) throw new Error('PDF export cancelled.');
       saveDownload(bytes, outputName);
-      if (chosen === pages) setLastDownloadedRevision(documentRevision);
+      // A full-page extraction builds a new array via filter(), but produces
+      // the same complete PDF as Export all when every export-order page matches.
+      // Only a genuinely partial extraction must keep the unsaved-work guard.
+      if (chosen.length === pages.length && chosen.every((page, index) => page === pages[index])) {
+        setLastDownloadedRevision(documentRevision);
+      }
       setNotice(successMessage);
     } finally {
       exportAbortRef.current = null;
