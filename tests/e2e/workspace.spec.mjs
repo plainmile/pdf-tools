@@ -1145,3 +1145,32 @@ test('Chinese single-result split by pages per PDF is a direct full PDF export',
   expect(result.getPages().map(p => p.getWidth())).toEqual([301, 302, 303]);
   await expect(page.getByRole('status')).toContainText('无需解压 ZIP');
 });
+
+
+test('two same-tick PDF drop batches cannot bypass 20-file workspace safety limit', async ({ page }) => {
+  await page.goto('/workspace/');
+  const pdfData = (await makePdf([307])).toString('base64');
+  await page.evaluate(base64 => {
+    const bytes = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
+    const zone = document.querySelector('[data-testid="dropzone"]');
+    for (let batch = 0; batch < 2; batch++) {
+      const dt = new DataTransfer();
+      for (let n = 0; n < 12; n++) {
+        dt.items.add(new File([bytes], `race-${batch}-${n}.pdf`, { type: 'application/pdf' }));
+      }
+      zone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    }
+  }, pdfData);
+  // A synchronous lock rejects the second batch before either asynchronous
+  // read finishes; individually valid groups must not result in 24 sources.
+  await expect(page.getByTestId('page-tile')).toHaveCount(12, { timeout: 30000 });
+  await expect(page.locator('.file-count')).toContainText('from 12 files');
+  const exported = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(exported.getPageCount()).toBe(12);
+  // Verify the real file cap still applies to later, sequential imports.
+  await page.getByTestId('file-input').setInputFiles(Array.from({ length: 9 }, (_, n) => ({
+    name: `too-many-${n}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from(pdfData, 'base64'),
+  })));
+  await expect(page.getByRole('alert')).toContainText('at most 20 files');
+  await expect(page.getByTestId('page-tile')).toHaveCount(12);
+});
