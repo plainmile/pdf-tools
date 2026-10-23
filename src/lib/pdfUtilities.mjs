@@ -196,6 +196,10 @@ export async function addPageNumbers(pdf, opts = {}, reportProgress = () => {}) 
 export async function textToPdf(text, markdown = false, options = {}) {
   checkCancelled(options.signal);
   const blocks = parseTextBlocks(text, markdown);
+  // Trailing newlines are common in pasted TXT/Markdown. They must not create
+  // a final, entirely blank PDF page or exhaust long-document page limits.
+  // Keep interior blank lines: those can separate real paragraphs.
+  while (blocks.at(-1)?.kind === 'gap') blocks.pop();
   if (!blocks.some(b => b.text.trim())) throw new Error('Enter some text first.');
   const doc = await PDFDocument.create();
   const regular = await doc.embedFont(StandardFonts.Helvetica);
