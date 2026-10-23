@@ -302,6 +302,23 @@ test('Chinese focused Delete stays accessible on narrow mobile without sideways 
   expect(measure.scrollWidth).toBeLessThanOrEqual(measure.clientWidth + 2);
 });
 
+test('split tool clearly distinguishes a split download from full-document export', async ({ page }) => {
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({ name: 'split.pdf', mimeType: 'application/pdf', buffer: await makePdf([301,302,303]) });
+  await expect(page.getByTestId('page-tile')).toHaveCount(0); // Split tab does not show organizer tiles.
+  await expect(page.getByRole('button', { name: 'Export all pages' })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Page ranges', exact: true }).fill('2-3');
+  const splitDownload = await downloadPdf(page, () => page.getByRole('button', { name: 'Download PDF' }).click());
+  expect(splitDownload.getPages().map(p => p.getWidth())).toEqual([302,303]);
+  const complete = await downloadPdf(page, () => page.getByRole('button', { name: 'Export all pages' }).click());
+  expect(complete.getPages().map(p => p.getWidth())).toEqual([301,302,303]);
+  // Switching into the split tab from another route must be equally clear.
+  await page.getByRole('tab', { name: 'Organize' }).click();
+  await expect(page.getByRole('button', { name: 'Export PDF' })).toBeVisible();
+  await page.getByRole('tab', { name: 'Split' }).click();
+  await expect(page.getByRole('button', { name: 'Export all pages' })).toBeVisible();
+});
+
 test('rotate, delete, undo and extract selected pages', async ({ page }) => {
   await loadInput(page);
   await page.getByRole('checkbox', { name: 'Select page 2' }).check();
