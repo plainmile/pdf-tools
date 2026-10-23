@@ -121,6 +121,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   // stale busy=false and individually pass limits before either import finishes.
   const busyRef = useRef(false);
   const [clearConfirm, setClearConfirm] = useState(false);
+  const pendingReimportRef = useRef(null);
+  const [pendingReimportCount, setPendingReimportCount] = useState(0);
   const [splitProgress, setSplitProgress] = useState(null);
   const [splitCancelling, setSplitCancelling] = useState(false);
   const [exportProgress, setExportProgress] = useState(null);
@@ -282,9 +284,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setClearConfirm(false);
   };
 
-  const addFiles = async (incoming) => {
+  const addFiles = async (incoming, { confirmedReimport = false } = {}) => {
     const items = [...(incoming ?? [])];
-    if (!items.length || busyRef.current) return;
+    if (!items.length || busyRef.current || pendingReimportRef.current) return;
     busyRef.current = true; // Reserve synchronously before awaiting file bytes.
     setError(''); setNotice(''); setClearConfirm(false); setBusy(true);
     // Once every page has been deleted, a successful new import starts a fresh
@@ -316,6 +318,16 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           nextPages.push({ id: temporaryWorkspaceId(), sourceId: source.id, pageIndex, rotation: 0 });
         }
       }
+      // Validate and parse the candidate before asking the user to throw away
+      // Undo. An invalid replacement should fail immediately and leave the old
+      // recovery state intact. Store only File handles (not another 200 MiB of
+      // parsed PDFs) while the decision is open; revalidate on confirmation.
+      if (replacingDeletedPages && recoverableDeletedPages && !confirmedReimport) {
+        pendingReimportRef.current = items;
+        setPendingReimportCount(items.length);
+        setNotice('');
+        return;
+      }
       if (!pages.length) {
         // Never auto-select an arbitrary split point. A new document needs
         // an explicit range or pages-per-file choice before ZIP download.
@@ -343,6 +355,16 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     } catch (reason) {
       setError(translateProcessingError(reason instanceof Error ? reason.message : t.errorGeneric, locale));
     } finally { busyRef.current = false; setBusy(false); }
+  };
+
+  const cancelReimport = () => {
+    pendingReimportRef.current = null;
+    setPendingReimportCount(0);
+  };
+  const confirmReimport = () => {
+    const pending = pendingReimportRef.current;
+    cancelReimport();
+    if (pending) void addFiles(pending, { confirmedReimport: true });
   };
 
   const withBusy = async (task) => {
@@ -583,6 +605,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   };
 
   const clearAll = () => {
+    cancelReimport();
     setClearConfirm(false);
     setPreviewPageId(null);
     setWatermarkEnabled(false); setWatermarkText(''); setExportSettingsOpen(mode === 'watermark-pdf');
@@ -682,8 +705,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           <button type="button" role="tab" aria-selected={tab === 'split'} className={tab === 'split' ? 'active' : ''} onClick={() => setTab('split')} disabled={busy}>{t.split}</button>
         </div>
         <div className="workspace-primary-buttons">
-          <input ref={inputRef} data-testid="file-input" aria-label={t.add} className="hidden-input" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.bmp,.avif,application/pdf,image/jpeg,image/png,image/webp,image/bmp,image/avif" onChange={(event) => { void addFiles(event.target.files); event.target.value = ''; }} />
-          <button className="button button-secondary button-small" type="button" disabled={busy} onClick={() => inputRef.current?.click()}>＋ {t.add}</button>
+          <input ref={inputRef} data-testid="file-input" aria-label={t.add} className="hidden-input" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.bmp,.avif,application/pdf,image/jpeg,image/png,image/webp,image/bmp,image/avif" disabled={busy || pendingReimportCount > 0} onChange={(event) => { void addFiles(event.target.files); event.target.value = ''; }} />
+          <button className="button button-secondary button-small" type="button" disabled={busy || pendingReimportCount > 0} onClick={() => inputRef.current?.click()}>＋ {t.add}</button>
           {pages.length > 0 && <button className="button button-secondary button-small" type="button" disabled={busy} onClick={() => setExportSettingsOpen((value) => !value)} aria-expanded={exportSettingsOpen} aria-controls="export-options-panel" data-testid="export-options-button">{t.exportOptions}{watermarkEnabled ? ` \u00b7 ${t.watermarkOn}` : ""}</button>}
           <button className={`button ${fullDocumentExportIsSecondary ? 'button-secondary' : 'button-primary'} button-small`} type="button"
             disabled={!pages.length || busy || imageLayoutDirty} onClick={exportAll}
@@ -692,6 +715,16 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           </button>
         </div>
       </div>
+      {pendingReimportCount > 0 && !busy && <div className="workspace-clear-confirm" role="group"
+        aria-label={t.reimportConfirmTitle} data-testid="reimport-confirmation">
+        <p>{interpolate(t.reimportConfirmMessage, { files: pendingReimportCount })}</p>
+        <div className="workspace-clear-buttons">
+          <button type="button" className="button button-secondary button-small"
+            data-testid="cancel-reimport" onClick={cancelReimport}>{t.reimportKeep}</button>
+          <button type="button" className="button button-secondary button-small muted-danger"
+            data-testid="confirm-reimport" onClick={confirmReimport}>{t.reimportReplace}</button>
+        </div>
+      </div>}
       {clearConfirm && sources.length > 0 && !busy && <div className="workspace-clear-confirm" role="group" aria-label={t.clearConfirmTitle} data-testid="clear-confirmation">
         <p>{t.clearConfirmDescription}</p>
         <div className="workspace-clear-buttons">
@@ -803,11 +836,11 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           <div className="dropzone" data-testid="dropzone" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); void addFiles(event.dataTransfer.files); }}>
             <div className="drop-icon" aria-hidden="true">＋</div>
             <h2>{t.dropTitle}</h2><p>{t.dropSub}</p>
-            <button type="button" className="button button-primary" disabled={busy} onClick={() => inputRef.current?.click()}>{busy ? t.opening : t.choose}</button>
+            <button type="button" className="button button-primary" disabled={busy || pendingReimportCount > 0} onClick={() => inputRef.current?.click()}>{busy ? t.opening : t.choose}</button>
             <p className="drop-limits">{t.limits}</p><div className="empty-privacy">✓ {t.private}</div>
             {sources.length > 0 && <p className="utility-note" data-testid="empty-history-hint">{t.emptyHistoryHint}</p>}
-            {history.past.length > 0 && <button type="button" className="button button-secondary button-small" data-testid="undo-all-deleted" disabled={busy} onClick={() => { setHistory(undoHistory); resetSelection(); setError(''); setNotice(''); }}>{t.undo}</button>}
-            {sources.length > 0 && <button type="button" className="button button-secondary button-small" onClick={() => setClearConfirm(true)} disabled={busy}>{t.reset}</button>}
+            {history.past.length > 0 && <button type="button" className="button button-secondary button-small" data-testid="undo-all-deleted" disabled={busy || pendingReimportCount > 0} onClick={() => { setHistory(undoHistory); resetSelection(); setError(''); setNotice(''); }}>{t.undo}</button>}
+            {sources.length > 0 && <button type="button" className="button button-secondary button-small" onClick={() => setClearConfirm(true)} disabled={busy || pendingReimportCount > 0}>{t.reset}</button>}
           </div>
         ) : (
           <>
