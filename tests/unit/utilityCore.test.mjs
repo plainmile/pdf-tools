@@ -1,10 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  formatBytes, compressionStats, requestedPages, normalizeText, parseTextBlocks, stripMarkdownInline,
+  formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline,
   textContentToLines, linesToReadableText, summarizeTextCoverage, sanitizeFilename, workspaceFilenameStem,
   UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
+
+test('text importer decodes UTF-8 and BOM-marked Windows UTF-16 without data loss', () => {
+  const sample = 'Report 2026: Café and 中文';
+  const utf8 = new TextEncoder().encode(sample);
+  const bomUtf8 = Uint8Array.from([0xef, 0xbb, 0xbf, ...utf8]);
+  const le = Buffer.from(sample, 'utf16le');
+  const be = Buffer.from(le);
+  for (let i = 0; i < be.length; i += 2) [be[i], be[i + 1]] = [be[i + 1], be[i]];
+  assert.equal(decodeImportedText(utf8), sample);
+  assert.equal(decodeImportedText(bomUtf8), sample);
+  assert.equal(decodeImportedText(Uint8Array.from([0xff, 0xfe, ...le])), sample);
+  assert.equal(decodeImportedText(Uint8Array.from([0xfe, 0xff, ...be])), sample);
+  assert.throws(() => decodeImportedText(Uint8Array.of(0xc3, 0x28)), /Text encoding/);
+  assert.throws(() => decodeImportedText(Uint8Array.of(0x41, 0x00, 0x42, 0x00)), /Text encoding/);
+  assert.throws(() => decodeImportedText(Uint8Array.of(0xff, 0xfe, 0, 0, 0x41, 0, 0, 0)), /Text encoding/);
+  assert.throws(() => decodeImportedText(Uint8Array.of(0xc3, 0x28), 'zh'), /文本编码无法识别/);
+});
 
 test('compression reports actual savings; a larger result must not count as savings', () => {
   assert.deepEqual(compressionStats(1000, 700), { original: 1000, candidate: 700, bytesSaved: 300, percent: 30, smaller: true });
