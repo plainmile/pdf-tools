@@ -525,6 +525,30 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   });
 
 
+  // Keep the single tested workspace/engine, but make the entry tool's
+  // intended task immediately available. Secondary actions remain accessible
+  // in a native disclosure instead of overwhelming first-time users.
+  const fullDocumentExportIsSecondary = mode === 'extract-pages' || tab === 'split';
+  const focusedActionKeys = ({
+    'rotate-pdf': ['rotateLeft', 'rotateRight'],
+    'delete-pages': ['delete'],
+    'extract-pages': ['extract'],
+  })[mode] || null;
+  const focusedHint = ({
+    'rotate-pdf': t.focusRotateHint,
+    'delete-pages': t.focusDeleteHint,
+    'extract-pages': t.focusExtractHint,
+  })[mode];
+  const pageActionItems = [
+    { key: 'rotateLeft', node: <button type="button" disabled={!selectedCount || busy} onClick={() => commit((previous) => rotatePages(previous, selected, -90), true)} aria-label={t.rotateLeft}>↶ {t.rotateLeft}</button> },
+    { key: 'rotateRight', node: <button type="button" disabled={!selectedCount || busy} onClick={() => commit((previous) => rotatePages(previous, selected, 90), true)} aria-label={locale === 'en' ? 'Rotate clockwise' : t.rotateRight}>↷ {t.rotateRight}</button> },
+    { key: 'extract', node: <button type="button" disabled={!selectedCount || busy || imageLayoutDirty} onClick={exportSelected} aria-label={locale === 'en' ? 'Extract selected pages' : t.extract}>↗ {t.extract}</button> },
+    { key: 'duplicate', node: <button type="button" data-testid="duplicate-pages" disabled={!selectedCount || busy} onClick={duplicateSelected} aria-label={t.duplicateSelected}>⧉ {t.duplicateSelected}</button> },
+    { key: 'blank', node: <button type="button" data-testid="insert-blank-page" disabled={busy || selectedCount > 1} onClick={insertBlank} title={t.blankHint} aria-label={t.insertBlank}>＋ {t.insertBlank}</button> },
+    { key: 'delete', node: <button type="button" disabled={!selectedCount || busy} className="muted-danger" onClick={() => commit((previous) => deletePages(previous, selected))} aria-label={locale === 'en' ? 'Delete selected pages' : t.del}>× {t.del}</button> },
+  ];
+  const renderPageAction = ({ key, node }) => <React.Fragment key={key}>{node}</React.Fragment>;
+
   return (
     <div className="pdf-workspace" data-testid="pdf-workspace">
       <UnsavedNavigationGuard active={navigationWouldLoseWork} locale={locale} />
@@ -541,7 +565,11 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           <input ref={inputRef} data-testid="file-input" aria-label={t.add} className="hidden-input" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.bmp,.avif,application/pdf,image/jpeg,image/png,image/webp,image/bmp,image/avif" onChange={(event) => { void addFiles(event.target.files); event.target.value = ''; }} />
           <button className="button button-secondary button-small" type="button" disabled={busy} onClick={() => inputRef.current?.click()}>＋ {t.add}</button>
           {pages.length > 0 && <button className="button button-secondary button-small" type="button" disabled={busy} onClick={() => setExportSettingsOpen((value) => !value)} aria-expanded={exportSettingsOpen} aria-controls="export-options-panel" data-testid="export-options-button">{t.exportOptions}{watermarkEnabled ? ` \u00b7 ${t.watermarkOn}` : ""}</button>}
-          <button className="button button-primary button-small" type="button" disabled={!pages.length || busy || imageLayoutDirty} onClick={exportAll} aria-label={t.export}>{busy ? t.working : t.export} ↓</button>
+          <button className={`button ${fullDocumentExportIsSecondary ? 'button-secondary' : 'button-primary'} button-small`} type="button"
+            disabled={!pages.length || busy || imageLayoutDirty} onClick={exportAll}
+            aria-label={fullDocumentExportIsSecondary ? t.exportAllPages : t.export}>
+            {busy ? t.working : fullDocumentExportIsSecondary ? t.exportAllPages : t.export} ↓
+          </button>
         </div>
       </div>
       {clearConfirm && sources.length > 0 && !busy && <div className="workspace-clear-confirm" role="group" aria-label={t.clearConfirmTitle} data-testid="clear-confirmation">
@@ -671,15 +699,19 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
               <section aria-label={t.organize} className="pages-work-area">
                 <div className="selection-toolbar">
                   <div className="selection-info"><strong>{selectedText}</strong><button type="button" disabled={busy} onClick={() => { setSelected(new Set(pages.map((page) => page.id))); lastSelectedIndex.current = null; lastGroupedSelection.current = null; }}>{t.all}</button><button type="button" onClick={resetSelection} disabled={busy || !selectedCount}>{t.none}</button></div>
-                  <div className="page-action-buttons">
-                    <button type="button" disabled={!selectedCount || busy} onClick={() => commit((previous) => rotatePages(previous, selected, -90), true)} aria-label={t.rotateLeft}>↶ {t.rotateLeft}</button>
-                    <button type="button" disabled={!selectedCount || busy} onClick={() => commit((previous) => rotatePages(previous, selected, 90), true)} aria-label={locale === 'en' ? 'Rotate clockwise' : t.rotateRight}>↷ {t.rotateRight}</button>
-                    <button type="button" disabled={!selectedCount || busy || imageLayoutDirty} onClick={exportSelected} aria-label={locale === 'en' ? 'Extract selected pages' : t.extract}>↗ {t.extract}</button>
-                    <button type="button" data-testid="duplicate-pages" disabled={!selectedCount || busy} onClick={duplicateSelected} aria-label={t.duplicateSelected}>⧉ {t.duplicateSelected}</button>
-                    <button type="button" data-testid="insert-blank-page" disabled={busy || selectedCount > 1} onClick={insertBlank} title={t.blankHint} aria-label={t.insertBlank}>＋ {t.insertBlank}</button>
-                    <button type="button" disabled={!selectedCount || busy} className="muted-danger" onClick={() => commit((previous) => deletePages(previous, selected))} aria-label={locale === 'en' ? 'Delete selected pages' : t.del}>× {t.del}</button>
+                  <div className="page-action-buttons" data-testid="page-actions">
+                    {focusedActionKeys
+                      ? pageActionItems.filter(item => focusedActionKeys.includes(item.key)).map(renderPageAction)
+                      : pageActionItems.map(renderPageAction)}
+                    {focusedActionKeys && <details className="page-more-actions" data-testid="page-more-actions">
+                      <summary>{t.morePageActions}</summary>
+                      <div className="page-action-buttons">
+                        {pageActionItems.filter(item => !focusedActionKeys.includes(item.key)).map(renderPageAction)}
+                      </div>
+                    </details>}
                   </div>
                 </div>
+                {focusedActionKeys && <p className="input-note focused-page-hint" data-testid="focused-page-hint">{focusedHint}</p>}
                 <details className="selection-range-panel" data-testid="selection-range-panel">
                   <summary>{t.rangeSelectToggle}</summary>
                   <form className="selection-range-form" onSubmit={applyPageRangeSelection}>
