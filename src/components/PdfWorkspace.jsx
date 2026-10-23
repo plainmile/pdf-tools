@@ -961,7 +961,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     <p className="input-note">{t.jumpHint}</p>
                   </form>
                 </details>}
-                {onlyImages && <div className="page-action-buttons" data-testid="image-batch-actions"><button type="button" disabled={busy} onClick={() => commit(previous => sortPagesByFilename(previous, sources, locale))}>{t.sortFilename}</button><button type="button" disabled={busy} onClick={() => commit(reversePages)}>{t.reverseOrder}</button></div>}
+                {pages.length > 1 && <div className="page-action-buttons" data-testid={onlyImages ? 'image-batch-actions' : 'page-order-actions'}>
+                  {onlyImages && <button type="button" disabled={busy} onClick={() => commit(previous => sortPagesByFilename(previous, sources, locale))}>{t.sortFilename}</button>}
+                  <button type="button" data-testid="reverse-all-pages" disabled={busy} onClick={() => commit(reversePages)}>{onlyImages ? t.reverseOrder : t.reversePdfOrder}</button>
+                </div>}
                 {pageView === 'grouped' ? (
                   <div className="source-groups" data-testid="source-groups">
                     <div className="source-group-actions">
