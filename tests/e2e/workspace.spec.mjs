@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { PDFDocument, PDFDict, PDFName, degrees, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, PDFDict, PDFName, PDFHexString, degrees, rgb, StandardFonts } from 'pdf-lib';
 import JSZip from 'jszip';
 import { readFile } from 'node:fs/promises';
 
@@ -1348,6 +1348,45 @@ test('Chinese custom download name affects split ZIP but does not change page id
   const second = await PDFDocument.load(await zip.file('part-02-pages-2-3.pdf').async('uint8array'));
   expect(first.getPage(0).getWidth()).toBe(301);
   expect(second.getPages().map(p => p.getWidth())).toEqual([302,303]);
+});
+
+test('real chapter-bookmark PDF warns that exports lose the original outline navigation', async ({ page }) => {
+  const source = await PDFDocument.create();
+  const first = source.addPage([430, 600]);
+  source.addPage([440, 600]);
+  const outline = source.context.obj({ Type: PDFName.of('Outlines'), Count: 1 });
+  const rootRef = source.context.register(outline);
+  const item = source.context.obj({
+    Title: PDFHexString.fromText('Chapter 1'),
+    Parent: rootRef,
+    Dest: [first.ref, PDFName.of('Fit')],
+  });
+  const childRef = source.context.register(item);
+  outline.set(PDFName.of('First'), childRef);
+  outline.set(PDFName.of('Last'), childRef);
+  source.catalog.set(PDFName.of('Outlines'), rootRef);
+  const bytes = Buffer.from(await source.save());
+
+  await page.goto('/organize-pdf/');
+  await page.getByTestId('file-input').setInputFiles({ name: 'book.pdf', mimeType: 'application/pdf', buffer: bytes });
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await expect(page.getByTestId('workspace-bookmark-risk')).toContainText('Document bookmarks detected in 1 PDF');
+  await expect(page.getByTestId('workspace-bookmark-risk')).toContainText('clickable table of contents');
+  const exported = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(exported.getPageCount()).toBe(2);
+  expect(exported.catalog.get(PDFName.of('Outlines'))).toBeUndefined();
+
+  // Warning is tied to the active source pages, not stale Undo-only data.
+  await page.getByRole('button', { name: 'Select all' }).click();
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.getByTestId('workspace-bookmark-risk')).toHaveCount(0);
+  await page.getByTestId('undo-all-deleted').click();
+  await expect(page.getByTestId('workspace-bookmark-risk')).toContainText('Document bookmarks');
+
+  await page.goto('/zh/organize-pdf/');
+  await page.getByTestId('file-input').setInputFiles({ name: 'book.pdf', mimeType: 'application/pdf', buffer: bytes });
+  await expect(page.getByTestId('workspace-bookmark-risk')).toContainText('目录书签');
+  await expect(page.getByTestId('workspace-bookmark-risk')).toContainText('核对导出结果');
 });
 
 test('genuine interactive PDF form triggers specific risk warning before page-copy export', async ({ page }) => {
