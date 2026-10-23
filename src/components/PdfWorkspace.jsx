@@ -535,11 +535,15 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       // A single atomic history edit; selecting a target does not unselect
       // moved page IDs or silently change the user's requested side.
       commit(() => moved, true);
+      // Shift-click anchors refer to old export/group indices; after a move
+      // retaining them would select the wrong range on the next click.
+      lastSelectedIndex.current = null;
+      lastGroupedSelection.current = null;
       setMoveTargetInput('');
       setPageView('order');
       setPendingJump(firstNewIndex);
-      setNotice(interpolate(t.moveDone, { pages: selectedCount, position: target,
-        side: movePlacement === 'before' ? t.moveBefore : t.moveAfter }));
+      setNotice(interpolate(movePlacement === 'before' ? t.moveDoneBefore : t.moveDoneAfter,
+        { pages: selectedCount, position: target }));
     } catch (_error) {
       setNotice('');
       setError(t.moveInvalid);
