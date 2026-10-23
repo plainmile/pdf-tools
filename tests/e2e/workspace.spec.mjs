@@ -677,6 +677,11 @@ test('all eight EXIF orientations render actual PDF pages upright, including mir
     await expect(page.getByTestId('page-tile')).toHaveCount(1);
     await expect.poll(async () => (await visiblePhotoCorners(page)).join(''), { timeout: 15000 })
       .toBe(expected[orientation]);
+    // Release the imported preview PDF before moving to the next scenario.
+    // Its image source has not itself been re-exported, so navigation would
+    // correctly warn that this in-memory document would be discarded.
+    await page.getByRole('button', { name: 'Clear', exact: true }).click();
+    await page.getByTestId('confirm-clear').click();
   }
   expect(writes).toEqual([]);
 });
