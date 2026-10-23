@@ -18,6 +18,25 @@ export function countActiveSources(pages) {
   return new Set(pages.map((page) => page.sourceId)).size;
 }
 
+/**
+ * A read-only presentation grouping by original source. Each item retains
+ * its REAL index in export order, even if pages were interleaved across PDFs.
+ * Never use these groups when composing/exporting or changing page order.
+ * Deleted/Undo-only sources are omitted because they have no active pages.
+ */
+export function groupPagesBySource(pages) {
+  const groups = new Map();
+  pages.forEach((pageRef, index) => {
+    let group = groups.get(pageRef.sourceId);
+    if (!group) {
+      group = { sourceId: pageRef.sourceId, items: [] };
+      groups.set(pageRef.sourceId, group);
+    }
+    group.items.push({ pageRef, index });
+  });
+  return [...groups.values()];
+}
+
 export function movePage(pages, draggedId, targetId) {
   const from = pages.findIndex((page) => page.id === draggedId);
   const to = pages.findIndex((page) => page.id === targetId);
