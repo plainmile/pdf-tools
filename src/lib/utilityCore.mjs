@@ -99,6 +99,21 @@ export function imagePageBatch(count, batchIndex = 0) {
   return { start, end, total, range: `${start}-${end}` };
 }
 
+/** Resume standard 60-page batches from a user-entered custom selection.
+ * Avoid jumping back to a stale batch counter (often pages 61-120) after the
+ * user typed e.g. 301-306. Invalid selections fall back to the last batch.
+ */
+export function batchIndexFromCustomPages(input, pageCount, fallbackIndex = 0) {
+  imagePageBatch(pageCount, fallbackIndex); // Validate existing position too.
+  try {
+    const chosen = requestedPages(input, pageCount);
+    if (chosen.length > 0 && chosen.length <= UTILITY_LIMITS.maxImagePagesPerRun) {
+      return Math.floor((chosen[0] - 1) / UTILITY_LIMITS.maxImagePagesPerRun);
+    }
+  } catch { /* Keep the last valid preset for invalid page ranges. */ }
+  return fallbackIndex;
+}
+
 export const utilitySlugs = Object.freeze([
   'pdf-to-images', 'compress-pdf', 'pdf-to-txt', 'pdf-to-markdown',
   'txt-to-pdf', 'markdown-to-pdf', 'add-page-numbers',
