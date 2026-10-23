@@ -528,3 +528,17 @@ test('changing Markdown after rendering invalidates the old PDF and download', a
   const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
   expect(extracted.bytes.toString('utf8')).toContain('Changed document');
 });
+
+test('follow-up link is honest about file handoff and leads to the full tool catalog', async ({ page }) => {
+  for (const [route, catalog, message] of [
+    ['/txt-to-pdf/', '/#all-tools', 'files do not transfer automatically'],
+    ['/zh/txt-to-pdf/', '/zh/#all-tools', '文件不会自动带入'],
+  ]) {
+    await page.goto(route);
+    await page.getByTestId('utility-text').fill('Hello, this is a synthetic test.');
+    await page.getByTestId('utility-run').click();
+    const action = page.getByTestId('utility-next-step').getByRole('link');
+    await expect(action).toContainText(message);
+    await expect(action).toHaveAttribute('href', catalog);
+  }
+});
