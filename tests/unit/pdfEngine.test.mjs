@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { imageTypeFor, isSupportedFile, compressedImageDimensions, composePdf, temporaryWorkspaceId, createBlankPageSource, LIMITS, retainedSourceBytes, retainedSourcesBytes, reflowImageSources } from '../../src/lib/pdfEngine.mjs';
+import { imageTypeFor, isSupportedFile, compressedImageDimensions, composePdf, temporaryWorkspaceId, createBlankPageSource, hasInteractivePdfForm, LIMITS, retainedSourceBytes, retainedSourcesBytes, reflowImageSources } from '../../src/lib/pdfEngine.mjs';
 import { PDFDocument, degrees } from 'pdf-lib';
 
 test('recognize JPEG/PNG/WebP images even with missing or generic MIME types', () => {
@@ -284,4 +284,21 @@ test('reject animated WebP rather than silently dropping later frames', () => {
   bytes.write('VP8X', 12); bytes.writeUInt32LE(10, 16);
   bytes[20] = 0x02; // animation flag
   assert.throws(() => compressedImageDimensions('image/webp', bytes), /Animated WebP/);
+});
+
+test('detect interactive AcroForm fields but not a normal or empty-form PDF', async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([420, 595]);
+  assert.equal(hasInteractivePdfForm(doc), false);
+  const form = doc.getForm(); // Creates an empty field tree, not user data.
+  assert.equal(hasInteractivePdfForm(doc), false);
+  const field = form.createTextField('customer.name');
+  field.setText('Example field text');
+  field.addToPage(page);
+  assert.equal(hasInteractivePdfForm(doc), true);
+  const reloaded = await PDFDocument.load(await doc.save());
+  assert.equal(hasInteractivePdfForm(reloaded), true);
+  const flattened = await PDFDocument.create();
+  flattened.addPage([420, 595]);
+  assert.equal(hasInteractivePdfForm(await PDFDocument.load(await flattened.save())), false);
 });

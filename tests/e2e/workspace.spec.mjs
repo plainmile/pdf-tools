@@ -1345,3 +1345,46 @@ test('Chinese custom download name affects split ZIP but does not change page id
   expect(first.getPage(0).getWidth()).toBe(301);
   expect(second.getPages().map(p => p.getWidth())).toEqual([302,303]);
 });
+
+test('genuine interactive PDF form triggers specific risk warning before page-copy export', async ({ page }) => {
+  const src = await PDFDocument.create();
+  const canvas = src.addPage([420, 595]);
+  const field = src.getForm().createTextField('customer.name');
+  field.setText('Filled original');
+  field.addToPage(canvas);
+  const bytes = Buffer.from(await src.save());
+  await page.goto('/organize-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'interactive-form.pdf', mimeType: 'application/pdf', buffer: bytes,
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  await expect(page.getByTestId('workspace-document-caution')).toBeVisible();
+  await expect(page.getByTestId('workspace-form-risk')).toContainText('Interactive form fields detected in 1 PDF');
+  await expect(page.getByTestId('workspace-form-risk')).toContainText('fillable fields');
+  const exported = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(exported.getPageCount()).toBe(1);
+  const original = await PDFDocument.load(bytes);
+  expect(original.getForm().getFields().length).toBe(1);
+  // We do not claim copied forms or signatures survive into another document.
+});
+
+test('Chinese form-risk warning appears on focused page tools but plain PDFs stay quiet', async ({ page }) => {
+  const doc = await PDFDocument.create();
+  const p = doc.addPage([450, 600]);
+  const field = doc.getForm().createCheckBox('consent');
+  field.addToPage(p);
+  await page.goto('/zh/delete-pages/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'checkbox.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await doc.save()),
+  });
+  await expect(page.getByTestId('workspace-form-risk')).toContainText('含交互表单字段');
+  await expect(page.getByTestId('workspace-form-risk')).toContainText('数字签名');
+  await page.getByRole('button', { name: '清空' }).click();
+  await expect(page.getByTestId('clear-confirmation')).toBeVisible();
+  await page.getByTestId('confirm-clear').click();
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'ordinary.pdf', mimeType: 'application/pdf', buffer: await makePdf([450, 500]),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await expect(page.getByTestId('workspace-form-risk')).toHaveCount(0);
+});
