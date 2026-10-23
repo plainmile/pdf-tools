@@ -56,13 +56,18 @@ Use the visible **Report an issue / 反馈问题** link in the website footer, o
 
 - Merge PDFs at the page level, including interleaving pages from different files.
 - Drag individual thumbnails or selected groups of pages to reorder; Shift selection and touch/keyboard move buttons are supported.
-- Select, rotate, delete, extract and undo/redo up to 20 edits.
+- Select, rotate, **duplicate**, delete, extract and undo/redo up to 20 edits. Duplicated pages appear immediately after their originals with distinct editable page IDs.
+- Insert a **blank PDF page** after a single selected page, or at the document's end when no page is selected. The blank follows the visible size/orientation of its neighboring page and contains none of the original page's document contents. With multiple pages selected, choose one before inserting; each new page remains Undo-able.
 - Split by page ranges (`1-3, 4-6`) or every N pages, bundled in a ZIP download.
 - Convert JPG, PNG and WebP to PDF pages with A4 / US Letter / fit-to-image sizes, automatic / portrait / landscape orientation and four margin presets. Choose **fit entire image** (no crop) or **fill available paper area** (centered crop; never stretches). Fit-to-image always shows the entire source image. Supports mixed images/PDFs, per-page thumbnails, drag ordering, explicit numeric filename sorting and reverse ordering with Undo.
 - Optional text watermarks: **off by default**. Open Export options near the download button, enable the checkbox and enter your own text (English or Chinese). The light diagonal overlay is added on export only and also works for extracted/split PDFs. No automatic company watermark.
 - No upload API, account, server-side PDF processing, analytics or advertising code.
 - Human-written bilingual English / Simplified Chinese SEO pages: `/workspace/`, `/merge-pdf/`, `/split-pdf/`, `/organize-pdf/`, `/rotate-pdf/`, `/extract-pages/`, `/delete-pages/`, `/image-to-pdf/`, `/watermark-pdf/`, `/privacy/` plus `/zh/` counterparts. Hreflang and canonical tags provided.
 - Three appearance modes: follow system, light, dark. Preference saved locally if the browser allows localStorage; all modes are CSS token-based.
+
+### Duplicate and blank page limits
+
+The 600-page workspace ceiling includes duplicated and generated blank pages. Duplicate creates new page references, not reimports of the original file; page rotation/order may be edited independently. Synthetic blank-page PDFs are kept in browser RAM, count toward page and memory budgets but not the 20 **imported-file** limit. Each blank page is sized to its visible neighbor, including an existing 90/270° rotation; it is not a new user-uploaded document. Current PDF forms, signatures, annotations and bookmarks may not be preserved in the reorganized output: keep and review the original.
 
 ## Deployment cache safety
 
