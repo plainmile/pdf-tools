@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { loadPdf, convertPdfToImages, compressPdfRaster, extractPdfText, textToPdf, addPageNumbers } from '../lib/pdfUtilities.mjs';
-import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, translateUtilityError } from '../lib/utilityCore.mjs';
+import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, translateUtilityError } from '../lib/utilityCore.mjs';
 import { saveDownload } from '../lib/pdfEngine.mjs';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 
@@ -25,7 +25,7 @@ const COPY = {
     numbersHint: 'Adds selectable numbers to every page and preserves page size. Review annotations and digital signatures before using this modified file.',
     ready: 'Ready to download', noPdf: 'Select a PDF first.', noText: 'Enter text to convert.', sizeLimit: 'PDF up to 100 MB / 1,000 pages; TXT / Markdown up to 5 MB.', limitText: 'TXT / Markdown up to 5 MB; PDF output: up to 1,000 pages (300 image-based pages for CJK).', limitImages: 'PDF up to 100 MB / 1,000 pages; up to 60 selected image pages per batch.', limitCompression: 'PDF up to 100 MB / 120 pages; JPEG output safety budget 96 MB.', limitGeneral: 'PDF up to 100 MB / 1,000 pages.', heavyWarning: 'Large document: processing hundreds of pages may take time and require substantial device memory. Close other heavy tabs if necessary.', progressLabel: 'Processed {done} of {total} pages', tooMuchText: 'Text exceeds 5 MB.',
     noteUnicode: 'This PDF uses rasterized pages for non-Latin characters. Text in the result cannot be selected.', noteSearch: 'Output text is selectable.',
-    invalidFile: 'Please select a supported file and retry.', resultPreview: 'Extracted text preview', dropHint: 'Or drag a file here. Nothing is uploaded.', imported: 'Imported', multipleFiles: 'This converter accepts one file at a time. No file was replaced; choose a single file.', batchLabel: 'Image batch {current} of {total}', batchPrev: 'Previous pages', batchNext: 'Next pages', batchCustom: 'Custom page selection', cancel: 'Cancel', cancelling: 'Cancelling…', cancelled: 'Cancelled', packaging: 'Packaging ZIP: {percent}%', replacedFailed: 'Import failed. Previous file remains: {name}.', modified: 'Edited after import', nextStep: 'Browse other tools (files do not transfer automatically)', overlap: 'Page numbers are drawn over existing content. Check footers, stamps and existing numbers before using the result.',
+    invalidFile: 'Please select a supported file and retry.', resultPreview: 'Extracted text preview', dropHint: 'Or drag a file here. Nothing is uploaded.', imported: 'Imported', multipleFiles: 'This converter accepts one file at a time. No file was replaced; choose a single file.', batchLabel: 'Image batch {current} of {total}', batchPrev: 'Previous pages', batchNext: 'Next pages', batchCustom: 'Custom page selection', batchCustomHint: 'Previous/Next work with standard 60-page batches. Return to batches to continue near your custom range.', batchResume: 'Return to page batches', cancel: 'Cancel', cancelling: 'Cancelling…', cancelled: 'Cancelled', packaging: 'Packaging ZIP: {percent}%', replacedFailed: 'Import failed. Previous file remains: {name}.', modified: 'Edited after import', nextStep: 'Browse other tools (files do not transfer automatically)', overlap: 'Page numbers are drawn over existing content. Check footers, stamps and existing numbers before using the result.',
   },
   zh: {
     label: '仅在浏览器本地处理', file: '选择 PDF 文件', textFile: '导入 TXT / Markdown', uploaded: '已读取', pages: '页', choose: '选择文件', start: '开始处理', run: '转换并下载', busy: '正在本机处理…',
@@ -47,7 +47,7 @@ const COPY = {
     numbersHint: '在每页添加可选择的数字，保持纸张尺寸。重要文件请检查注释、数字签名等内容。',
     ready: '文件已经生成', noPdf: '请先选择 PDF 文件。', noText: '请输入待转换的文字。', sizeLimit: 'PDF 最多 100 MB / 1000 页；TXT / Markdown 最多 5 MB。', limitText: 'TXT / Markdown 最多 5 MB；输出最多 1000 页（中文等图片化内容最多 300 页）。', limitImages: 'PDF 最多 100 MB / 1000 页；每批最多导出选定的 60 页图片。', limitCompression: 'PDF 最多 100 MB / 120 页；JPEG 数据累计上限 96 MB。', limitGeneral: 'PDF 最多 100 MB / 1000 页。', heavyWarning: '大文档提示：处理数百页时可能占用较多设备内存，并需要更长时间。建议关闭其他高负载标签页。', progressLabel: '已处理 {done} / {total} 页', tooMuchText: '文本内容超过 5 MB。',
     noteUnicode: '由于含有非拉丁文字，此 PDF 输出为图片页，无法选择和搜索文字。', noteSearch: '输出文字可选择和搜索。',
-    invalidFile: '请选择受支持的文件后重试。', resultPreview: '提取文字预览', dropHint: '也可以将文件拖到这里，不会上传至服务器。', imported: '已导入', multipleFiles: '此转换工具每次只接受一个文件。当前文件未改变，请只选择一个文件。', batchLabel: '图片批次 {current} / {total}', batchPrev: '上一批', batchNext: '下一批', batchCustom: '自定义页码范围', cancel: '取消处理', cancelling: '正在取消…', cancelled: '已取消', packaging: '正在打包 ZIP：{percent}%', replacedFailed: '导入失败，当前仍是旧文件：{name}。', modified: '导入后已修改', nextStep: '查看其他工具（文件不会自动带入）', overlap: '页码会直接叠加在原页面上，可能遮挡页脚、印章或已有页码，使用前请核对。',
+    invalidFile: '请选择受支持的文件后重试。', resultPreview: '提取文字预览', dropHint: '也可以将文件拖到这里，不会上传至服务器。', imported: '已导入', multipleFiles: '此转换工具每次只接受一个文件。当前文件未改变，请只选择一个文件。', batchLabel: '图片批次 {current} / {total}', batchPrev: '上一批', batchNext: '下一批', batchCustom: '自定义页码范围', batchCustomHint: '“上一批 / 下一批”按每 60 页导航。先返回批次模式，才能从自定义页码附近继续。', batchResume: '返回分批浏览', cancel: '取消处理', cancelling: '正在取消…', cancelled: '已取消', packaging: '正在打包 ZIP：{percent}%', replacedFailed: '导入失败，当前仍是旧文件：{name}。', modified: '导入后已修改', nextStep: '查看其他工具（文件不会自动带入）', overlap: '页码会直接叠加在原页面上，可能遮挡页脚、印章或已有页码，使用前请核对。',
   },
 };
 
@@ -171,6 +171,11 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     setPages(imagePageBatch(pdf.count, index).range);
     clearOutput();
   }
+  function resumeImageBatches() {
+    if (!pdf || busy) return;
+    const index = batchIndexFromCustomPages(pages, pdf.count, batchIndex);
+    chooseBatch(index);
+  }
   function save(outputFile) {
     saveDownload(outputFile.bytes, outputFile.name, outputFile.mime || 'application/pdf');
     setNotDownloaded(false);
@@ -237,6 +242,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const isImages = mode === 'pdf-to-images';
   const imageBatch = isImages && pdf && pdf.count > UTILITY_LIMITS.maxImagePagesPerRun
     ? imagePageBatch(pdf.count, batchIndex) : null;
+  const customImageRange = Boolean(imageBatch && pages !== imageBatch.range);
   const limitHint = isTextInput ? t.limitText : isCompress ? t.limitCompression : isImages ? t.limitImages : t.limitGeneral;
   const description = isCompress ? t.compressionWarning : isTextOutput ? `${t.textWarning} ${mode === 'pdf-to-markdown' ? t.markdownWarning : ''}` : isTextInput ? mode === 'markdown-to-pdf' ? t.markdownInputHint : t.textInputHint : mode === 'add-page-numbers' ? t.numbersHint : t.privacy;
   return (
@@ -282,15 +288,20 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         </div>}
         {isImages && <p className="utility-helper">{t.rangeHint}</p>}
         {imageBatch && <div className="utility-batch-nav" data-testid="utility-batch-nav">
-          <span>{pages === imageBatch.range
-            ? t.batchLabel.replace('{current}', batchIndex + 1).replace('{total}', imageBatch.total)
-            : t.batchCustom}</span>
-          <div role="group" aria-label={t.batchLabel.replace('{current}', batchIndex + 1).replace('{total}', imageBatch.total)}>
-            <button type="button" data-testid="utility-batch-prev" disabled={busy || batchIndex === 0}
+          <span>{customImageRange
+            ? t.batchCustom
+            : t.batchLabel.replace('{current}', batchIndex + 1).replace('{total}', imageBatch.total)}</span>
+          <div role="group" aria-label={customImageRange ? t.batchCustom : t.batchLabel.replace('{current}', batchIndex + 1).replace('{total}', imageBatch.total)}>
+            <button type="button" data-testid="utility-batch-prev" disabled={busy || customImageRange || batchIndex === 0}
               onClick={() => chooseBatch(batchIndex - 1)}>← {t.batchPrev}</button>
-            <button type="button" data-testid="utility-batch-next" disabled={busy || batchIndex >= imageBatch.total - 1}
+            <button type="button" data-testid="utility-batch-next" disabled={busy || customImageRange || batchIndex >= imageBatch.total - 1}
               onClick={() => chooseBatch(batchIndex + 1)}>{t.batchNext} →</button>
           </div>
+          {customImageRange && <div className="utility-batch-custom" data-testid="utility-batch-custom">
+            <p className="utility-note">{t.batchCustomHint}</p>
+            <button type="button" className="button button-secondary button-small"
+              data-testid="utility-batch-resume" onClick={resumeImageBatches} disabled={busy}>{t.batchResume}</button>
+          </div>}
         </div>}
         {isCompress && <div className="utility-options"><label><span>{t.compressionMethod}</span><select aria-label={t.compressionMethod} value={compressMode} onChange={e => { setCompressMode(e.target.value); clearOutput(); }}><option value="compact">{t.compressionLow}</option><option value="balanced">{t.compressionMid}</option><option value="clearer">{t.compressionHigh}</option></select></label></div>}
         {mode === 'add-page-numbers' && <div className="utility-options">
