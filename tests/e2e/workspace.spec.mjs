@@ -1560,3 +1560,89 @@ test('mixed paper, native page rotations and shifted CropBoxes preserve exact re
     expect(await renderedPageTilePng(page, index), 'visual parity at split page ' + (index + 1)).toEqual(before[index + 1]);
   }
 });
+
+test('125-page document moves selected nonconsecutive pages before page 100 and preserves Undo/Redo and actual PDF order', async ({ page }) => {
+  test.setTimeout(85000);
+  await page.goto('/organize-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'technical-book.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf(Array.from({ length: 125 }, (_, n) => 300 + n)),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(125);
+  await page.getByTestId('selection-range-panel').locator('summary').click();
+  await page.getByTestId('selection-ranges').fill('2-4, 8');
+  await page.getByTestId('selection-range-apply').click();
+  await expect(page.locator('.selection-info strong')).toContainText('4 pages selected');
+  await page.getByTestId('workspace-view-grouped').click();
+  await expect(page.getByTestId('workspace-view-grouped')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByTestId('move-position-panel').locator('summary').click();
+  await page.getByTestId('move-target-input').fill('１００');
+  await page.getByTestId('move-position-side').selectOption('before');
+  await page.getByTestId('move-position-submit').click();
+  await expect(page.getByTestId('workspace-view-order')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.selection-info strong')).toContainText('4 pages selected');
+  const movedFirst = page.locator('[data-testid="page-grid"] [data-export-position="96"]');
+  await expect(movedFirst).toBeInViewport({ timeout: 15000 });
+  await expect(movedFirst).toHaveAttribute('data-original-page', '2');
+  for (const [position, original] of [[97,3],[98,4],[99,8],[100,100]]) {
+    await expect(page.locator(`[data-testid="page-grid"] [data-export-position="${position}"]`)).toHaveAttribute('data-original-page', String(original));
+  }
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('page-grid').getByTestId('page-tile').nth(1)).toHaveAttribute('data-original-page', '2');
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(page.locator('[data-testid="page-grid"] [data-export-position="96"]')).toHaveAttribute('data-original-page', '2');
+  const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(output.getPageCount()).toBe(125);
+  expect(output.getPages().slice(95,100).map(pdf => pdf.getWidth())).toEqual([301,302,303,307,399]);
+  expect(output.getPage(0).getWidth()).toBe(300);
+});
+
+test('Chinese mobile exact insertion rejects selected destination, then moves pages after current export page', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'small-book.pdf', mimeType: 'application/pdf', buffer: await makePdf([301,302,303,304,305,306,307]),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(7);
+  await page.getByTestId('selection-range-panel').locator('summary').click();
+  await page.getByTestId('selection-ranges').fill('3, 5');
+  await page.getByTestId('selection-range-apply').click();
+  await page.getByTestId('move-position-panel').locator('summary').click();
+  await page.getByTestId('move-target-input').fill('３');
+  await page.getByTestId('move-position-submit').click();
+  await expect(page.getByRole('alert')).toContainText('目标页也处于选中状态');
+  await expect(page.locator('.selection-info strong')).toContainText('2 页已选中');
+  await page.getByTestId('move-target-input').fill('６');
+  await page.getByTestId('move-position-side').selectOption('after');
+  await page.getByTestId('move-position-submit').click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.locator('.selection-info strong')).toContainText('2 页已选中');
+  const saved = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
+  expect(saved.getPages().map(pdf => pdf.getWidth())).toEqual([301,302,304,306,303,305,307]);
+  const viewport = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth,
+  }));
+  expect(viewport.scroll).toBeLessThanOrEqual(viewport.client + 2);
+});
+
+test('moving pages preserves chosen page IDs but clears stale Shift-range anchors', async ({ page }) => {
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'book.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf([301,302,303,304,305,306]),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(6);
+  await page.getByRole('checkbox', { name: 'Select page 2', exact: true }).check();
+  await page.getByRole('checkbox', { name: 'Select page 4', exact: true }).check();
+  await page.getByTestId('move-position-panel').locator('summary').click();
+  await page.getByTestId('move-target-input').fill('6');
+  await page.getByTestId('move-position-submit').click();
+  await expect(page.locator('.selection-info strong')).toContainText('2 pages selected');
+  await expect(page.getByRole('status')).toContainText('before the previous output page 6');
+  // The last clicked page before the move was output position 4. Reusing
+  // that old anchor here incorrectly selects pages 1-4, not just page 1.
+  await page.getByRole('checkbox', { name: 'Select page 1', exact: true }).click({ modifiers: ['Shift'] });
+  await expect(page.locator('.selection-info strong')).toContainText('3 pages selected');
+  const saved = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(saved.getPages().map(p => p.getWidth())).toEqual([301,303,305,302,304,306]);
+});

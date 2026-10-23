@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  movePage, movePageGroup, pageDropSide, shiftPage, rotatePages, deletePages, parsePageRanges,
+  movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, parsePageRanges,
   chunkPageRanges, getRangePages, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
   reversePages, sortPagesByFilename, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges,
@@ -39,6 +39,32 @@ test('drop indicator describes exactly where the existing drag algorithms insert
   assert.equal(pageDropSide(pages, ['a', 'c'], 'a'), null);
   assert.equal(pageDropSide(pages, ['a'], 'missing'), null);
   assert.equal(pageDropSide(pages, [], 'a'), null);
+});
+
+test('numeric insertion moves nonadjacent PDF pages to an exact before/after anchor', () => {
+  const original = Object.freeze(['a', 'b', 'c', 'd', 'e', 'f'].map(id => Object.freeze({ id })));
+  assert.deepEqual(ids(moveSelectedPagesToPosition(original, ['b', 'd'], 6, 'before')), ['a','c','e','b','d','f']);
+  assert.deepEqual(ids(moveSelectedPagesToPosition(original, ['d', 'b'], 6, 'after')), ['a','c','e','f','b','d']);
+  assert.deepEqual(ids(moveSelectedPagesToPosition(original, new Set(['b','d']), 1, 'after')), ['a','b','d','c','e','f']);
+  assert.deepEqual(ids(original), ['a','b','c','d','e','f']);
+  const noop = moveSelectedPagesToPosition(original, ['b'], 3, 'before');
+  assert.strictEqual(noop, original);
+  const undoable = commitHistory(makeHistoryState(original), moveSelectedPagesToPosition(original, ['b','d'], 6, 'before'));
+  assert.deepEqual(ids(undoHistory(undoable).present), ids(original));
+  assert.deepEqual(ids(redoHistory(undoHistory(undoable)).present), ids(undoable.present));
+});
+
+test('numeric insertion rejects invalid and selected target atomically', () => {
+  const original = [{id:'a'}, {id:'b'}, {id:'c'}];
+  for (const position of [0, -1, 4, 1.5, NaN, Infinity, '2']) {
+    assert.throws(() => moveSelectedPagesToPosition(original, ['b'], position, 'before'), /Target/);
+  }
+  assert.throws(() => moveSelectedPagesToPosition(original, ['b'], 2, 'after'), /selected/);
+  assert.throws(() => moveSelectedPagesToPosition(original, ['a','b','c'], 1), /selected/);
+  assert.throws(() => moveSelectedPagesToPosition(original, [], 1), /Select/);
+  assert.throws(() => moveSelectedPagesToPosition(original, ['unknown'], 1), /Select/);
+  assert.throws(() => moveSelectedPagesToPosition(original, ['a'], 2, 'inside'), /before or after/);
+  assert.deepEqual(ids(original), ['a','b','c']);
 });
 
 test('rotate only selected pages, normalize degrees', () => {

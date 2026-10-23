@@ -74,6 +74,35 @@ export function pageDropSide(pages, movingIds, targetId) {
   return movingIds.length > 1 || fromIndex > toIndex ? 'before' : 'after';
 }
 
+/** Reinsert the current selection immediately before/after an UNSELECTED page.
+ * The target is its original 1-based OUTPUT position, prior to removal.
+ * Moved pages keep their relative order, identities, rotations and sources.
+ * Return the same array on no-op to avoid inventing an Undo step.
+ */
+export function moveSelectedPagesToPosition(pages, selectedIds, targetPosition, side = 'before') {
+  if (!Number.isSafeInteger(targetPosition) || targetPosition < 1 || targetPosition > pages.length) {
+    throw new Error('Target must be a current output page number.');
+  }
+  if (side !== 'before' && side !== 'after') {
+    throw new Error('Specify before or after the target page.');
+  }
+  const selected = new Set(selectedIds);
+  const moved = pages.filter(page => selected.has(page.id));
+  if (!moved.length || moved.length !== selected.size) {
+    throw new Error('Select existing pages to move.');
+  }
+  const anchor = pages[targetPosition - 1];
+  if (selected.has(anchor.id)) {
+    throw new Error('Target page is selected. Choose an unselected page.');
+  }
+  const remaining = pages.filter(page => !selected.has(page.id));
+  const remainingTarget = remaining.indexOf(anchor);
+  if (remainingTarget < 0) throw new Error('Target page is no longer in the workspace.');
+  const insertAt = remainingTarget + (side === 'after' ? 1 : 0);
+  const next = [...remaining.slice(0, insertAt), ...moved, ...remaining.slice(insertAt)];
+  return next.every((page, index) => page === pages[index]) ? pages : next;
+}
+
 export function shiftPage(pages, pageId, delta) {
   const from = pages.findIndex((page) => page.id === pageId);
   const to = from + delta;
