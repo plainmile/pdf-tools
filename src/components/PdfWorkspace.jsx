@@ -512,7 +512,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     if (busy || !pages.length || !selectedCount) return;
     const normalized = moveTargetInput.trim().normalize('NFKC');
     const target = Number(normalized);
-    if (!/^\\d+$/.test(normalized) || !Number.isSafeInteger(target) ||
+    if (!/^\d+$/.test(normalized) || !Number.isSafeInteger(target) ||
         target < 1 || target > pages.length) {
       setError(interpolate(t.moveInvalid, { pages: pages.length }));
       setNotice('');
