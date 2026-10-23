@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { PDFDocument, PDFDict, PDFName } from 'pdf-lib';
+import { PDFDocument, PDFDict, PDFName, degrees, rgb, StandardFonts } from 'pdf-lib';
 import JSZip from 'jszip';
 import { readFile } from 'node:fs/promises';
 
@@ -1435,4 +1435,128 @@ test('invalid Chinese jump never alters page selection or causes mobile overflow
   expect(size.scroll).toBeLessThanOrEqual(size.viewport + 2);
   const pdf = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
   expect(pdf.getPages().map(p => p.getWidth())).toEqual(Array.from({ length: 24 }, (_, n) => 280 + n));
+});
+
+/** Pixel-level export regression: metadata-only checks cannot detect a shifted
+ * CropBox origin, blanked stream, missing graphics, mirrored page or wrong
+ * rotation. Render the same PDF with the actual browser PDF.js worker before
+ * export and after the exported file is reopened. No golden files or network.
+ */
+async function renderedPageTilePng(page, index) {
+  const tile = page.getByTestId('page-grid').getByTestId('page-tile').nth(index);
+  // IntersectionObserver watches the *preview*, not the outer tile. A tile
+  // can be "in view" while its preview is still below the lazy-load threshold.
+  await tile.locator('.page-preview').scrollIntoViewIfNeeded();
+  const canvas = tile.locator('canvas');
+  await expect(canvas).toBeVisible({ timeout: 20000 });
+  await expect.poll(() => canvas.evaluate(node => {
+    if (!node.width || !node.height) return 0;
+    const pixels = node.getContext('2d').getImageData(0, 0, node.width, node.height).data;
+    let coloredPixels = 0;
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      if (pixels[offset + 3] > 0 &&
+          (pixels[offset] < 235 || pixels[offset + 1] < 235 || pixels[offset + 2] < 235)) coloredPixels++;
+    }
+    // A white-but-fully-rendered blank page must NOT qualify as fidelity.
+    return coloredPixels;
+  }), { timeout: 20000 }).toBeGreaterThan(100);
+  // Wait one frame to ensure the worker's canvas render has completed.
+  await page.waitForTimeout(80);
+  return canvas.evaluate(node => ({
+    width: node.width,
+    height: node.height,
+    png: node.toDataURL('image/png'),
+  }));
+}
+
+test('mixed paper, native page rotations and shifted CropBoxes preserve exact rendered pixels across export and split', async ({ page }) => {
+  test.setTimeout(110000);
+  // This test measures PDF.js visual fidelity, not IntersectionObserver
+  // virtualization (which has separate 1x/2x DPR regression coverage). Force
+  // the five source thumbnails to render even if the CI viewport is small.
+  await page.addInitScript(() => {
+    window.IntersectionObserver = class {
+      constructor(callback) { this.callback = callback; }
+      observe(target) {
+        queueMicrotask(() => this.callback([{ target, isIntersecting: true }]));
+      }
+      unobserve() {}
+      disconnect() {}
+    };
+  });
+  const source = await PDFDocument.create();
+  const font = await source.embedFont(StandardFonts.Helvetica);
+  const inputRotations = [0, 90, 180, 270];
+  for (let index = 0; index < 4; index++) {
+    const sheet = source.addPage([475 + index * 43, 620 + index * 27]);
+    const left = 24 + index * 4, bottom = 42 + index * 3;
+    sheet.setCropBox(left, bottom, 340 + index * 12, 465 + index * 14);
+    sheet.setRotation(degrees(inputRotations[index]));
+    // Opaque colored objects at asymmetric positions reveal shifts, mirrors,
+    // clipping, and unexpected blank-page exports in the actual PDF view.
+    sheet.drawRectangle({ x: left + 3, y: bottom + 9, width: 48, height: 70, color: rgb(0.15, 0.4, 0.8) });
+    sheet.drawRectangle({ x: left + 151, y: bottom + 263, width: 81, height: 25, color: rgb(0.8, 0.24, 0.13) });
+    sheet.drawText('PAGE CROP ' + (index + 1), { x: left + 85, y: bottom + 164, size: 19, font });
+  }
+  const second = await PDFDocument.create();
+  const landscape = second.addPage([792, 612]);
+  landscape.setCropBox(45, 32, 680, 480);
+  landscape.drawRectangle({ x: 62, y: 73, width: 208, height: 102, color: rgb(0.12, 0.7, 0.3) });
+  landscape.drawText('LANDSCAPE SOURCE', { x: 118, y: 280, size: 23, font: await second.embedFont(StandardFonts.Helvetica) });
+
+  await page.goto('/organize-pdf/');
+  await page.getByTestId('file-input').setInputFiles([
+    { name: 'native-rotations.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await source.save()) },
+    { name: 'different-paper.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await second.save()) },
+  ]);
+  await expect(page.getByTestId('page-grid').getByTestId('page-tile')).toHaveCount(5);
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  await page.getByRole('button', { name: 'Rotate clockwise' }).click();
+  await page.getByRole('checkbox', { name: 'Select page 1' }).uncheck();
+  await page.getByRole('checkbox', { name: 'Select page 4' }).check();
+  await page.getByRole('button', { name: 'Rotate left' }).click();
+  await page.getByRole('checkbox', { name: 'Select page 4' }).uncheck();
+  await page.getByRole('button', { name: 'Move page 5 left' }).click();
+  await page.getByRole('button', { name: 'Move page 4 left' }).click();
+
+  const before = [];
+  for (let index = 0; index < 5; index++) before.push(await renderedPageTilePng(page, index));
+
+  const pending = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export PDF' }).click();
+  const dl = await pending;
+  const completeBytes = await readFile(await dl.path());
+  const complete = await PDFDocument.load(completeBytes);
+  expect(complete.getPageCount()).toBe(5);
+  expect(complete.getPages().map(p => p.getRotation().angle)).toEqual([90, 90, 0, 180, 180]);
+  const firstCrop = complete.getPage(0).getCropBox();
+  expect(firstCrop).toMatchObject({ x: 24, y: 42, width: 340, height: 465 });
+  const thirdCrop = complete.getPage(2).getCropBox();
+  expect(thirdCrop).toMatchObject({ x: 45, y: 32, width: 680, height: 480 });
+
+  await page.goto('/organize-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'exported-reopened.pdf', mimeType: 'application/pdf', buffer: completeBytes,
+  });
+  await expect(page.getByTestId('page-grid').getByTestId('page-tile')).toHaveCount(5);
+  for (let index = 0; index < 5; index++) {
+    expect(await renderedPageTilePng(page, index), 'visual parity at output page ' + (index + 1)).toEqual(before[index]);
+  }
+
+  // Split uses a separate front-end path but the same export engine.
+  await page.getByRole('tab', { name: 'Split' }).click();
+  await page.getByRole('textbox', { name: 'Page ranges', exact: true }).fill('2-4');
+  const splitEvent = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download PDF' }).click();
+  const splitFile = await splitEvent;
+  const splitBytes = await readFile(await splitFile.path());
+  expect((await PDFDocument.load(splitBytes)).getPageCount()).toBe(3);
+  await page.goto('/organize-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'split-reopened.pdf', mimeType: 'application/pdf', buffer: splitBytes,
+  });
+  await expect(page.getByTestId('page-grid').getByTestId('page-tile')).toHaveCount(3);
+  for (let index = 0; index < 3; index++) {
+    expect(await renderedPageTilePng(page, index), 'visual parity at split page ' + (index + 1)).toEqual(before[index + 1]);
+  }
 });
