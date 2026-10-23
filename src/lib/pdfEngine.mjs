@@ -2,7 +2,7 @@ import {
   PDFDocument, degrees, pushGraphicsState, popGraphicsState,
   moveTo, lineTo, closePath, clip, endPath,
 } from 'pdf-lib';
-import { renderWatermarkPng, watermarkTextFromOptions, WATERMARK_OPACITY } from './watermark.mjs';
+import { renderWatermarkPng, watermarkTextFromOptions, watermarkPagePlacement, WATERMARK_OPACITY } from './watermark.mjs';
 import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement, stripJpegPrivateMetadata } from './jpegExif.mjs';
 import { imagePdfPageLayout, IMAGE_PDF_LAYOUT_DEFAULT, shouldReflowImageSource } from './imagePdfLayout.mjs';
 
@@ -415,16 +415,17 @@ export async function composePdf(sources, pageRefs, options = {}) {
     }
     destination.addPage(page);
     if (watermarkText) {
-      const crop = page.getCropBox();
-      const key = `${crop.width}x${crop.height}`;
+      const placement = watermarkPagePlacement(page.getCropBox(), page.getRotation().angle);
+      const key = `${placement.visualWidth}x${placement.visualHeight}`;
       let watermarkImage = watermarkImages.get(key);
       if (!watermarkImage) {
-        const png = await renderWatermarkPng(watermarkText, crop.width, crop.height);
+        const png = await renderWatermarkPng(watermarkText, placement.visualWidth, placement.visualHeight);
         watermarkImage = await destination.embedPng(png);
         watermarkImages.set(key, watermarkImage);
       }
       page.drawImage(watermarkImage, {
-        x: crop.x, y: crop.y, width: crop.width, height: crop.height, opacity: WATERMARK_OPACITY,
+        x: placement.x, y: placement.y, width: placement.width, height: placement.height,
+        rotate: degrees(placement.rotation), opacity: WATERMARK_OPACITY,
       });
     }
     if (options.onProgress && (index === 0 || (index + 1) % 8 === 0 || index === pageRefs.length - 1)) {
