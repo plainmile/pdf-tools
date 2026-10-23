@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { PDFDocument } from 'pdf-lib';
+import { readFile } from 'node:fs/promises';
 
 async function syntheticPdf() {
   const doc = await PDFDocument.create();
@@ -52,6 +53,35 @@ test('successful full export allows normal navigation; a new page edit warns aga
   await page.getByRole('button', { name: 'Rotate clockwise' }).click();
   await page.locator('.language-link').click();
   await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
+});
+
+test('partial extract keeps the unsaved warning, but extracting every page releases it', async ({ page }) => {
+  const doc = await PDFDocument.create();
+  for (const width of [320, 340, 360]) doc.addPage([width, 420]);
+  await page.goto('/extract-pages/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'all-pages.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await doc.save()),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(3);
+
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  const subsetEvent = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Extract selected pages' }).click();
+  const subset = await subsetEvent;
+  const subsetDoc = await PDFDocument.load(await readFile(await subset.path()));
+  expect(subsetDoc.getPages().map(p => p.getWidth())).toEqual([320]);
+  await page.locator('.language-link').click();
+  await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
+  await page.getByTestId('unsaved-keep').click();
+
+  await page.getByRole('button', { name: 'Select all' }).click();
+  const allEvent = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Extract selected pages' }).click();
+  const all = await allEvent;
+  const allDoc = await PDFDocument.load(await readFile(await all.path()));
+  expect(allDoc.getPages().map(p => p.getWidth())).toEqual([320, 340, 360]);
+  await page.locator('.language-link').click();
+  await expect(page).toHaveURL(/\/zh\/extract-pages\/$/);
 });
 
 test('native Back/Reload/Close warning is registered only for unsaved work', async ({ page }) => {
