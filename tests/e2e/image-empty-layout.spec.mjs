@@ -211,3 +211,43 @@ test('full clear resets prior destructive image cropping and paper options', asy
   expect(Math.round(pdf.getPage(0).getHeight())).toBe(842);
   expect(pageOperators(pdf, pdf.getPage(0))).not.toMatch(/\bW\s+n\b/);
 });
+
+test('real WebP import, paper reflow and generated blank count retained bytes, not just upload size', async ({ page }) => {
+  await page.goto('/image-to-pdf/');
+  const webpBase64 = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 160; canvas.height = 110;
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 160, 110);
+    gradient.addColorStop(0, '#273b54'); gradient.addColorStop(1, '#eed493');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 160, 110);
+    return canvas.toDataURL('image/webp', .66).split(',')[1];
+  });
+  const webp = Buffer.from(webpBase64, 'base64');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'small-original.webp', mimeType: 'image/webp', buffer: webp,
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  const retained = async () => Number(await page.locator('.file-count').getAttribute('data-retained-bytes'));
+  const firstBytes = await retained();
+  expect(firstBytes).toBeGreaterThan(webp.length);
+
+  await page.getByTestId('image-paper').selectOption('letter');
+  await expect(page.getByTestId('image-layout-dirty')).toBeVisible();
+  await page.getByTestId('image-layout-apply').click();
+  await expect(page.getByTestId('image-layout-dirty')).toHaveCount(0);
+  const reflowBytes = await retained();
+  expect(reflowBytes).toBeGreaterThan(webp.length);
+
+  await page.getByTestId('insert-blank-page').click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  expect(await retained()).toBeGreaterThan(reflowBytes);
+
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export PDF' }).click();
+  const generated = await PDFDocument.load(await readFile(await (await download).path()));
+  expect(generated.getPageCount()).toBe(2);
+  expect(generated.getPage(0).getWidth()).toBe(612);
+  expect(generated.getPage(1).getWidth()).toBe(612);
+});
