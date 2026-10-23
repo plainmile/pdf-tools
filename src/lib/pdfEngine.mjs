@@ -1,4 +1,7 @@
-import { PDFDocument, degrees } from 'pdf-lib';
+import {
+  PDFDocument, degrees, pushGraphicsState, popGraphicsState,
+  moveTo, lineTo, closePath, clip, endPath,
+} from 'pdf-lib';
 import { renderWatermarkPng, watermarkTextFromOptions, WATERMARK_OPACITY } from './watermark.mjs';
 import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement, stripJpegPrivateMetadata } from './jpegExif.mjs';
 import { imagePdfPageLayout } from './imagePdfLayout.mjs';
@@ -189,10 +192,19 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}) {
     const placement = jpegPdfPlacement(layout.image, exifOrientation);
     // EXIF changes the displayed orientation, not the JPEG pixel data or its
     // compression quality. PDF transforms handle all eight incl. mirrors.
+    if (layout.clip) {
+      const { x, y, width, height } = layout.clip;
+      page.pushOperators(
+        pushGraphicsState(), moveTo(x, y), lineTo(x + width, y),
+        lineTo(x + width, y + height), lineTo(x, y + height),
+        closePath(), clip(), endPath(),
+      );
+    }
     page.drawImage(embedded, {
       x: placement.x, y: placement.y, width: placement.width, height: placement.height,
       rotate: degrees(placement.angle),
     });
+    if (layout.clip) page.pushOperators(popGraphicsState());
     return new Uint8Array(await doc.save({ useObjectStreams: true }));
   } catch (error) {
     if (error?.message === 'Image dimensions are too large.' ||
