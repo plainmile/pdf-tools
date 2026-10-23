@@ -305,6 +305,45 @@ test('125-page PDF displays safe image batches and exports last five actual page
   await expect(input).toHaveValue('61-120');
 });
 
+test('custom image page ranges cannot silently jump to stale 60-page batches', async ({ page }) => {
+  await page.goto('/pdf-to-images/');
+  await upload(page, await fixturePdf('Custom batch navigation', 320));
+  const input = page.getByTestId('utility-page-ranges');
+  await expect(input).toHaveValue('1-60');
+  await input.fill('301-306');
+  await expect(page.getByTestId('utility-batch-nav')).toContainText('Custom page selection');
+  await expect(page.getByTestId('utility-batch-next')).toBeDisabled();
+  await expect(page.getByTestId('utility-batch-prev')).toBeDisabled();
+  await expect(page.getByTestId('utility-batch-custom')).toContainText('Return to batches');
+  await page.getByTestId('utility-batch-resume').click();
+  await expect(input).toHaveValue('301-320');
+  await expect(page.getByTestId('utility-batch-nav')).toContainText('6 of 6');
+  await expect(page.getByTestId('utility-batch-next')).toBeDisabled();
+  await page.getByTestId('utility-batch-prev').click();
+  await expect(input).toHaveValue('241-300');
+  await input.fill('400-300');
+  await page.getByTestId('utility-batch-resume').click();
+  await expect(input).toHaveValue('241-300');
+});
+
+test('Chinese custom fullwidth range resumes the containing batch on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/pdf-to-images/');
+  await upload(page, await fixturePdf('Chinese custom pages', 125));
+  await page.getByTestId('utility-page-ranges').fill('１２１－１２５');
+  await expect(page.getByTestId('utility-batch-nav')).toContainText('自定义页码范围');
+  await expect(page.getByTestId('utility-batch-next')).toBeDisabled();
+  await page.getByTestId('utility-batch-resume').click();
+  await expect(page.getByTestId('utility-page-ranges')).toHaveValue('121-125');
+  await page.getByTestId('utility-batch-prev').click();
+  await expect(page.getByTestId('utility-page-ranges')).toHaveValue('61-120');
+  const dimensions = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    viewport: document.documentElement.clientWidth,
+  }));
+  expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.viewport + 2);
+});
+
 test('Chinese converter on narrow mobile keeps native file chooser and page batches accessible', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/zh/pdf-to-images/');
