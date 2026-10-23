@@ -2,6 +2,39 @@
 export const MAX_WATERMARK_CHARS = 60;
 export const WATERMARK_OPACITY = 0.2;
 
+/**
+ * Paint a watermark in the orientation a reader actually sees, not in the
+ * PDF's unrotated content coordinates. /Rotate is clockwise, whereas PDF
+ * drawing transforms use counter-clockwise angles. The inverse rotation and
+ * CropBox offset keep the image anchored over the visible page for all four
+ * common orientations, including pages rotated inside the workspace.
+ */
+export function watermarkPagePlacement(crop, degrees) {
+  const [x, y, width, height] = [crop?.x, crop?.y, crop?.width, crop?.height];
+  if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) {
+    throw new Error('Invalid PDF crop-box dimensions for watermarking.');
+  }
+  const rotation = ((degrees % 360) + 360) % 360;
+  if (![0, 90, 180, 270].includes(rotation)) {
+    throw new Error('Unsupported PDF page rotation for watermarking.');
+  }
+  switch (rotation) {
+    case 90:
+      return { x: x + width, y, width: height, height: width, rotation,
+        visualWidth: height, visualHeight: width };
+    case 180:
+      return { x: x + width, y: y + height, width, height, rotation,
+        visualWidth: width, visualHeight: height };
+    case 270:
+      return { x, y: y + height, width: height, height: width, rotation,
+        visualWidth: height, visualHeight: width };
+    default:
+      return { x, y, width, height, rotation,
+        visualWidth: width, visualHeight: height };
+  }
+}
+
+
 export function watermarkTextFromOptions(watermark) {
   if (!watermark?.enabled) return null;
   const text = String(watermark.text ?? '').replace(/\s+/gu, ' ').trim();
