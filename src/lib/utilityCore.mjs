@@ -183,12 +183,19 @@ export function parseTextBlocks(source, markdown = false) {
   }
   return blocks;
 }
+// Accept conventional HTML formatting tags only: technical Markdown often
+// contains C++/TypeScript generics, XML-like placeholders, or unspaced
+// comparisons which must not disappear as if they were arbitrary HTML.
+const PLAIN_MARKDOWN_HTML_TAGS = new Set(
+  'a abbr article aside b blockquote br code del div em h1 h2 h3 h4 h5 h6 hr i img input li ol p pre s script section small span strong style table tbody td th thead tr u ul'.split(' '),
+);
 // Intentionally a minimal CommonMark subset: never execute HTML, remote images or scripts.
 export function stripMarkdownInline(source) {
   return source.replace(/!?\[([^\]]+)\]\([^\n)]+\)/g, '$1')
-    // Remove actual HTML-looking tags and comments, but never erase
-    // comparisons such as "value < 3 && count > 2" in technical Markdown.
-    .replace(/<!--[\s\S]*?-->|<\/?[A-Za-z][^>]*>/g, '')
+    // Strip only recognizable HTML tags with syntactically valid attributes.
+    // Preserve "List<T>", "<username>", and "a<b && c>d" verbatim.
+    .replace(/<!--[\s\S]*?-->|<\/?([A-Za-z][\w:-]*)(?:\s+[A-Za-z_:][\w:.-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*\s*\/?>/g,
+      (token, tag) => tag && !PLAIN_MARKDOWN_HTML_TAGS.has(tag.toLowerCase()) ? token : '')
     // Strip only MATCHED Markdown formatting markers. Removing every '*' and
     // '_' silently corrupts identifiers (user_id), multiplication (a*b) and
     // exponent notation (x**2) in technical reports.

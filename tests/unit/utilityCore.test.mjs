@@ -50,6 +50,19 @@ test('Markdown inline formatting preserves identifiers, arithmetic and unmatched
   assert.equal(headings[1].text, 'Result: a*b + x**2 and c_d');
 });
 
+test('Markdown parser preserves generics, placeholders and comparisons without spaces', () => {
+  const literal = 'Generics: List<T> and Map<string, number>; template <username>; x<y&&z>q; a<b && c>d';
+  assert.equal(stripMarkdownInline(literal), literal);
+  assert.equal(
+    stripMarkdownInline('HTML: <strong>bold</strong>, <span class="note">visible</span>, <br/> and <!-- secret -->text'),
+    'HTML: bold, visible,  and text',
+  );
+  const blocks = parseTextBlocks('# Types: List<T>\nArgument: <username>\nCheck: a<b && c>d', true);
+  assert.equal(blocks[0].text, 'Types: List<T>');
+  assert.equal(blocks[1].text, 'Argument: <username>');
+  assert.equal(blocks[2].text, 'Check: a<b && c>d');
+});
+
 test('PDF positioned text is approximately sorted by vertical position then X', () => {
   const items = [
     { str: 'right', transform: [1,0,0,12, 100, 300], height: 12, width: 25 },

@@ -501,6 +501,22 @@ test('Markdown technical identifiers and arithmetic survive actual PDF and TXT r
   expect(extracted).toContain('Emphasis: bold and italic');
 });
 
+test('technical Markdown generics, placeholders and tight comparisons survive actual PDF-to-TXT round-trip', async ({ page }) => {
+  await page.goto('/markdown-to-pdf/');
+  await page.getByTestId('utility-text').fill(
+    '# Types: List<T>\nGeneric: Map<string, number>\nPlaceholder: <username>\nComparison: a<b && c>d\nCode: x<y&&z>q\nHTML: <strong>bold</strong>',
+  );
+  const generated = await generateTextPdfAndDownload(page);
+  expect((await PDFDocument.load(generated.bytes)).getPageCount()).toBe(1);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, generated.bytes);
+  const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
+  const text = extracted.bytes.toString('utf8');
+  for (const preserved of ['Types: List<T>', 'Map<string, number>', '<username>', 'a<b && c>d', 'x<y&&z>q', 'HTML: bold']) {
+    expect(text).toContain(preserved);
+  }
+});
+
 test('page numbering on rotated cropped PDFs preserves page rotations and searchable digits', async ({ page }) => {
   const { degrees } = await import('pdf-lib');
   const input = await PDFDocument.create();
