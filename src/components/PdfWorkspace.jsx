@@ -96,12 +96,15 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const lastSelectedIndex = useRef(null);
   const previewDocuments = useRef(new Map());
   const splitAbortRef = useRef(null);
+  const exportAbortRef = useRef(null);
   const [sources, setSources] = useState([]);
   const [history, setHistory] = useState(() => makeHistoryState());
   const [selected, setSelected] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
   const [splitProgress, setSplitProgress] = useState(null);
   const [splitCancelling, setSplitCancelling] = useState(false);
+  const [exportProgress, setExportProgress] = useState(null);
+  const [exportCancelling, setExportCancelling] = useState(false);
   const [imageLayout, setImageLayout] = useState(() => ({ ...IMAGE_PDF_LAYOUT_DEFAULT }));
   const [appliedImageLayout, setAppliedImageLayout] = useState(() => ({ ...IMAGE_PDF_LAYOUT_DEFAULT }));
   const [notice, setNotice] = useState('');
@@ -171,7 +174,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     }
     previewDocuments.current.clear();
   }, []);
-  useEffect(() => () => { splitAbortRef.current?.abort(); releasePreviewDocuments(); }, [releasePreviewDocuments]);
+  useEffect(() => () => { splitAbortRef.current?.abort(); exportAbortRef.current?.abort(); releasePreviewDocuments(); }, [releasePreviewDocuments]);
 
   const resetSelection = () => { setSelected(new Set()); lastSelectedIndex.current = null; };
   const commit = (operation, preserveSelection = false) => {
@@ -251,19 +254,36 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setNotice(t.imageApplied);
   });
 
-  const exportAll = () => withBusy(async () => {
-    if (!pages.length) throw new Error(t.noFile);
+  // Long PDF exports now share the split tool's cancellation behavior.
+  // PDF serialization itself may not yield, but no partial download is ever offered.
+  const exportPages = (chosen, outputName, successMessage) => withBusy(async () => {
+    if (!chosen.length) throw new Error(t.noFile);
     if (imageLayoutDirty) throw new Error(t.imageMustApply);
-    saveDownload(await composePdf(sources, pages, { watermark }), filename);
-    setNotice(t.exported);
+    const controller = new AbortController();
+    exportAbortRef.current = controller;
+    setExportCancelling(false);
+    const largeExport = chosen.length >= 24;
+    if (largeExport) setExportProgress({ done: 0, total: chosen.length });
+    try {
+      const bytes = await composePdf(sources, chosen, {
+        watermark, signal: controller.signal, cancelMessage: 'PDF export cancelled.',
+        onProgress: (done, total) => { if (largeExport && !controller.signal.aborted) setExportProgress({ done, total }); },
+      });
+      if (controller.signal.aborted) throw new Error('PDF export cancelled.');
+      saveDownload(bytes, outputName);
+      setNotice(successMessage);
+    } finally {
+      exportAbortRef.current = null;
+      setExportProgress(null);
+      setExportCancelling(false);
+    }
   });
-  const exportSelected = () => withBusy(async () => {
+  const exportAll = () => exportPages(pages, filename, t.exported);
+  const exportSelected = () => {
     const chosen = pages.filter((page) => selected.has(page.id));
-    if (!chosen.length) throw new Error(t.selectionNeeded);
-    if (imageLayoutDirty) throw new Error(t.imageMustApply);
-    saveDownload(await composePdf(sources, chosen, { watermark }), `${fileBase}-selected-${chosen.length}-pages.pdf`);
-    setNotice(interpolate(t.extracted, { pages: chosen.length }));
-  });
+    if (!chosen.length) return withBusy(async () => { throw new Error(t.selectionNeeded); });
+    return exportPages(chosen, `${fileBase}-selected-${chosen.length}-pages.pdf`, interpolate(t.extracted, { pages: chosen.length }));
+  };
   const splitIntoZip = () => withBusy(async () => {
     if (!pages.length) throw new Error(t.noFile);
     if (imageLayoutDirty) throw new Error(t.imageMustApply);
@@ -362,6 +382,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           <button className="button button-primary button-small" type="button" disabled={!pages.length || busy || imageLayoutDirty} onClick={exportAll} aria-label={t.export}>{busy ? t.working : t.export} ↓</button>
         </div>
       </div>
+      {busy && exportProgress && <div className="export-progress-row" data-testid="export-progress-row">
+        <p className="utility-note" data-testid="export-progress" role="status" aria-live="polite">{interpolate(t.exportProgress, exportProgress)}</p>
+        <button type="button" className="button button-secondary button-small" data-testid="export-cancel"
+          disabled={exportCancelling} onClick={() => { exportAbortRef.current?.abort(); setExportCancelling(true); }}>
+          {exportCancelling ? t.exportCancelling : t.exportCancel}
+        </button>
+      </div>}
       {mode === 'image-to-pdf' && (
         <section className="export-options-panel" data-testid="image-page-settings" aria-label={t.imageSettings}>
           <div className="export-options-header"><strong>{t.imageSettings}</strong><span>{t.imageSettingsHint}</span></div>
