@@ -104,6 +104,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [selected, setSelected] = useState(() => new Set());
   const [selectionRanges, setSelectionRanges] = useState('');
   const [busy, setBusy] = useState(false);
+  // `setBusy` is a UI update, not a lock. Same-tick file drops can both read
+  // stale busy=false and individually pass limits before either import finishes.
+  const busyRef = useRef(false);
   const [clearConfirm, setClearConfirm] = useState(false);
   const [splitProgress, setSplitProgress] = useState(null);
   const [splitCancelling, setSplitCancelling] = useState(false);
@@ -221,7 +224,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
 
   const addFiles = async (incoming) => {
     const items = [...(incoming ?? [])];
-    if (!items.length || busy) return;
+    if (!items.length || busyRef.current) return;
+    busyRef.current = true; // Reserve synchronously before awaiting file bytes.
     setError(''); setNotice(''); setClearConfirm(false); setBusy(true);
     // Once every page has been deleted, a successful new import starts a fresh
     // workspace. Keep the old undo history intact until that import succeeds.
@@ -275,15 +279,16 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         : interpolate(t.loaded, { files: nextSources.length, pages: nextPages.length }));
     } catch (reason) {
       setError(translateProcessingError(reason instanceof Error ? reason.message : t.errorGeneric, locale));
-    } finally { setBusy(false); }
+    } finally { busyRef.current = false; setBusy(false); }
   };
 
   const withBusy = async (task) => {
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true); setError(''); setNotice(''); setClearConfirm(false);
     try { await task(); }
     catch (reason) { setError(translateProcessingError(reason instanceof Error ? reason.message : t.errorGeneric, locale)); }
-    finally { setBusy(false); }
+    finally { busyRef.current = false; setBusy(false); }
   };
 
   const duplicateSelected = () => {
