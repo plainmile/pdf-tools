@@ -144,6 +144,54 @@ test('cross-file drag-and-drop changes the actual exported page order', async ({
   expect(output.getPages().map((p) => p.getWidth())).toEqual([320, 300, 310]);
 });
 
+test('the real drag target shows before/after insertion markers matching exported page order', async ({ page }) => {
+  await loadInput(page);
+  const tiles = page.getByTestId('page-grid').getByTestId('page-tile');
+  await page.evaluate(sourceIndex => {
+    const nodes = document.querySelectorAll('[data-testid="page-grid"] [data-testid="page-tile"]');
+    const transfer = new DataTransfer();
+    window.__dragTestTransfer = transfer;
+    nodes[sourceIndex].dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+  }, 2);
+  await expect(tiles.nth(2)).toHaveClass(/is-dragging/);
+  await page.evaluate(targetIndex => {
+    const nodes = document.querySelectorAll('[data-testid="page-grid"] [data-testid="page-tile"]');
+    nodes[targetIndex].dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: window.__dragTestTransfer }));
+  }, 0);
+  await expect(tiles.nth(0)).toHaveAttribute('data-drop-side', 'before');
+  await page.evaluate(targetIndex => {
+    const nodes = document.querySelectorAll('[data-testid="page-grid"] [data-testid="page-tile"]');
+    nodes[targetIndex].dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: window.__dragTestTransfer }));
+  }, 0);
+  await expect(tiles.nth(0)).not.toHaveAttribute('data-drop-side', 'before');
+  const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(output.getPages().map(p => p.getWidth())).toEqual([320,300,310]);
+});
+
+test('selected multi-page drag marker always describes insertion before the target', async ({ page }) => {
+  await loadInput(page);
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  await page.getByRole('checkbox', { name: 'Select page 3' }).check();
+  const tiles = page.getByTestId('page-grid').getByTestId('page-tile');
+  await page.evaluate(() => {
+    const nodes = document.querySelectorAll('[data-testid="page-grid"] [data-testid="page-tile"]');
+    window.__dragTestTransfer = new DataTransfer();
+    nodes[0].dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: window.__dragTestTransfer }));
+  });
+  await expect(tiles.nth(0)).toHaveClass(/is-dragging/);
+  await page.evaluate(() => {
+    const nodes = document.querySelectorAll('[data-testid="page-grid"] [data-testid="page-tile"]');
+    nodes[1].dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: window.__dragTestTransfer }));
+  });
+  await expect(tiles.nth(1)).toHaveAttribute('data-drop-side', 'before');
+  await page.evaluate(() => {
+    const nodes = document.querySelectorAll('[data-testid="page-grid"] [data-testid="page-tile"]');
+    nodes[1].dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: window.__dragTestTransfer }));
+  });
+  const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(output.getPages().map(p => p.getWidth())).toEqual([300,320,310]);
+});
+
 test('keyboard-accessible move buttons change the actual exported page order', async ({ page }) => {
   await loadInput(page);
   await page.getByRole('button', { name: 'Move page 2 left' }).click();
