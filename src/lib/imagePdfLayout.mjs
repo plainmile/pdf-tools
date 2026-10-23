@@ -2,6 +2,7 @@ export const IMAGE_PDF_LAYOUT_DEFAULT = Object.freeze({
   paper: 'a4',
   orientation: 'portrait',
   margin: 30,
+  imageSizing: 'contain',
 });
 
 const PAPER_SIZES = Object.freeze({
@@ -20,9 +21,11 @@ export function imagePdfPageLayout(imageWidth, imageHeight, options = {}) {
   const paper = options.paper ?? IMAGE_PDF_LAYOUT_DEFAULT.paper;
   const orientation = options.orientation ?? IMAGE_PDF_LAYOUT_DEFAULT.orientation;
   const margin = Number(options.margin ?? IMAGE_PDF_LAYOUT_DEFAULT.margin);
+  const imageSizing = options.imageSizing ?? IMAGE_PDF_LAYOUT_DEFAULT.imageSizing;
   if (!(paper in PAPER_SIZES) && paper !== 'fit') throw new Error('Unsupported image PDF paper size.');
   if (!['portrait', 'landscape', 'auto'].includes(orientation)) throw new Error('Unsupported image PDF orientation.');
   if (![0, 12, 30, 48].includes(margin)) throw new Error('Unsupported image PDF margin.');
+  if (!['contain', 'cover'].includes(imageSizing)) throw new Error('Unsupported image PDF sizing.');
   if (![imageWidth, imageHeight].every(Number.isFinite) || imageWidth <= 0 || imageHeight <= 0) {
     throw new Error('Invalid image dimensions.');
   }
@@ -49,10 +52,16 @@ export function imagePdfPageLayout(imageWidth, imageHeight, options = {}) {
   const areaWidth = width - 2 * margin;
   const areaHeight = height - 2 * margin;
   if (!(areaWidth > 0 && areaHeight > 0)) throw new Error('Image PDF margins leave no room for a picture.');
-  const scale = Math.min(areaWidth / imageWidth, areaHeight / imageHeight);
+  // Cover fills the printable rectangle, cropping overflow *inside* the margins.
+  // Fit-to-image has the same ratio as its source and always uses Contain.
+  const cover = paper !== 'fit' && imageSizing === 'cover';
+  const scale = cover
+    ? Math.max(areaWidth / imageWidth, areaHeight / imageHeight)
+    : Math.min(areaWidth / imageWidth, areaHeight / imageHeight);
   const drawWidth = imageWidth * scale, drawHeight = imageHeight * scale;
   return {
     width, height, margin,
     image: { x: (width - drawWidth) / 2, y: (height - drawHeight) / 2, width: drawWidth, height: drawHeight },
+    clip: cover ? { x: margin, y: margin, width: areaWidth, height: areaHeight } : null,
   };
 }
