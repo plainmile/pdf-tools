@@ -181,7 +181,7 @@ Do not copy or reveal secrets through this repository. Do not disable host-key v
 ```sh
 # Run on netcup VPS; no Node or npm installation needed.
 cd /opt/compose/pdf-tools
-sudo docker compose ps
+sudo docker compose -f compose.prod.yaml ps
 sudo docker inspect -f '{{.State.Health.Status}}' plainmile-pdf-tools
 sudo docker network inspect edge --format '{{range .Containers}}{{println .Name}}{{end}}'
 curl -fsSI https://pdf.plainmile.com/
@@ -197,8 +197,8 @@ sudo mkdir -p /opt/compose/pdf-tools
 cd /opt/compose/pdf-tools
 # Copy compose.prod.yaml here from the reviewed repository.
 printf 'IMAGE_TAG=REVIEWED_MAIN_SHA\n' | sudo tee .env
-sudo docker compose pull
-sudo docker compose up -d
+sudo docker compose -f compose.prod.yaml pull
+sudo docker compose -f compose.prod.yaml up -d
 sudo docker inspect -f '{{.State.Health.Status}}' plainmile-pdf-tools
 ```
 
