@@ -13,7 +13,7 @@ const COPY = {
     download: 'Download result', compressionMethod: 'Compression level', compressionLow: 'Smaller size (lossier)', compressionMid: 'Balanced', compressionHigh: 'Clearer (larger)',
     compressionWarning: 'This method converts every PDF page into a JPEG image. Text stops being searchable or selectable. Forms, annotations, hyperlinks and signatures are not preserved. Keep the original and inspect the output.',
     original: 'Original', result: 'Result', saved: 'Saved', increased: 'Size increase', unchanged: 'No change', noSaving: 'No size reduction. This file was not downloaded; try a lower resolution or keep the original.',
-    compressionReady: 'The output is smaller. Check text sharpness before using it.', previewCompressed: 'Preview compressed page 1', hidePreview: 'Hide preview',
+    compressionReady: 'The output is smaller. Check text sharpness before using it.', compressionResultStale: 'This is the previous result, made with a different compression level. You can still download it, or run again with the new setting.', previewCompressed: 'Preview compressed page 1', hidePreview: 'Hide preview',
     noSavingEarly: 'Stopped early: JPEG data already exceeds the original size. Keep the original or lower the resolution.',
     compressionLowerBound: 'At least', previewAction: 'Generate PDF preview', previewTitle: 'Generated PDF preview', previewFirst: 'Previewing page 1 of {pages}', previewFailed: 'Preview unavailable; you can still download the PDF.', downloadPdf: 'Download PDF',
     textWarning: 'Extracts existing selectable PDF text only, not OCR. Columns, tables and heading formatting may not be preserved. Check the exported text.',
@@ -36,7 +36,7 @@ const COPY = {
     download: '下载结果', compressionMethod: '压缩强度', compressionLow: '更小体积（画质较低）', compressionMid: '平衡', compressionHigh: '画质较清晰（体积较大）',
     compressionWarning: '此压缩方式会将 PDF 各页重新渲染为 JPEG 图片。输出将失去文本搜索和选中能力，也无法保留表单、注释、链接及数字签名。请保存原文件并检查输出画质。',
     original: '原文件', result: '输出文件', saved: '节省', increased: '体积增加', unchanged: '无变化', noSaving: '未缩小文件，因此没有自动下载。可尝试降低清晰度，或保留原文件。',
-    compressionReady: '输出文件确实更小。请先核对文字清晰度。', previewCompressed: '预览压缩后的首页', hidePreview: '收起预览',
+    compressionReady: '输出文件确实更小。请先核对文字清晰度。', compressionResultStale: '这是之前压缩强度生成的结果。您仍可下载，或按当前设置重新处理。', previewCompressed: '预览压缩后的首页', hidePreview: '收起预览',
     noSavingEarly: '已提前停止：JPEG 数据已不小于原文件，继续转换也不能节省空间。请保留原文件或降低清晰度。',
     compressionLowerBound: '至少', previewAction: '生成 PDF 预览', previewTitle: '生成的 PDF 预览', previewFirst: '第 1 页预览（共 {pages} 页）', previewFailed: '无法生成预览，但仍可下载 PDF。', downloadPdf: '下载 PDF',
     textWarning: '只提取 PDF 中已有的可选择文字，不具备 OCR。多栏、表格和段落顺序可能不准确，请核对导出内容。',
@@ -247,7 +247,16 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   async function processFile() {
     if (operationRef.current || pendingReplacementRef.current) return;
     operationRef.current = true; // Prevent a second Run during the same event turn.
-    clearOutput(); setBusy(true); setProcessing(true); setCancelling(false);
+    // A costly compression result must stay downloadable while trying a new
+    // level. Only replace it after the next candidate is fully calculated.
+    // Failed/cancelled retries leave the previous output intact.
+    if (isCompress) {
+      setClearConfirm(false); setNotice(''); setError(''); setProgress(null);
+      setShowCompressionPreview(false);
+    } else {
+      clearOutput();
+    }
+    setBusy(true); setProcessing(true); setCancelling(false);
     const controller = new AbortController();
     taskRef.current = controller;
     const ensureNotCancelled = () => { if (controller.signal.aborted) throw new Error('Processing cancelled.'); };
@@ -275,7 +284,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         const candidate = await compressPdfRaster(pdf, { ...options, locale, signal: controller.signal }, report);
         ensureNotCancelled();
         setOutput({ bytes: candidate.stats.smaller ? candidate.bytes : null,
-          mime: 'application/pdf', name: `${pdfName}-compressed.pdf`, stats: candidate.stats });
+          mime: 'application/pdf', name: `${pdfName}-compressed.pdf`, stats: candidate.stats, compressionMode: compressMode });
+        setNotDownloaded(Boolean(candidate.stats.smaller && candidate.bytes));
         setNotice(candidate.stats.smaller ? t.compressionReady : candidate.stats.lowerBound ? t.noSavingEarly : t.noSaving);
       } else if (isTextOutput) {
         const markdown = mode === 'pdf-to-markdown';
@@ -405,7 +415,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
               data-testid="utility-batch-resume" onClick={resumeImageBatches} disabled={inputLocked}>{t.batchResume}</button>
           </div>}
         </div>}
-        {isCompress && <div className="utility-options"><label><span>{t.compressionMethod}</span><select aria-label={t.compressionMethod} value={compressMode} disabled={inputLocked} onChange={e => { setCompressMode(e.target.value); clearOutput(); }}><option value="compact">{t.compressionLow}</option><option value="balanced">{t.compressionMid}</option><option value="clearer">{t.compressionHigh}</option></select></label></div>}
+        {isCompress && <div className="utility-options"><label><span>{t.compressionMethod}</span><select aria-label={t.compressionMethod} value={compressMode} disabled={inputLocked} onChange={e => { setCompressMode(e.target.value); setNotice(''); setError(''); }}><option value="compact">{t.compressionLow}</option><option value="balanced">{t.compressionMid}</option><option value="clearer">{t.compressionHigh}</option></select></label></div>}
         {mode === 'add-page-numbers' && <div className="utility-options">
           <label><span>{t.pageStart}</span><input data-testid="number-start" type="number" min="1" max="99999" value={start} disabled={inputLocked} onChange={e => { setStart(e.target.value); clearOutput(); }} /></label>
           <label><span>{t.pagePosition}</span><select aria-label={t.pagePosition} value={position} disabled={inputLocked} onChange={e => { setPosition(e.target.value); clearOutput(); }}><option value="bottom-center">{t.bottomCenter}</option><option value="bottom-right">{t.bottomRight}</option><option value="top-right">{t.topRight}</option></select></label>
@@ -418,6 +428,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         {progress && (busy || notice) && <p className="utility-note" data-testid="utility-progress" aria-live="polite">{'packaging' in progress ? t.packaging.replace('{percent}', progress.packaging) : t.progressLabel.replace('{done}', progress.done).replace('{total}', progress.total)}</p>}
         {isCompress && output && <div className="utility-result" data-testid="compression-result">
           <div className="utility-comparison"><div><span>{t.original}</span><strong>{formatBytes(output.stats.original)}</strong></div><div><span>{t.result}</span><strong>{output.stats.lowerBound ? `${t.compressionLowerBound} ` : ''}{formatBytes(output.stats.candidate)}</strong></div><div><span data-testid="compression-change-label">{output.stats.smaller ? t.saved : output.stats.candidate > output.stats.original ? t.increased : t.unchanged}</span><strong data-testid="compression-change-value" className={output.stats.smaller ? 'utility-smaller' : output.stats.candidate > output.stats.original ? 'utility-not-smaller' : ''}>{Math.abs(output.stats.percent)}%</strong></div></div>
+          {output.compressionMode !== compressMode && <p className="utility-note" role="status" data-testid="compression-result-stale">{t.compressionResultStale}</p>}
           {output.bytes && <button type="button" className="button button-secondary" data-testid="compression-preview-action"
             aria-expanded={showCompressionPreview} aria-controls="compression-preview-content"
             onClick={() => setShowCompressionPreview(value => !value)}>
