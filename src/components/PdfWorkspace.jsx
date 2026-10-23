@@ -102,6 +102,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const inputRef = useRef(null);
   const lastSelectedIndex = useRef(null);
   const lastGroupedSelection = useRef(null);
+  // HTML drag events can arrive before React commits setDragged(). The ref
+  // synchronously carries the whole selected page group across that turn.
+  const draggedPageIdsRef = useRef(null);
   const pageGridRef = useRef(null);
   const previewDocuments = useRef(new Map());
   const splitAbortRef = useRef(null);
@@ -623,11 +626,21 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const onMoveDrop = (event, targetId) => {
     event.preventDefault();
     setDropTarget(null);
-    if (event.dataTransfer.files?.length) { void addFiles(event.dataTransfer.files); return; }
-    const text = event.dataTransfer.getData('application/x-plainmile-pages');
-    let group = [];
-    try { group = JSON.parse(text); } catch (_error) { /* fall back to the source page */ }
+    if (event.dataTransfer.files?.length) {
+      draggedPageIdsRef.current = null;
+      setDragged(null);
+      void addFiles(event.dataTransfer.files);
+      return;
+    }
+    // DataTransfer's custom payload is not always available on every drop.
+    // Prefer the synchronous dragstart snapshot to stale React state.
+    let group = draggedPageIdsRef.current;
+    if (!Array.isArray(group) || !group.length) {
+      const text = event.dataTransfer.getData('application/x-plainmile-pages');
+      try { group = JSON.parse(text); } catch (_error) { group = []; }
+    }
     if (!Array.isArray(group) || !group.length) group = dragged ? [dragged] : [];
+    draggedPageIdsRef.current = null;
     if (group.length) commit((previous) => group.length === 1 ? movePage(previous, group[0], targetId) : movePageGroup(previous, group, targetId));
     setDragged(null);
   };
@@ -1000,14 +1013,14 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                         data-drop-side={dropTarget?.id === pageRef.id ? dropTarget.side : undefined}
                         draggable={!busy} onDragStart={(event) => {
                           const ids = selected.has(pageRef.id) ? pages.filter((page) => selected.has(page.id)).map((page) => page.id) : [pageRef.id];
+                          draggedPageIdsRef.current = ids;
                           event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-plainmile-pages', JSON.stringify(ids));
                           setDragged(pageRef.id);
                         }}
                         onDragOver={(event) => {
                           event.preventDefault();
-                          if (busy || !dragged || Array.from(event.dataTransfer.types || []).includes('Files')) return;
-                          const movingIds = selected.has(dragged)
-                            ? pages.filter(page => selected.has(page.id)).map(page => page.id) : [dragged];
+                          const movingIds = draggedPageIdsRef.current;
+                          if (busy || !movingIds?.length || Array.from(event.dataTransfer.types || []).includes('Files')) return;
                           const side = pageDropSide(pages, movingIds, pageRef.id);
                           event.dataTransfer.dropEffect = side ? 'move' : 'none';
                           setDropTarget(previous =>
@@ -1020,7 +1033,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                           }
                         }}
                         onDrop={(event) => { event.stopPropagation(); onMoveDrop(event, pageRef.id); }}
-                        onDragEnd={() => { setDragged(null); setDropTarget(null); }}>
+                        onDragEnd={() => { draggedPageIdsRef.current = null; setDragged(null); setDropTarget(null); }}>
                         <label className="page-tile-checkbox"><input type="checkbox" checked={selected.has(pageRef.id)} disabled={busy} onChange={(event) => toggleSelection(pageRef.id, index, Boolean(event.nativeEvent?.shiftKey))} aria-label={locale === 'zh' ? `${t.selectPage} ${index + 1} 页` : `Select page ${index + 1}`} /></label>
                         <div className="tile-sequence">{String(index + 1).padStart(2, '0')}</div>
                         <PageThumbnail source={source} pageRef={pageRef} getPreviewDoc={getPreviewDoc} locale={locale} t={t}
