@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import JSZip from 'jszip';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 import { LIMITS, composePdf, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId, createBlankPageSource, retainedSourceBytes, retainedSourcesBytes } from '../lib/pdfEngine.mjs';
-import { sanitizeFilename } from '../lib/utilityCore.mjs';
+import { sanitizeFilename, workspaceFilenameStem } from '../lib/utilityCore.mjs';
 import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLayout.mjs';
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
@@ -103,6 +103,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [history, setHistory] = useState(() => makeHistoryState());
   const [selected, setSelected] = useState(() => new Set());
   const [selectionRanges, setSelectionRanges] = useState('');
+  const [downloadNameInput, setDownloadNameInput] = useState('');
   const [busy, setBusy] = useState(false);
   // `setBusy` is a UI update, not a lock. Same-tick file drops can both read
   // stale busy=false and individually pass limits before either import finishes.
@@ -145,7 +146,11 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   }, [pages, sources]);
   const fileBase = activeNames.length === 1 ? sanitizeFilename(activeNames[0]) :
     activeNames.length ? `plainmile-${activeNames.length}-files` : 'plainmile-pages';
-  const filename = `${fileBase}-${mode === 'image-to-pdf' ? 'images' : 'organized'}.pdf`;
+  const defaultFilename = `${fileBase}-${mode === 'image-to-pdf' ? 'images' : 'organized'}.pdf`;
+  // An optional name must never change the PDF bytes, page order, or privacy.
+  const userDownloadStem = workspaceFilenameStem(downloadNameInput);
+  const filename = userDownloadStem ? `${userDownloadStem}.pdf` : defaultFilename;
+  const outputBase = userDownloadStem || fileBase;
   const activeSourceCount = useMemo(() => countActiveSources(pages.filter(page => !sourceLookup.get(page.sourceId)?.isGeneratedBlank)), [pages, sourceLookup]);
   const onlyImages = pages.length > 1 && pages.every(page => sourceLookup.get(page.sourceId)?.isImage);
   const hasOriginalPdf = pages.some(page => { const src = sourceLookup.get(page.sourceId); return src && !src.isImage && !src.isGeneratedBlank; });
@@ -262,6 +267,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         setRanges('');
         setChunkSize('');
         setSplitMode('ranges');
+        setDownloadNameInput('');
       }
       if (replacingDeletedPages) {
         releasePreviewDocuments();
@@ -357,7 +363,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const exportSelected = () => {
     const chosen = pages.filter((page) => selected.has(page.id));
     if (!chosen.length) return withBusy(async () => { throw new Error(t.selectionNeeded); });
-    return exportPages(chosen, `${fileBase}-selected-${chosen.length}-pages.pdf`, interpolate(t.extracted, { pages: chosen.length }));
+    return exportPages(chosen, `${outputBase}-selected-${chosen.length}-pages.pdf`, interpolate(t.extracted, { pages: chosen.length }));
   };
   const downloadSplit = () => withBusy(async () => {
     if (!pages.length) throw new Error(t.noFile);
@@ -381,7 +387,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         if (controller.signal.aborted) throw new Error('Split cancelled.');
         size = enforceSplitZipBudget(size, contents.length);
         if (!zip) {
-          saveDownload(contents, `${fileBase}-pages-${range.start}-${range.end}.pdf`);
+          saveDownload(contents, `${outputBase}-pages-${range.start}-${range.end}.pdf`);
           // A one-piece export covering the entire edited workspace is
           // equivalent to Export PDF; don't warn about work already saved.
           if (range.start === 1 && range.end === pages.length) setLastDownloadedRevision(documentRevision);
@@ -404,7 +410,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         }
       });
       if (controller.signal.aborted) throw new Error('Split cancelled.');
-      saveDownload(archive, `${fileBase}-split.zip`, 'application/zip');
+      saveDownload(archive, `${outputBase}-split.zip`, 'application/zip');
       setNotice(interpolate(t.zipped, { files: pieces.length }));
     } finally {
       splitAbortRef.current = null;
@@ -470,7 +476,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setPageView('order'); setCollapsedSources(new Set());
     setLastDownloadedRevision(null);
     setRanges(''); setChunkSize(''); setSplitMode('ranges');
-    setSelectionRanges('');
+    setSelectionRanges(''); setDownloadNameInput('');
     // A fresh image-to-PDF workspace must not inherit a previous crop choice.
     setImageLayout({ ...IMAGE_PDF_LAYOUT_DEFAULT });
     releasePreviewDocuments();
@@ -618,7 +624,22 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           )}
         </section>
       )}
-      {pages.length > 0 && <p className="utility-note" data-testid="workspace-export-filename">{t.outputName}: {filename} · {pages.length} {t.pages}</p>}
+      {pages.length > 0 && <section className="workspace-download-settings">
+        <details data-testid="download-name-panel">
+          <summary>{t.renameDownload}</summary>
+          <div className="download-name-controls">
+            <label htmlFor="download-name-input">{t.outputName}</label>
+            <input type="text" id="download-name-input" data-testid="download-name-input"
+              maxLength={120} value={downloadNameInput} disabled={busy}
+              placeholder={defaultFilename}
+              onChange={event => setDownloadNameInput(event.target.value)} />
+            <button type="button" className="button button-secondary button-small"
+              onClick={() => setDownloadNameInput('')} disabled={busy || !downloadNameInput}>{t.renameReset}</button>
+            <p className="input-note">{t.renameHint}</p>
+          </div>
+        </details>
+        <p className="utility-note" data-testid="workspace-export-filename">{t.outputName}: <strong>{filename}</strong> · {pages.length} {t.pages}</p>
+      </section>
       <div className="workspace-content" onDragOver={(event) => { if (Array.from(event.dataTransfer.types ?? []).includes('Files')) event.preventDefault(); }} onDrop={(event) => { if (event.dataTransfer.files?.length) { event.preventDefault(); void addFiles(event.dataTransfer.files); } }}>
         {error && <div className="notice notice-error" role="alert">{error}<button type="button" aria-label={t.dismiss} onClick={() => setError('')}>×</button></div>}
         {notice && <div className="notice notice-success" role="status">{notice}<button type="button" aria-label={t.dismiss} onClick={() => setNotice('')}>×</button></div>}
