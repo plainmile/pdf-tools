@@ -137,6 +137,17 @@ export function parsePageRanges(input, pageCount, maxRanges = 50) {
   });
 }
 
+/** Select by the current EXPORT order rather than the source PDF page number.
+ * Repeated/overlapping ranges are deduplicated, and validation is atomic.
+ */
+export function pageIdsForRanges(pages, input) {
+  const chosen = new Set();
+  for (const { start, end } of parsePageRanges(input, pages.length)) {
+    for (let index = start - 1; index < end; index++) chosen.add(pages[index].id);
+  }
+  return chosen;
+}
+
 export function chunkPageRanges(pageCount, chunkSize) {
   const n = Number(chunkSize);
   if (!Number.isSafeInteger(n) || n < 1 || n > pageCount) throw new Error('Choose a valid pages-per-file value.');
