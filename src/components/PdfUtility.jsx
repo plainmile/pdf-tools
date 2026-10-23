@@ -136,16 +136,21 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   function reset() { if (busy) return; setPdf(null); setSourceText(''); setPages(''); setTextFileName(''); setTextEdited(false); setBatchIndex(0); clearOutput(); setNotDownloaded(false); }
   async function acceptFile(file) {
     if (!file || busy) return;
-    clearOutput();
+    // A failed replacement must preserve the previously generated result,
+    // preview and download button, not just the old input document.
+    setError('');
     setBusy(true);
     try {
       if (isTextInput) {
         if (!/\.(?:txt|md|markdown)$/i.test(file.name) || !file.size || file.size > UTILITY_LIMITS.maxTextBytes) throw new Error(t.invalidFile);
-        setSourceText(await file.text());
+        const content = await file.text();
+        clearOutput();
+        setSourceText(content);
         setTextFileName(file.name);
         setTextEdited(false);
       } else {
         const loaded = await loadPdf(file, mode, locale);
+        clearOutput();
         setPdf(loaded);
         setBatchIndex(0);
         setPages(mode === 'pdf-to-images' && loaded.count > UTILITY_LIMITS.maxImagePagesPerRun
@@ -252,7 +257,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
             event.stopPropagation();
             setDragging(false);
             if (event.dataTransfer.files.length > 1) {
-              clearOutput();
+              // Reject without erasing a valid, possibly undownloaded result.
               setError(t.multipleFiles);
               return;
             }
