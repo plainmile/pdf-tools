@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, parseTextBlocks,
   textContentToLines, linesToReadableText, sanitizeFilename,
-  UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
+  UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
 
 test('compression reports actual savings; a larger result must not count as savings', () => {
