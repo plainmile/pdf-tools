@@ -177,6 +177,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const onlyImages = pages.length > 1 && pages.every(page => sourceLookup.get(page.sourceId)?.isImage);
   const hasOriginalPdf = pages.some(page => { const src = sourceLookup.get(page.sourceId); return src && !src.isImage && !src.isGeneratedBlank; });
   const activeFormSourceCount = countActiveSources(pages.filter(page => sourceLookup.get(page.sourceId)?.hasInteractiveForms));
+  const activeBookmarkSourceCount = countActiveSources(pages.filter(page => sourceLookup.get(page.sourceId)?.hasOutlineBookmarks));
   // Only a full Export PDF marks these particular edits as safely downloaded.
   // A later rotation/reorder/paper/watermark change immediately re-enables the
   // navigation guard; no document bytes ever leave browser RAM or enter storage.
@@ -830,6 +831,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         {activeFormSourceCount > 0 && <p className="utility-note workspace-form-risk"
           data-testid="workspace-form-risk" role="alert">
           {interpolate(t.formRisk, { files: activeFormSourceCount })}
+        </p>}
+        {activeBookmarkSourceCount > 0 && <p className="utility-note workspace-bookmark-risk"
+          data-testid="workspace-bookmark-risk" role="alert">
+          {interpolate(t.bookmarkRisk, { files: activeBookmarkSourceCount })}
         </p>}
         {largeWorkspace && <p className="utility-note" data-testid="workspace-large-warning">{t.bigDocWarning}</p>}
         {!pages.length ? (
