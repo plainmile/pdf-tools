@@ -7,7 +7,7 @@ import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLay
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
-  movePage, movePageGroup, pageDropSide, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges,
+  movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges,
   getRangePages, reversePages, sortPagesByFilename, groupPagesBySource, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
@@ -104,6 +104,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [history, setHistory] = useState(() => makeHistoryState());
   const [selected, setSelected] = useState(() => new Set());
   const [selectionRanges, setSelectionRanges] = useState('');
+  const [moveTargetInput, setMoveTargetInput] = useState('');
+  const [movePlacement, setMovePlacement] = useState('before');
   const [jumpInput, setJumpInput] = useState('');
   const [pendingJump, setPendingJump] = useState(null);
   const [downloadNameInput, setDownloadNameInput] = useState('');
@@ -302,6 +304,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         setChunkSize('');
         setSplitMode('ranges');
         setDownloadNameInput('');
+        setMoveTargetInput('');
+        setMovePlacement('before');
       }
       if (replacingDeletedPages) {
         releasePreviewDocuments();
@@ -503,6 +507,45 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     }
   };
 
+  const moveSelectedToPage = (event) => {
+    event.preventDefault();
+    if (busy || !pages.length || !selectedCount) return;
+    const normalized = moveTargetInput.trim().normalize('NFKC');
+    const target = Number(normalized);
+    if (!/^\\d+$/.test(normalized) || !Number.isSafeInteger(target) ||
+        target < 1 || target > pages.length) {
+      setError(interpolate(t.moveInvalid, { pages: pages.length }));
+      setNotice('');
+      return;
+    }
+    if (selected.has(pages[target - 1].id)) {
+      setError(t.moveTargetSelected);
+      setNotice('');
+      return;
+    }
+    try {
+      const moved = moveSelectedPagesToPosition(pages, selected, target, movePlacement);
+      if (moved === pages) {
+        setError('');
+        setNotice(t.moveUnchanged);
+        return;
+      }
+      const firstSelected = pages.find(page => selected.has(page.id));
+      const firstNewIndex = moved.findIndex(page => page.id === firstSelected.id) + 1;
+      // A single atomic history edit; selecting a target does not unselect
+      // moved page IDs or silently change the user's requested side.
+      commit(() => moved, true);
+      setMoveTargetInput('');
+      setPageView('order');
+      setPendingJump(firstNewIndex);
+      setNotice(interpolate(t.moveDone, { pages: selectedCount, position: target,
+        side: movePlacement === 'before' ? t.moveBefore : t.moveAfter }));
+    } catch (_error) {
+      setNotice('');
+      setError(t.moveInvalid);
+    }
+  };
+
   const clearAll = () => {
     setClearConfirm(false);
     setWatermarkEnabled(false); setWatermarkText(''); setExportSettingsOpen(mode === 'watermark-pdf');
@@ -510,7 +553,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setPageView('order'); setCollapsedSources(new Set());
     setLastDownloadedRevision(null);
     setRanges(''); setChunkSize(''); setSplitMode('ranges');
-    setSelectionRanges(''); setDownloadNameInput(''); setJumpInput(''); setPendingJump(null);
+    setSelectionRanges(''); setMoveTargetInput(''); setMovePlacement('before'); setDownloadNameInput(''); setJumpInput(''); setPendingJump(null);
     // A fresh image-to-PDF workspace must not inherit a previous crop choice.
     setImageLayout({ ...IMAGE_PDF_LAYOUT_DEFAULT });
     releasePreviewDocuments();
@@ -762,6 +805,31 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     <p className="input-note">{t.rangeSelectHint}</p>
                   </form>
                 </details>
+                {pages.length > 1 && <details className="move-position-panel" data-testid="move-position-panel">
+                  <summary>{t.moveToggle}</summary>
+                  <form className="move-position-form" onSubmit={moveSelectedToPage}>
+                    <label htmlFor="move-target-position">{interpolate(t.moveLabel, { pages: pages.length })}
+                      <input id="move-target-position" data-testid="move-target-input"
+                        type="text" inputMode="numeric" maxLength={8} placeholder="100"
+                        value={moveTargetInput} disabled={busy}
+                        onChange={event => setMoveTargetInput(event.target.value)} />
+                    </label>
+                    <label htmlFor="move-position-side">{t.movePositionSide}
+                      <select id="move-position-side" data-testid="move-position-side"
+                        value={movePlacement} disabled={busy}
+                        onChange={event => setMovePlacement(event.target.value)}>
+                        <option value="before">{t.moveBefore}</option>
+                        <option value="after">{t.moveAfter}</option>
+                      </select>
+                    </label>
+                    <button type="submit" className="button button-secondary button-small"
+                      data-testid="move-position-submit"
+                      disabled={busy || !selectedCount || selectedCount === pages.length || !moveTargetInput.trim()}>
+                      {t.moveApply}
+                    </button>
+                    <p className="input-note">{selectedCount === pages.length ? t.moveAllSelected : t.moveHint}</p>
+                  </form>
+                </details>}
                 <p className="input-note" data-testid="blank-position-hint">{t.blankHint}</p>
                 <div className="workspace-view-switch" role="group" aria-label={t.viewBySource} data-testid="workspace-view-switch">
                   <button type="button" data-testid="workspace-view-order"
