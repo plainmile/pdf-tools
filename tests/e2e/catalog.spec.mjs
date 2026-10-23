@@ -123,3 +123,13 @@ test('every standalone converter has visible bilingual file-drop guidance', asyn
     }
   }
 });
+
+test('localized footer provides a clear privacy-safe issue reporting route', async ({ page }) => {
+  for (const [route, label] of [['/', 'Report an issue'], ['/zh/', '反馈问题']]) {
+    await page.goto(route);
+    const report = page.locator('[data-report-issue]');
+    await expect(report).toHaveText(label + ' ↗');
+    await expect(report).toHaveAttribute('href', 'https://github.com/plainmile/pdf-tools/issues/new/choose');
+    await expect(report).toHaveAttribute('rel', /noopener noreferrer/);
+  }
+});
