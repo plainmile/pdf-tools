@@ -60,6 +60,20 @@ export function movePageGroup(pages, pageIds, targetId) {
   return result.every((page, index) => page === pages[index]) ? pages : result;
 }
 
+/** Predict the exact insertion side of the current drag operations.
+ * A single page inserted at a later target goes AFTER it; otherwise BEFORE.
+ * Grouped selected pages always insert BEFORE the target page.
+ * This helper changes visual feedback, never the established page ordering.
+ */
+export function pageDropSide(pages, movingIds, targetId) {
+  if (!Array.isArray(movingIds) || !movingIds.length) return null;
+  if (movingIds.includes(targetId)) return null;
+  const fromIndex = pages.findIndex(page => page.id === movingIds[0]);
+  const toIndex = pages.findIndex(page => page.id === targetId);
+  if (fromIndex < 0 || toIndex < 0) return null;
+  return movingIds.length > 1 || fromIndex > toIndex ? 'before' : 'after';
+}
+
 export function shiftPage(pages, pageId, delta) {
   const from = pages.findIndex((page) => page.id === pageId);
   const to = from + delta;

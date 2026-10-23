@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  movePage, movePageGroup, shiftPage, rotatePages, deletePages, parsePageRanges,
+  movePage, movePageGroup, pageDropSide, shiftPage, rotatePages, deletePages, parsePageRanges,
   chunkPageRanges, getRangePages, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
   reversePages, sortPagesByFilename, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges,
@@ -27,6 +27,18 @@ test('moving forward places item after drop target', () => {
   assert.strictEqual(movePage(pages, 'a', 'missing'), pages);
   assert.deepEqual(ids(shiftPage(pages, 'b', -1)), ['b', 'a', 'c']);
   assert.strictEqual(shiftPage(pages, 'a', -1), pages);
+});
+
+test('drop indicator describes exactly where the existing drag algorithms insert pages', () => {
+  assert.equal(pageDropSide(pages, ['c'], 'a'), 'before');
+  assert.deepEqual(ids(movePage(pages, 'c', 'a')), ['c', 'a', 'b']);
+  assert.equal(pageDropSide(pages, ['a'], 'c'), 'after');
+  assert.deepEqual(ids(movePage(pages, 'a', 'c')), ['b', 'c', 'a']);
+  assert.equal(pageDropSide(pages, ['a', 'c'], 'b'), 'before');
+  assert.deepEqual(ids(movePageGroup(pages, ['a','c'], 'b')), ['a', 'c', 'b']);
+  assert.equal(pageDropSide(pages, ['a', 'c'], 'a'), null);
+  assert.equal(pageDropSide(pages, ['a'], 'missing'), null);
+  assert.equal(pageDropSide(pages, [], 'a'), null);
 });
 
 test('rotate only selected pages, normalize degrees', () => {

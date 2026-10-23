@@ -269,6 +269,16 @@ main { flex: 1; }
 .page-tile:hover { border-color: var(--accent); }
 .page-tile.is-selected { outline: 2px solid var(--accent); background: var(--accent-wash); }
 .page-tile.is-dragging { opacity: .65; }
+/* Reveal the actual before/after insertion point; do not guess from cursor.
+ * CSS pseudo-elements add no extra controls or drag hit targets.
+ */
+.page-tile.is-drop-before::before, .page-tile.is-drop-after::after {
+  content: ''; position: absolute; top: -5px; bottom: -5px; width: 4px;
+  border-radius: 5px; background: var(--accent); z-index: 4;
+  pointer-events: none; box-shadow: 0 0 0 2px var(--surface);
+}
+.page-tile.is-drop-before::before { left: -8px; }
+.page-tile.is-drop-after::after { right: -8px; }
 .page-tile-checkbox { position: absolute; left: 15px; top: 13px; z-index: 2; background: var(--surface); border-radius: 4px; width: 24px; height: 24px; display: grid; place-items: center; }
 .page-tile-checkbox input { cursor: pointer; accent-color: var(--accent); margin: 0; width: 16px; height: 16px; }
 .tile-sequence { position: absolute; top: 18px; right: 16px; color: var(--subtle); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
