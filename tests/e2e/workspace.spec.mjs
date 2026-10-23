@@ -217,6 +217,7 @@ test('deleting every page allows the workspace to be completely reset', async ({
   await page.getByRole('button', { name: 'Delete selected pages' }).click();
   await expect(page.getByTestId('dropzone')).toBeVisible();
   await page.getByRole('button', { name: 'Clear workspace and start over' }).click();
+  await page.getByTestId('confirm-clear').click();
   await page.getByTestId('file-input').setInputFiles((await inputDocuments())[0]);
   await expect(page.getByTestId('page-tile')).toHaveCount(2);
   const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
@@ -320,6 +321,8 @@ test('image import uses filename when MIME is generic and blocks oversized PNG b
   const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
   expect(output.getPageCount()).toBe(1);
   await page.getByRole('button', { name: 'Clear', exact: true }).click();
+  await expect(page.getByTestId('clear-confirmation')).toBeVisible();
+  await page.getByTestId('confirm-clear').click();
   const header = Buffer.alloc(24);
   Buffer.from([137,80,78,71,13,10,26,10]).copy(header, 0);
   Buffer.from('IHDR').copy(header, 12);
@@ -517,6 +520,8 @@ test('split requires deliberate input for a 320-page book and starts blank after
   await expect(page.locator('.split-estimate')).toContainText('2 PDF file(s)');
   await expect(download).toBeEnabled();
   await page.getByRole('button', { name: 'Clear', exact: true }).click();
+  await expect(page.getByTestId('clear-confirmation')).toBeVisible();
+  await page.getByTestId('confirm-clear').click();
   await page.getByTestId('file-input').setInputFiles({
     name: 'new-document.pdf', mimeType: 'application/pdf', buffer: await makePdf([350, 351, 352, 353]),
   });
@@ -876,4 +881,36 @@ test('oversized WebP header is rejected before canvas decode, while ordinary Web
   const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
   expect(output.getPageCount()).toBe(1);
   expect(output.getPage(0).getWidth()).toBeCloseTo(595.28, 1);
+});
+
+test('irreversible workspace reset has a cancellable confirmation and preserves edits until confirmed', async ({ page }) => {
+  await loadInput(page);
+  await page.getByRole('checkbox', { name: 'Select page 3' }).check();
+  await page.getByRole('button', { name: 'Delete selected pages' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
+  await expect(page.getByTestId('clear-confirmation')).toContainText('undo history');
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await page.getByTestId('cancel-clear').click();
+  await expect(page.getByTestId('clear-confirmation')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
+  await page.getByTestId('confirm-clear').click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(0);
+  await expect(page.getByTestId('clear-confirmation')).toHaveCount(0);
+  await expect(page.getByTestId('undo-all-deleted')).toHaveCount(0);
+});
+
+test('mobile Chinese clear confirmation preserves document when cancelled', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'private-synthetic.pdf', mimeType: 'application/pdf', buffer: await makePdf([301]),
+  });
+  await page.getByRole('button', { name: '清空', exact: true }).click();
+  await expect(page.getByTestId('clear-confirmation')).toContainText('永久清除');
+  await page.getByTestId('cancel-clear').click();
+  const pdf = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
+  expect(pdf.getPage(0).getWidth()).toBe(301);
 });
