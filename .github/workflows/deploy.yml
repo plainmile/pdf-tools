@@ -64,12 +64,31 @@ jobs:
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
         run: |
           set -eu
+          # Existing Compose services live under /opt/compose on this VPS.
+          # Move the old pdf-tools directory only when the target does not
+          # exist; never overwrite or delete a pre-existing target directory.
           ssh -p "$DEPLOY_PORT" -o BatchMode=yes -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
-            'mkdir -p /opt/data/compose/pdf-tools'
+            '/bin/sh -s' <<'REMOTE'
+          set -eu
+          mkdir -p /opt/compose
+          if [ -L /opt/compose/pdf-tools ]; then
+            echo 'Refusing to deploy through a symlink at /opt/compose/pdf-tools' >&2
+            exit 1
+          fi
+          if [ ! -e /opt/compose/pdf-tools ] && [ -d /opt/data/compose/pdf-tools ] && [ ! -L /opt/data/compose/pdf-tools ]; then
+            mv /opt/data/compose/pdf-tools /opt/compose/pdf-tools
+          else
+            mkdir -p /opt/compose/pdf-tools
+          fi
+          test -d /opt/compose/pdf-tools
+          if [ -d /opt/data/compose/pdf-tools ]; then
+            echo 'Legacy compose directory still exists; leave it untouched until manually reviewed.'
+          fi
+          REMOTE
           scp -P "$DEPLOY_PORT" -o BatchMode=yes -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes compose.prod.yaml \
-            "$DEPLOY_USER@$DEPLOY_HOST:/opt/data/compose/pdf-tools/compose.prod.yaml"
+            "$DEPLOY_USER@$DEPLOY_HOST:/opt/compose/pdf-tools/compose.prod.yaml"
 
       - name: Deploy the exact published image and check its health
         env:
@@ -87,7 +106,8 @@ jobs:
             -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
             "IMAGE_TAG=$IMAGE_TAG /bin/sh -s" <<'REMOTE'
           set -eu
-          cd /opt/data/compose/pdf-tools
+          cd /opt/compose/pdf-tools
+          docker compose -f compose.prod.yaml config --quiet
           docker network inspect edge >/dev/null
           umask 077
           printf 'IMAGE_TAG=%s\n' "$IMAGE_TAG" > .env
@@ -95,7 +115,14 @@ jobs:
           docker compose -f compose.prod.yaml up -d
           for i in $(seq 1 24); do
             status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' plainmile-pdf-tools 2>/dev/null || true)
-            if [ "$status" = healthy ]; then exit 0; fi
+            if [ "$status" = healthy ]; then
+              working_dir=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' plainmile-pdf-tools)
+              if [ "$working_dir" != /opt/compose/pdf-tools ]; then
+                echo "Unexpected Compose working directory: $working_dir" >&2
+                exit 1
+              fi
+              exit 0
+            fi
             sleep 5
           done
           docker compose -f compose.prod.yaml ps
