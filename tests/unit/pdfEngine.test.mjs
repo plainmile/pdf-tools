@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { imageTypeFor, isSupportedFile, compressedImageDimensions } from '../../src/lib/pdfEngine.mjs';
+import { imageTypeFor, isSupportedFile, compressedImageDimensions, composePdf } from '../../src/lib/pdfEngine.mjs';
+import { PDFDocument } from 'pdf-lib';
 
 test('recognize JPEG/PNG/WebP images even with missing or generic MIME types', () => {
   for (const [name, type] of [['photo.JPG', 'image/jpeg'], ['figure.png', 'image/png'], ['cover.WebP', 'image/webp']]) {
@@ -89,4 +90,31 @@ test('WebP preflight refuses malformed, truncated or unsized RIFF headers', () =
   const spoof = new Uint8Array(valid);
   new DataView(spoof.buffer).setUint32(16, 0xfffffffe, true);
   assert.throws(() => compressedImageDimensions('image/webp', spoof), /Invalid image header/);
+});
+
+test('long PDF export reports real pages and rejects cancellation without returning partial PDF', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([300, 500]);
+  const source = { id: 'original', bytes: new Uint8Array(await doc.save()) };
+  const pages = Array.from({ length: 12 }, (_, index) =>
+    ({ id: String(index), sourceId: 'original', pageIndex: 0, rotation: 0 }));
+  const abort = new AbortController();
+  const progress = [];
+  await assert.rejects(
+    composePdf([source], pages, {
+      signal: abort.signal,
+      cancelMessage: 'PDF export cancelled.',
+      onProgress: (done, total) => {
+        progress.push([done, total]);
+        if (done === 1) abort.abort();
+      },
+    }),
+    /PDF export cancelled/,
+  );
+  assert.deepEqual(progress, [[1, 12]]);
+  const good = await composePdf([source], pages, {
+    onProgress: (done, total) => progress.push([done, total]),
+  });
+  assert.equal((await PDFDocument.load(good)).getPageCount(), 12);
+  assert.deepEqual(progress.at(-1), [12, 12]);
 });
