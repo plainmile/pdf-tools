@@ -55,10 +55,10 @@ export const siteCopy = {
 };
 
 export const chineseTools = {
-  workspace: { title: 'PDF 工作台', short: '一个地方，整理全部页面', headline: '自由整理每一页 PDF。', description: '把多个 PDF 或图片组合起来，拖拽排序、旋转、删除、提取并导出。所有操作在浏览器本地完成。', details: '添加文件后即可看到全部页面缩略图。按您指定的顺序编辑，再导出新的 PDF。', steps: ['添加 PDF 或图片', '按需调整页面顺序', '导出 PDF'] },
+  workspace: { title: 'PDF 工作台', short: '一个地方，整理全部页面', headline: '自由整理每一页 PDF。', description: '在浏览器本地整理 PDF：拖拽排序、旋转、复制页面、插入空白页、删除或提取，不上传原始文件。', details: '添加 PDF 或图片后预览全部页面；可复制选中页，或按相邻纸张大小插入空白页，再下载新的 PDF。', steps: ['添加 PDF 或图片', '按需调整页面顺序', '导出 PDF'] },
   'merge-pdf': { title: '合并 PDF', short: '多个文件，合并成一个', headline: '按您指定的顺序合并 PDF。', description: '合并多个 PDF，导出前可预览、逐页调整顺序。不必上传文件到服务器。', details: '不仅能调整文件顺序，还能混排不同文件中的页面，旋转扫描件并删除不需要的页面。', steps: ['添加多个 PDF', '调整页面顺序', '导出合并后的 PDF'] },
   'split-pdf': { title: '拆分 PDF', short: '按范围或固定页数拆分', headline: '将 PDF 拆分成需要的部分。', description: '按页码范围或每 N 页拆分 PDF，将结果打包成 ZIP 下载。文件在本地处理。', details: '输入 1-3, 4-6 等范围，每个范围独立输出；也可以按固定页数自动拆分。', steps: ['添加 PDF', '输入拆分范围或每份页数', '下载 ZIP'] },
-  'organize-pdf': { title: '整理 PDF 页面', short: '缩略图拖拽排序', headline: '让每一页出现在正确位置。', description: '通过缩略图和移动按钮调整 PDF 页面顺序，支持撤销和重做。', details: '跨文件调整页面顺序，旋转、删除页面。也可通过键盘可操作的按钮移动页面。', steps: ['添加文件', '预览并排序', '导出 PDF'] },
+  'organize-pdf': { title: '整理 PDF 页面', short: '缩略图拖拽排序', headline: '让每一页出现在正确位置。', description: '可视化排序、复制 PDF 页面、插入空白页，还能旋转与删除。支持撤销、重做和本地导出。', details: '跨文件调整页面顺序，复制选中页或插入与相邻页面等尺寸的空白页。支持键盘操作，不上传文档。', steps: ['添加文件', '预览并排序', '导出 PDF'] },
   'rotate-pdf': { title: '旋转 PDF 页面', short: '修正方向不对的扫描页', headline: '轻松调整歪倒的页面。', description: '选中一页或多页，以 90° 为单位旋转，再导出新的 PDF。', details: '选中方向不正确的页面，向左或向右旋转。原始文件不会被修改。', steps: ['添加 PDF', '选择并旋转页面', '导出 PDF'] },
   'extract-pages': { title: '提取 PDF 页面', short: '只保留需要的页面', headline: '把选中的页面单独保存。', description: '从一个或多个 PDF 中勾选页面，按照工作台当前顺序提取成新 PDF。', details: '适合从报告、合同和附件中快速提取需要的几页。', steps: ['添加 PDF', '选择需要的页面', '导出所选页面'] },
   'delete-pages': { title: '删除 PDF 页面', short: '去除不需要的页面', headline: '去掉不需要的 PDF 页面。', description: '预览并批量删除页面，支持撤销操作。不会修改原始 PDF。', details: '勾选一个或多个页面、删除、核对结果，再下载整理好的文档。', steps: ['添加 PDF', '选择并删除页面', '导出 PDF'] },
