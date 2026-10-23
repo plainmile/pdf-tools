@@ -81,6 +81,8 @@ test('Chinese watermark page supports custom Chinese text and resets to no water
   const marked = await downloadPdf(page, () => page.getByRole('button', { name: '\u5bfc\u51fa PDF' }).click());
   expect(watermarkImageCounts(marked)).toEqual([1, 1]);
   await page.getByRole('button', { name: '\u6e05\u7a7a', exact: true }).click();
+  await expect(page.getByTestId('clear-confirmation')).toContainText('永久清除');
+  await page.getByTestId('confirm-clear').click();
   await page.getByTestId('file-input').setInputFiles((await inputDocuments())[0]);
   await expect(page.getByTestId('watermark-toggle')).not.toBeChecked();
   const plain = await downloadPdf(page, () => page.getByRole('button', { name: '\u5bfc\u51fa PDF' }).click());
