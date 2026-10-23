@@ -13,6 +13,7 @@
 - Do not add OAuth, ad code, telemetry, remote fonts, third-party upload APIs or paid AI without explicit approval and privacy review.
 - Production container must not bind ports 80 or 443 on the host. Domain and TLS changes require testing edge proxy config and preserving current routes.
 - The remote repository and DNS/Nginx have been created by the user. Never present a branch/PR or published image as proof of a deployed and browser-tested production site.
+- Long PDF exports need cooperative cancellation and visible page progress; aborted exports must never download partial files. Setting fit-to-image must clear any hidden crop/cover option, and image-page layout must be initialized from active images, not stale Undo-only sources. Show advanced PDF feature-loss warnings only when the active workspace contains an original PDF.
 
 - Text watermarks must be opt-in and off by default, including after clearing the workspace. Never insert a branded watermark automatically. Treat them as visual marks, not redactions. All operations remain browser-local and must work for CJK text where system fonts are present.
 
