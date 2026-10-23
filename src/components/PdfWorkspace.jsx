@@ -836,7 +836,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           data-testid="workspace-bookmark-risk" role="alert">
           {interpolate(t.bookmarkRisk, { files: activeBookmarkSourceCount })}
         </p>}
-        {largeWorkspace && <p className="utility-note" data-testid="workspace-large-warning">{t.bigDocWarning}</p>
+        {largeWorkspace && <p className="utility-note" data-testid="workspace-large-warning">{t.bigDocWarning}</p>}
         {!pages.length ? (
           <div className="dropzone" data-testid="dropzone" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); void addFiles(event.dataTransfer.files); }}>
             <div className="drop-icon" aria-hidden="true">＋</div>
