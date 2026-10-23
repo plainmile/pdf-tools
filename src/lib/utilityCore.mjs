@@ -188,8 +188,11 @@ export function stripMarkdownInline(source) {
   return source.replace(/!?\[([^\]]+)\]\([^\n)]+\)/g, '$1')
     // Remove actual HTML-looking tags and comments, but never erase
     // comparisons such as "value < 3 && count > 2" in technical Markdown.
-    .replace(/(?:\*\*|__|\*|_|~~|`)/g, '')
-    .replace(/<!--[\s\S]*?-->|<\/?[A-Za-z][^>]*>/g, '');
+    .replace(/<!--[\s\S]*?-->|<\/?[A-Za-z][^>]*>/g, '')
+    // Strip only MATCHED Markdown formatting markers. Removing every '*' and
+    // '_' silently corrupts identifiers (user_id), multiplication (a*b) and
+    // exponent notation (x**2) in technical reports.
+    .replace(/(?<![\p{L}\p{N}_])(\*\*|__|~~|`|\*|_)(?=\S)([^\n]*?\S)\1(?![\p{L}\p{N}_])/gu, '$2');
 }
 export function textContentToLines(content) {
   // PDF is positioned text, not a logical document. Sort approximately by baseline and X.
