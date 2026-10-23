@@ -363,9 +363,13 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}) {
     if (layout.clip) page.pushOperators(popGraphicsState());
     return new Uint8Array(await doc.save({ useObjectStreams: true }));
   } catch (error) {
+    if (imageType === 'image/avif' && error?.name === 'InvalidStateError') {
+      throw new Error('This AVIF could not be decoded in your browser. Try PNG or WebP.');
+    }
     if (error?.message === 'Image dimensions are too large.' ||
         error?.message === 'JPEG metadata could not be safely removed.' ||
-        /^Animated (AVIF|WebP) is not supported\.$/.test(error?.message)) throw error;
+        /^Animated (AVIF|WebP) is not supported\.$/.test(error?.message) ||
+        /^This AVIF could not be decoded/.test(error?.message)) throw error;
     throw new Error(`${file.name}: image could not be converted to PDF.`);
   } finally {
     bitmap?.close();
