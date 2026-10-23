@@ -144,3 +144,36 @@ test('photo-only import should not show irrelevant interactive-form and signatur
   await expect(page.getByTestId('page-tile')).toHaveCount(1);
   await expect(page.getByTestId('workspace-document-caution')).toHaveCount(0);
 });
+
+test('undo after reimport reactivates old paper settings and blocks mixed-layout export', async ({ page }) => {
+  await page.goto('/image-to-pdf/');
+  const doc = await PDFDocument.create();
+  doc.addPage([300, 400]);
+  await page.getByTestId('file-input').setInputFiles([
+    { name: 'original-photo.png', mimeType: 'image/png', buffer: await picture(page, 140, 100) },
+    { name: 'keep-original-pdf.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await doc.save()) },
+  ]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await page.getByRole('checkbox', { name: 'Select page 1', exact: true }).check();
+  await page.getByRole('button', { name: 'Delete selected pages' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  await page.getByTestId('image-paper').selectOption('letter');
+  await page.getByTestId('image-margin').selectOption('12');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'new-letter-photo.png', mimeType: 'image/png', buffer: await picture(page, 155, 105),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await expect(page.getByTestId('image-layout-dirty')).toHaveCount(0);
+  // Undo new import, then undo prior photo deletion: older A4 page is back.
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await expect(page.getByTestId('image-layout-dirty')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Export PDF' })).toBeDisabled();
+  await page.getByTestId('image-layout-apply').click();
+  await expect(page.getByTestId('image-layout-dirty')).toHaveCount(0);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export PDF' }).click();
+  const output = await PDFDocument.load(await readFile(await (await download).path()));
+  expect(output.getPages().map(p => Math.round(p.getWidth()))).toEqual([612, 300]);
+});
