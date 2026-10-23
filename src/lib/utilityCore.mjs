@@ -191,7 +191,15 @@ const PLAIN_MARKDOWN_HTML_TAGS = new Set(
 );
 // Intentionally a minimal CommonMark subset: never execute HTML, remote images or scripts.
 export function stripMarkdownInline(source) {
-  return source.replace(/!?\[([^\]]+)\]\([^\n)]+\)/g, '$1')
+  // Shield single-backtick inline code before stripping links, HTML or emphasis.
+  // Those tokens are literal text (e.g. `<strong>`, not an HTML element).
+  const inlineCode = [];
+  let marker = '\uE000';
+  while (source.includes(marker)) marker = String.fromCharCode(marker.charCodeAt(0) + 1);
+  const outsideCode = source.replace(/`([^`\n]+)`/g, (_token, literal) => {
+    return `${marker}${inlineCode.push(literal) - 1}${marker}`;
+  });
+  return outsideCode.replace(/!?\[([^\]]+)\]\([^\n)]+\)/g, '$1')
     // Strip only recognizable HTML tags with syntactically valid attributes.
     // Preserve "List<T>", "<username>", and "a<b && c>d" verbatim.
     .replace(/<!--[\s\S]*?-->|<\/?([A-Za-z][\w:-]*)(?:\s+[A-Za-z_:][\w:.-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*\s*\/?>/g,
@@ -199,7 +207,9 @@ export function stripMarkdownInline(source) {
     // Strip only MATCHED Markdown formatting markers. Removing every '*' and
     // '_' silently corrupts identifiers (user_id), multiplication (a*b) and
     // exponent notation (x**2) in technical reports.
-    .replace(/(?<![\p{L}\p{N}_])(\*\*|__|~~|`|\*|_)(?=\S)([^\n]*?\S)\1(?![\p{L}\p{N}_])/gu, '$2');
+    .replace(/(?<![\p{L}\p{N}_])(\*\*|__|~~|`|\*|_)(?=\S)([^\n]*?\S)\1(?![\p{L}\p{N}_])/gu, '$2')
+    .replace(new RegExp(`${marker}(\\d+)${marker}`, 'g'),
+      (_token, index) => inlineCode[Number(index)]);
 }
 export function textContentToLines(content) {
   // PDF is positioned text, not a logical document. Sort approximately by baseline and X.
