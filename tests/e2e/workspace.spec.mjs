@@ -1397,7 +1397,7 @@ test('book-length jump targets the true output position without reordering or ch
     name: 'long-book.pdf', mimeType: 'application/pdf', buffer: book,
   });
   await expect(page.getByTestId('page-tile')).toHaveCount(125);
-  await page.getByRole('checkbox', { name: 'Select page 2' }).check();
+  await page.getByRole('checkbox', { name: 'Select page 2', exact: true }).check();
   await page.getByTestId('workspace-view-grouped').click();
   await expect(page.getByTestId('source-group')).toHaveCount(1);
   await page.getByTestId('page-jump-panel').locator('summary').click();
@@ -1407,7 +1407,7 @@ test('book-length jump targets the true output position without reordering or ch
   const target = page.locator('[data-testid="page-grid"] [data-export-position="121"]');
   await expect(target).toBeInViewport({ timeout: 15000 });
   await expect(target).toHaveAttribute('aria-label', 'Output page 121');
-  await expect(page.getByRole('checkbox', { name: 'Select page 2' })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Select page 2', exact: true })).toBeChecked();
   const exported = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
   expect(exported.getPageCount()).toBe(125);
   expect(exported.getPage(120).getWidth()).toBe(420);
