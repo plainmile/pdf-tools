@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, parseTextBlocks,
   textContentToLines, linesToReadableText, sanitizeFilename,
-  UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
+  UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
 
 test('compression reports actual savings; a larger result must not count as savings', () => {
@@ -79,6 +79,16 @@ test('image batch suggestions cover the entire book without overlapping or excee
   assert.throws(() => imagePageBatch(1001), /Invalid/);
   assert.throws(() => imagePageBatch(100, -1), /outside/);
   assert.throws(() => imagePageBatch(100, 2), /outside/);
+});
+
+test('custom image range returns to the nearest standard page batch rather than stale first batch', () => {
+  assert.equal(batchIndexFromCustomPages('301-306', 500, 0), 5);
+  assert.equal(batchIndexFromCustomPages('１２１－１２５', 125, 0), 2);
+  assert.equal(batchIndexFromCustomPages('61,1', 125, 0), 1);
+  assert.equal(batchIndexFromCustomPages('99-1', 320, 3), 3);
+  assert.equal(batchIndexFromCustomPages('1000', 320, 2), 2);
+  assert.equal(batchIndexFromCustomPages('1-320', 320, 4), 4);
+  assert.throws(() => batchIndexFromCustomPages('301', 0, 0), /Invalid/);
 });
 
 test('batch output budget and cancellation prevent oversized downloads', () => {
