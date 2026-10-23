@@ -69,6 +69,7 @@ test('compression never auto-downloads, blocks a larger PDF, and shows actual by
     throw new Error('Compression output missing. Alerts: ' + JSON.stringify(await page.getByRole('alert').allTextContents()));
   });
   await expect(page.getByTestId('compression-download')).toBeDisabled();
+  await expect(page.getByTestId('compression-preview-action')).toHaveCount(0);
   await expect(page.getByRole('status')).toContainText('Stopped early');
   await expect(page.getByTestId('compression-change-label')).toHaveText('Size increase');
   await expect(page.getByTestId('compression-result')).toContainText('At least');
@@ -95,6 +96,11 @@ test('compression never auto-downloads, blocks a larger PDF, and shows actual by
   await page.getByTestId('utility-run').click();
   await expect(page.getByTestId('compression-download')).toBeEnabled();
   await expect(page.getByTestId('compression-change-label')).toHaveText('Saved');
+  await page.getByTestId('compression-preview-action').click();
+  await expect(page.getByTestId('compression-preview')).toBeVisible();
+  await expect.poll(() => page.getByTestId('compression-preview').locator('canvas').evaluate(canvas => canvas.width), { timeout: 15000 }).toBeGreaterThan(0);
+  await page.getByTestId('compression-preview-action').click();
+  await expect(page.getByTestId('compression-preview')).toHaveCount(0);
   await expect(page.getByTestId('compression-change-value')).not.toContainText('-');
   const compressed = await getDownload(page, () => page.getByTestId('compression-download').click());
   expect(compressed.bytes.byteLength).toBeLessThan(input.byteLength);
