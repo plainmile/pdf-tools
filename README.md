@@ -68,6 +68,11 @@ Use the visible **Report an issue / 反馈问题** link in the website footer, o
 
 The PDF.js Worker lives at the stable path `/pdfjs/pdf.worker.min.mjs`, while Astro application chunks have versioned filenames. Nginx requires the Worker to be revalidated (`Cache-Control: no-cache`) on each navigation to prevent a stale Worker from becoming incompatible with the updated PDF.js client after an upgrade. Versioned JS/CSS assets continue to use short-lived normal caching. The Docker CI smoke test verifies the Worker MIME type and cache response headers.
 
+## Workbench reset and exported PDF metadata
+
+- **Clear requires confirmation:** The workspace's irreversible reset explicitly asks before removing imported files, page edits and Undo/Redo history. Cancel keeps the entire edited document intact. This is different from Delete selected pages, which remains Undo-able.
+- **No automatic PDF branding in document properties:** Newly composed/merged/extracted/split PDFs no longer insert `PlainMile PDF` as Title or Creator. Automatic default Producer metadata is disabled for these new documents too. The visible official-site attribution remains on the web page. This is **not a general PDF metadata-scrubbing service**: embedded XMP, page-level attachments, images, or other structures may retain metadata, so do not rely on it for sensitive redaction.
+
 ## Important safety and editing behavior
 
 - **Merge/organize/rotate/extract/split** create a *new* PDF by copying pages. Interactive forms, signed documents, embedded attachments and some annotations may be lost, or signatures invalidated. These operations are not certified archival or preservation workflows. Keep the original and compare important exports.
