@@ -1176,3 +1176,41 @@ test('two same-tick PDF drop batches cannot bypass 20-file workspace safety limi
   await expect(page.getByRole('alert')).toContainText('at most 20 files');
   await expect(page.getByTestId('page-tile')).toHaveCount(12);
 });
+
+test('optional custom PDF filename follows safe preview and resets without changing PDF pages', async ({ page }) => {
+  await loadInput(page);
+  await page.getByTestId('download-name-panel').locator('summary').click();
+  const filenameInput = page.getByTestId('download-name-input');
+  await filenameInput.fill('  ../Client Review 2026.pdf  ');
+  await expect(page.getByTestId('workspace-export-filename')).toContainText('Client-Review-2026.pdf');
+  const pending = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export PDF' }).click();
+  const named = await pending;
+  expect(named.suggestedFilename()).toBe('Client-Review-2026.pdf');
+  const doc = await PDFDocument.load(await readFile(await named.path()));
+  expect(doc.getPages().map(p => p.getWidth())).toEqual([300,310,320]);
+  await page.getByRole('button', { name: 'Use suggested name' }).click();
+  await expect(page.getByTestId('workspace-export-filename')).toContainText('plainmile-2-files-organized.pdf');
+  await filenameInput.fill('??...///');
+  await expect(page.getByTestId('workspace-export-filename')).toContainText('plainmile-2-files-organized.pdf');
+});
+
+test('Chinese custom download name affects split ZIP but does not change page identity', async ({ page }) => {
+  await page.goto('/zh/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({ name: 'pages.pdf', mimeType: 'application/pdf', buffer: await makePdf([301,302,303]) });
+  await expect(page.locator('.file-count')).toContainText('3 页');
+  await page.getByTestId('download-name-panel').locator('summary').click();
+  await page.getByTestId('download-name-input').fill('客户报告.pdf');
+  await expect(page.getByTestId('workspace-export-filename')).toContainText('客户报告.pdf');
+  await page.getByRole('textbox', { name: '页码范围' }).fill('1, 2-3');
+  const pending = page.waitForEvent('download');
+  await page.getByRole('button', { name: '下载拆分文件（ZIP）' }).click();
+  const dl = await pending;
+  expect(dl.suggestedFilename()).toBe('客户报告-split.zip');
+  const zip = await JSZip.loadAsync(await readFile(await dl.path()));
+  expect(Object.keys(zip.files).sort()).toEqual(['part-01-pages-1-1.pdf','part-02-pages-2-3.pdf']);
+  const first = await PDFDocument.load(await zip.file('part-01-pages-1-1.pdf').async('uint8array'));
+  const second = await PDFDocument.load(await zip.file('part-02-pages-2-3.pdf').async('uint8array'));
+  expect(first.getPage(0).getWidth()).toBe(301);
+  expect(second.getPages().map(p => p.getWidth())).toEqual([302,303]);
+});
