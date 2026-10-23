@@ -96,6 +96,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const inputRef = useRef(null);
   const lastSelectedIndex = useRef(null);
   const lastGroupedSelection = useRef(null);
+  const pageGridRef = useRef(null);
   const previewDocuments = useRef(new Map());
   const splitAbortRef = useRef(null);
   const exportAbortRef = useRef(null);
@@ -103,6 +104,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [history, setHistory] = useState(() => makeHistoryState());
   const [selected, setSelected] = useState(() => new Set());
   const [selectionRanges, setSelectionRanges] = useState('');
+  const [jumpInput, setJumpInput] = useState('');
+  const [pendingJump, setPendingJump] = useState(null);
   const [downloadNameInput, setDownloadNameInput] = useState('');
   const [busy, setBusy] = useState(false);
   // `setBusy` is a UI update, not a lock. Same-tick file drops can both read
@@ -219,6 +222,35 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       return retained.length === previous.length ? previous : retained;
     });
   }, [history]);
+
+  // Jump to the *current export position*, not the page's original source
+  // number. Grouped view can be collapsed: switch to order then scroll after
+  // React mounts that grid. Do not change page order or selection.
+  useEffect(() => {
+    if (pendingJump === null || pageView !== 'order') return;
+    const tile = pageGridRef.current?.querySelector(`[data-export-position="${pendingJump}"]`);
+    if (tile) {
+      tile.scrollIntoView({ behavior: 'auto', block: 'center' });
+      tile.focus({ preventScroll: true });
+    }
+    setPendingJump(null);
+  }, [pendingJump, pageView, pages.length]);
+
+  const jumpToPage = (event) => {
+    event.preventDefault();
+    if (busy || !pages.length) return;
+    const value = jumpInput.trim().normalize('NFKC');
+    const number = Number(value);
+    if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(number) || number > pages.length) {
+      setError(interpolate(t.jumpInvalid, { pages: pages.length }));
+      setNotice('');
+      return;
+    }
+    setError('');
+    setNotice(interpolate(t.jumpFound, { n: number }));
+    setPendingJump(number);
+    if (pageView !== 'order') setPageView('order');
+  };
 
   const resetSelection = () => { setSelected(new Set()); lastSelectedIndex.current = null; lastGroupedSelection.current = null; };
   const commit = (operation, preserveSelection = false) => {
@@ -478,7 +510,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setPageView('order'); setCollapsedSources(new Set());
     setLastDownloadedRevision(null);
     setRanges(''); setChunkSize(''); setSplitMode('ranges');
-    setSelectionRanges(''); setDownloadNameInput('');
+    setSelectionRanges(''); setDownloadNameInput(''); setJumpInput(''); setPendingJump(null);
     // A fresh image-to-PDF workspace must not inherit a previous crop choice.
     setImageLayout({ ...IMAGE_PDF_LAYOUT_DEFAULT });
     releasePreviewDocuments();
@@ -739,6 +771,20 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     className={pageView === 'grouped' ? 'active' : ''} aria-pressed={pageView === 'grouped'} disabled={busy}
                     onClick={() => setPageView('grouped')}>{t.viewBySource}</button>
                 </div>
+                {pages.length > 1 && <details className="page-jump-panel" data-testid="page-jump-panel">
+                  <summary>{t.jumpToggle}</summary>
+                  <form onSubmit={jumpToPage} className="page-jump-form">
+                    <label htmlFor="page-jump-input">{interpolate(t.jumpLabel, { pages: pages.length })}
+                      <input id="page-jump-input" data-testid="page-jump-input" type="text"
+                        inputMode="numeric" maxLength={8} placeholder="137"
+                        value={jumpInput} disabled={busy}
+                        onChange={event => setJumpInput(event.target.value)} />
+                    </label>
+                    <button type="submit" className="button button-secondary button-small"
+                      data-testid="page-jump-submit" disabled={busy || !jumpInput.trim()}>{t.jumpAction}</button>
+                    <p className="input-note">{t.jumpHint}</p>
+                  </form>
+                </details>}
                 {onlyImages && <div className="page-action-buttons" data-testid="image-batch-actions"><button type="button" disabled={busy} onClick={() => commit(previous => sortPagesByFilename(previous, sources, locale))}>{t.sortFilename}</button><button type="button" disabled={busy} onClick={() => commit(reversePages)}>{t.reverseOrder}</button></div>}
                 {pageView === 'grouped' ? (
                   <div className="source-groups" data-testid="source-groups">
@@ -781,11 +827,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                       onClick={() => inputRef.current?.click()}>{t.addMore}</button>
                   </div>
                 ) : (
-                <div className="page-grid" data-testid="page-grid">
+                <div className="page-grid" data-testid="page-grid" ref={pageGridRef}>
                   {pages.map((pageRef, index) => {
                     const source = sourceLookup.get(pageRef.sourceId);
                     return (
                       <div className={`page-tile ${selected.has(pageRef.id) ? 'is-selected' : ''} ${dragged === pageRef.id ? 'is-dragging' : ''} ${dropTarget?.id === pageRef.id ? 'is-drop-' + dropTarget.side : ''}`} key={pageRef.id} data-testid="page-tile" data-original-page={pageRef.pageIndex + 1}
+                        data-export-position={index + 1} tabIndex={-1}
+                        role="group" aria-label={interpolate(t.jumpPositionLabel, { n: index + 1 })}
                         data-drop-side={dropTarget?.id === pageRef.id ? dropTarget.side : undefined}
                         draggable={!busy} onDragStart={(event) => {
                           const ids = selected.has(pageRef.id) ? pages.filter((page) => selected.has(page.id)).map((page) => page.id) : [pageRef.id];
