@@ -4,12 +4,14 @@ const COPY = {
   en: {
     title: 'Leave without saving your work?',
     message: 'This PDF or text is only in this browser tab. Leaving now loses any edits or results you have not downloaded. Export your work first, or keep editing.',
+    recoverableDeletedMessage: 'All pages have been deleted, but you can still Undo to restore them. Leaving now permanently loses that Undo history and the documents held only in this browser tab. Keep editing to restore the pages, or explicitly clear the workspace.',
     stay: 'Keep editing',
     leave: 'Leave without saving',
   },
   zh: {
     title: '确定离开并放弃未保存的内容？',
     message: '文件和编辑结果仅保存在当前浏览器标签页。离开后，尚未下载的修改或结果会丢失。您可以先导出，或者继续编辑。',
+    recoverableDeletedMessage: '所有页面已删除，但仍可通过“撤销”恢复。现在离开会永久丢失撤销历史及当前标签页保存的文档。请先继续编辑并撤销，或明确清空整个工作台。',
     stay: '继续编辑',
     leave: '放弃并离开',
   },
@@ -23,7 +25,7 @@ const COPY = {
  * each browser's user-interaction and dialog restrictions). Downloads, new-tab
  * links, Ctrl/Cmd-click and same-document fragment navigation are untouched.
  */
-export default function UnsavedNavigationGuard({ active = false, locale = 'en' }) {
+export default function UnsavedNavigationGuard({ active = false, locale = 'en', recoverableDeletedPages = false }) {
   const [pendingHref, setPendingHref] = useState(null);
   const allowLeave = useRef(false);
   const previousLink = useRef(null);
@@ -104,7 +106,7 @@ export default function UnsavedNavigationGuard({ active = false, locale = 'en' }
           }
         }}>
         <h2 id="unsaved-title">{t.title}</h2>
-        <p id="unsaved-message">{t.message}</p>
+        <p id="unsaved-message">{recoverableDeletedPages ? t.recoverableDeletedMessage : t.message}</p>
         <div className="unsaved-actions">
           <button ref={stayButton} type="button" className="button button-primary"
             data-testid="unsaved-keep" onClick={stay}>{t.stay}</button>

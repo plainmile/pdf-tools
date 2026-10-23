@@ -185,7 +185,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     paper: mode === 'image-to-pdf' ? imageLayout : null,
     watermark: watermarkEnabled ? watermarkText : null,
   }) : null, [pages, sources, imageLayout, watermarkEnabled, watermarkText, mode]);
-  const navigationWouldLoseWork = Boolean(pages.length && documentRevision !== lastDownloadedRevision);
+  // Deleting every page is still an unsaved edit. The original PDFs remain
+  // in the Undo history, but there is no nonempty PDF left to export until
+  // restored. Leaving the tab must not silently destroy the last Undo chance.
+  const recoverableDeletedPages = pages.length === 0 && history.past.some(snapshot => snapshot.length > 0);
+  const navigationWouldLoseWork = recoverableDeletedPages ||
+    Boolean(pages.length && documentRevision !== lastDownloadedRevision);
   const splitNeedsInput = splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim();
   const splitEstimate = useMemo(() => {
     if (!pages.length || (splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim())) return null;
@@ -660,7 +665,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
 
   return (
     <div className="pdf-workspace" data-testid="pdf-workspace">
-      <UnsavedNavigationGuard active={navigationWouldLoseWork} locale={locale} />
+      <UnsavedNavigationGuard active={navigationWouldLoseWork} locale={locale}
+        recoverableDeletedPages={recoverableDeletedPages} />
       {zoomPageRef && zoomSource && <PageZoomDialog
         source={zoomSource} pageRef={zoomPageRef} position={zoomPageIndex + 1}
         pageCount={pages.length} getPreviewDoc={getPreviewDoc}

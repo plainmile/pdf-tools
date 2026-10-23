@@ -112,3 +112,73 @@ test('plain PDF utility after import protects its source; explicit Clear release
   await page.locator('.primary-nav a[href="/merge-pdf/"]').click();
   await expect(page).toHaveURL(/\/merge-pdf\/$/);
 });
+
+test('deleting all pages protects the recoverable Undo history on internal and native navigation', async ({ page }) => {
+  await page.goto('/workspace/');
+  const doc = await PDFDocument.create();
+  doc.addPage([331, 490]);
+  doc.addPage([442, 590]);
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'all-deleted.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await doc.save()),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Select all' }).click();
+  await page.getByRole('button', { name: 'Delete selected pages' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(0);
+  await expect(page.getByTestId('undo-all-deleted')).toBeVisible();
+
+  const nativeGuard = () => page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  await expect.poll(nativeGuard).toBe(true);
+  await page.locator('.language-link').click();
+  await expect(page).toHaveURL(/\/workspace\/$/);
+  const dialog = page.getByTestId('unsaved-navigation-dialog');
+  await expect(dialog).toContainText('Undo to restore them');
+  await page.getByTestId('unsaved-keep').click();
+  await expect(dialog).toHaveCount(0);
+  await page.getByTestId('undo-all-deleted').click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  const outputEvent = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export PDF' }).click();
+  const outputFile = await outputEvent;
+  const restored = await PDFDocument.load(await (await import('node:fs/promises')).readFile(await outputFile.path()));
+  expect(restored.getPages().map(p => p.getWidth())).toEqual([331, 442]);
+
+  await expect.poll(nativeGuard).toBe(false);
+  await page.locator('.language-link').click();
+  await expect(page).toHaveURL(/\/zh\/workspace\/$/);
+});
+
+test('Chinese saved PDF becomes unsaved after deleting the final page; deliberate Clear releases the guard', async ({ page }) => {
+  await page.goto('/zh/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'one-page.pdf', mimeType: 'application/pdf', buffer: await syntheticPdf(),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '导出 PDF' }).click();
+  await download;
+  await page.getByRole('button', { name: '全选' }).click();
+  await page.getByRole('button', { name: '删除页面' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(0);
+  await expect(page.getByTestId('undo-all-deleted')).toBeVisible();
+
+  await page.locator('.language-link').click();
+  await expect(page.getByTestId('unsaved-navigation-dialog')).toContainText('仍可通过“撤销”恢复');
+  await page.getByTestId('unsaved-keep').click();
+  await page.getByRole('button', { name: '清空工作台，重新开始' }).click();
+  await expect(page.getByTestId('clear-confirmation')).toBeVisible();
+  await page.getByTestId('confirm-clear').click();
+  await expect(page.getByTestId('undo-all-deleted')).toHaveCount(0);
+  const isGuarded = await page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(isGuarded).toBe(false);
+  await page.locator('.language-link').click();
+  await expect(page).toHaveURL(/\/workspace\/$/);
+});
