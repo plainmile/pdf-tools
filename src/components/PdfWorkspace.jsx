@@ -95,6 +95,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const t = workspaceCopy[locale] ?? workspaceCopy.en;
   const inputRef = useRef(null);
   const lastSelectedIndex = useRef(null);
+  const lastGroupedSelection = useRef(null);
   const previewDocuments = useRef(new Map());
   const splitAbortRef = useRef(null);
   const exportAbortRef = useRef(null);
@@ -191,7 +192,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   }, []);
   useEffect(() => () => { splitAbortRef.current?.abort(); exportAbortRef.current?.abort(); releasePreviewDocuments(); }, [releasePreviewDocuments]);
 
-  const resetSelection = () => { setSelected(new Set()); lastSelectedIndex.current = null; };
+  const resetSelection = () => { setSelected(new Set()); lastSelectedIndex.current = null; lastGroupedSelection.current = null; };
   const commit = (operation, preserveSelection = false) => {
     setHistory((previous) => commitHistory(previous, operation(previous.present)));
     if (!preserveSelection) resetSelection();
@@ -377,18 +378,33 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     }
   });
 
-  const toggleSelection = (id, index, shift) => {
-    setSelected((previous) => {
+  const toggleSelection = (id, index, shift, group = null) => {
+    // Shift-range follows the VISIBLE grouped page order. A hidden page from
+    // another PDF must never be selected simply because it is interleaved in
+    // the underlying export order.
+    const groupPosition = group?.items.findIndex(item => item.pageRef.id === id) ?? -1;
+    const anchor = lastGroupedSelection.current;
+    setSelected(previous => {
       const next = new Set(previous);
-      if (shift && lastSelectedIndex.current !== null) {
-        const start = Math.min(index, lastSelectedIndex.current);
-        const end = Math.max(index, lastSelectedIndex.current);
-        for (let n = start; n <= end; n++) next.add(pages[n].id);
+      if (group && shift && anchor?.sourceId === group.sourceId && groupPosition >= 0) {
+        const first = Math.min(groupPosition, anchor.position);
+        const last = Math.max(groupPosition, anchor.position);
+        for (let n = first; n <= last; n++) next.add(group.items[n].pageRef.id);
+      } else if (!group && shift && lastSelectedIndex.current !== null) {
+        const first = Math.min(index, lastSelectedIndex.current);
+        const last = Math.max(index, lastSelectedIndex.current);
+        for (let n = first; n <= last; n++) next.add(pages[n].id);
       } else if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-    lastSelectedIndex.current = index;
+    if (group) {
+      lastGroupedSelection.current = { sourceId: group.sourceId, position: groupPosition };
+      lastSelectedIndex.current = null;
+    } else {
+      lastSelectedIndex.current = index;
+      lastGroupedSelection.current = null;
+    }
   };
 
   const clearAll = () => {
@@ -432,7 +448,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         data-export-position={index + 1}>
         <label className="page-tile-checkbox"><input type="checkbox"
           checked={selected.has(pageRef.id)} disabled={busy}
-          onChange={event => toggleSelection(pageRef.id, index, Boolean(event.nativeEvent?.shiftKey))}
+          onChange={event => toggleSelection(pageRef.id, index, Boolean(event.nativeEvent?.shiftKey), group)}
           aria-label={locale === 'zh' ? `${t.selectPage} ${index + 1} 页` : `Select page ${index + 1}`} /></label>
         <span className="tile-sequence" data-testid="group-output-position">{interpolate(t.groupOutputPosition, { n: index + 1 })}</span>
         <PageThumbnail source={source} pageRef={pageRef} getPreviewDoc={getPreviewDoc} locale={locale} t={t} watermarkPreview={watermarkPreview} />
@@ -574,7 +590,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
             {tab === 'organize' ? (
               <section aria-label={t.organize} className="pages-work-area">
                 <div className="selection-toolbar">
-                  <div className="selection-info"><strong>{selectedText}</strong><button type="button" disabled={busy} onClick={() => { setSelected(new Set(pages.map((page) => page.id))); lastSelectedIndex.current = null; }}>{t.all}</button><button type="button" onClick={resetSelection} disabled={busy || !selectedCount}>{t.none}</button></div>
+                  <div className="selection-info"><strong>{selectedText}</strong><button type="button" disabled={busy} onClick={() => { setSelected(new Set(pages.map((page) => page.id))); lastSelectedIndex.current = null; lastGroupedSelection.current = null; }}>{t.all}</button><button type="button" onClick={resetSelection} disabled={busy || !selectedCount}>{t.none}</button></div>
                   <div className="page-action-buttons">
                     <button type="button" disabled={!selectedCount || busy} onClick={() => commit((previous) => rotatePages(previous, selected, -90), true)} aria-label={t.rotateLeft}>↶ {t.rotateLeft}</button>
                     <button type="button" disabled={!selectedCount || busy} onClick={() => commit((previous) => rotatePages(previous, selected, 90), true)} aria-label={locale === 'en' ? 'Rotate clockwise' : t.rotateRight}>↷ {t.rotateRight}</button>
@@ -623,6 +639,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                               data-testid="source-group-select" onClick={() => {
                                 setSelected(previous => new Set([...previous, ...group.items.map(item => item.pageRef.id)]));
                                 lastSelectedIndex.current = null;
+                                lastGroupedSelection.current = null;
                               }}>{t.all}</button>
                           </div>
                           {!collapsed && <div className="page-grid" id={`source-pages-${group.sourceId}`}
