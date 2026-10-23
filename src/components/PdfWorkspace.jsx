@@ -343,6 +343,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setWatermarkEnabled(false); setWatermarkText(''); setExportSettingsOpen(mode === 'watermark-pdf');
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
     setRanges(''); setChunkSize(''); setSplitMode('ranges');
+    // A fresh image-to-PDF workspace must not inherit a previous crop choice.
+    setImageLayout({ ...IMAGE_PDF_LAYOUT_DEFAULT });
     releasePreviewDocuments();
   };
 
