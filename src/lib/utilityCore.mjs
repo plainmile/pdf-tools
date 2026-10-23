@@ -154,6 +154,39 @@ export function imagePageSelectionLabel(input, count) {
   return `selection-first${first}-last${last}-${selected.length}pages`;
 }
 
+/** Decode imported text without silently replacing damaged characters.
+ * File.text() assumes UTF-8, corrupting Windows UTF-16 (Unicode) files.
+ * UTF-16 needs a BOM; unmarked text defaults to strict UTF-8.
+ */
+export function decodeImportedText(bytes, locale = 'en') {
+  const invalid = () => {
+    throw new Error(locale === 'zh'
+      ? '文本编码无法识别。请将文件另存为 UTF-8，或带 BOM 的 UTF-16 LE/BE 格式后重新导入。'
+      : 'Text encoding is not valid UTF-8 or BOM-marked UTF-16 LE/BE. Re-save the file as UTF-8 and import it again.');
+  };
+  if (!(bytes instanceof Uint8Array) || bytes.length === 0) invalid();
+  // Explicitly reject UTF-32 BOMs before their first two bytes look like
+  // UTF-16; silently decoding those would produce invalid control characters.
+  if (bytes.length >= 4 && (
+    (bytes[0] === 0xff && bytes[1] === 0xfe && bytes[2] === 0 && bytes[3] === 0) ||
+    (bytes[0] === 0 && bytes[1] === 0 && bytes[2] === 0xfe && bytes[3] === 0xff)
+  )) invalid();
+  const encoding = bytes[0] === 0xff && bytes[1] === 0xfe ? 'utf-16le'
+    : bytes[0] === 0xfe && bytes[1] === 0xff ? 'utf-16be'
+    : 'utf-8';
+  try {
+    // fatal=true prevents mojibake/replacement-glyph PDF generation.
+    // TextDecoder consumes a BOM automatically, so it is not inserted in the editor.
+    const content = new TextDecoder(encoding, { fatal: true }).decode(bytes);
+    // UTF-16 without a BOM decodes to interspersed U+0000 under UTF-8;
+    // don't mistake it for normal text and silently strip the NULs later.
+    if (content.includes('\0')) invalid();
+    return content;
+  } catch {
+    invalid();
+  }
+}
+
 export function normalizeText(source) {
   return source.replace(/\r\n?/g, '\n').replace(/\0/g, '').replace(/\t/g, '    ');
 }
