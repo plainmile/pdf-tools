@@ -296,8 +296,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   });
 
   const applyImageLayout = () => withBusy(async () => {
-    const updated = await reflowImageSources(sources, imageLayout, () => {}, t.errorCombined);
-    // Rebuild must succeed for every photo before replacing ANY document.
+    const updated = await reflowImageSources(sources, imageLayout, () => {}, t.errorCombined, activeImageSources);
+    // Rebuild must succeed for every active photo before replacing ANY document.
+    // Undo-only photos retain their previous layout until they are restored.
     releasePreviewDocuments();
     setSources(updated);
     setNotice(t.imageApplied);
