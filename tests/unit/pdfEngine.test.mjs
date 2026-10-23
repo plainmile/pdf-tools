@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { imageTypeFor, isSupportedFile, compressedImageDimensions, composePdf, temporaryWorkspaceId } from '../../src/lib/pdfEngine.mjs';
-import { PDFDocument } from 'pdf-lib';
+import { imageTypeFor, isSupportedFile, compressedImageDimensions, composePdf, temporaryWorkspaceId, createBlankPageSource } from '../../src/lib/pdfEngine.mjs';
+import { PDFDocument, degrees } from 'pdf-lib';
 
 test('recognize JPEG/PNG/WebP images even with missing or generic MIME types', () => {
   for (const [name, type] of [['photo.JPG', 'image/jpeg'], ['figure.png', 'image/png'], ['cover.WebP', 'image/webp']]) {
@@ -152,4 +152,27 @@ test('page copying must not silently brand or inherit confidential PDF document 
   assert.equal(generated.getProducer(), undefined);
   const fileBytes = Buffer.from(output).toString('latin1');
   assert.ok(!fileBytes.includes('PlainMile PDF'), 'No hidden project brand in exported document');
+});
+
+test('generated blank page follows visible page size/rotation but contains none of the original content or metadata', async () => {
+  const original = await PDFDocument.create();
+  original.setTitle('CONFIDENTIAL ORIGINAL');
+  const page = original.addPage([300, 420]);
+  page.setRotation(degrees(90));
+  page.drawRectangle({ x: 15, y: 20, width: 100, height: 80 });
+  const source = { id: 'src', bytes: new Uint8Array(await original.save()), inputSize: 1200 };
+  const blankSource = await createBlankPageSource(source, { sourceId: 'src', pageIndex: 0, rotation: 0 });
+  const blank = await PDFDocument.load(blankSource.bytes, { updateMetadata: false });
+  assert.equal(blankSource.isGeneratedBlank, true);
+  assert.equal(blankSource.isImage, false);
+  assert.equal(blank.getPageCount(), 1);
+  assert.deepEqual(blank.getPage(0).getSize(), { width: 420, height: 300 });
+  assert.equal(blank.getPage(0).getRotation().angle, 0);
+  assert.equal(blank.getTitle(), undefined);
+  assert.ok(!Buffer.from(blankSource.bytes).includes(Buffer.from('CONFIDENTIAL ORIGINAL')));
+
+  const turned = await createBlankPageSource(source, { sourceId: 'src', pageIndex: 0, rotation: 90 });
+  const straight = await PDFDocument.load(turned.bytes);
+  assert.deepEqual(straight.getPage(0).getSize(), { width: 300, height: 420 });
+  await assert.rejects(createBlankPageSource(source, { sourceId: 'src', pageIndex: 3 }), /no longer exists/);
 });
