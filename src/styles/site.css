@@ -242,6 +242,12 @@ main { flex: 1; }
 .selection-range-form .input-note { flex-basis: 100%; margin: 0; }
 .selection-range-form button { flex: 0 0 auto; }
 .page-action-buttons { gap: 7px; }
+.page-more-actions { max-width: 100%; }
+.page-more-actions > summary { cursor: pointer; font-size: 11px; font-weight: 650; color: var(--accent); border: 1px solid var(--border); border-radius: 5px; padding: 8px 10px; background: var(--surface); }
+.page-more-actions[open] { flex-basis: 100%; }
+.page-more-actions > .page-action-buttons { padding: 11px 0 0; }
+.focused-page-hint { margin: -12px 0 17px; padding: 0 4px; }
+
 .page-action-buttons button { border: 1px solid var(--border); background: var(--surface); border-radius: 5px; padding: 8px 10px; color: var(--text); font-size: 11px; font-weight: 600; }
 .page-action-buttons button:not(:disabled):hover { border-color: var(--accent); }
 .page-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px,1fr)); gap: 13px; }
