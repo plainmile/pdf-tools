@@ -152,6 +152,18 @@ export function getRangePages(pages, range) {
   return pages.slice(range.start - 1, range.end);
 }
 
+/** Sources are needed while referenced by current, Undo or Redo pages.
+ * A deleted file may be kept for Undo, but once that snapshot falls outside
+ * the bounded history there is no reason to keep its sensitive bytes in RAM.
+ */
+export function historyReferencedSourceIds(history) {
+  const ids = new Set();
+  for (const snapshot of [...history.past, history.present, ...history.future]) {
+    for (const page of snapshot) ids.add(page.sourceId);
+  }
+  return ids;
+}
+
 export function makeHistoryState(pages = []) {
   return { past: [], present: pages, future: [] };
 }
