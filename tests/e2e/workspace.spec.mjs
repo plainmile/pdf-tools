@@ -989,3 +989,36 @@ test('duplicating at the 600-page workspace boundary fails safely and preserves 
   await expect(page.getByRole('alert')).toContainText('600 pages');
   await expect(page.getByTestId('page-tile')).toHaveCount(600);
 });
+
+
+test('photo paper reflow skips deleted Undo-only images until they are restored', async ({ page }) => {
+  await page.goto('/image-to-pdf/');
+  await page.getByTestId('file-input').setInputFiles([
+    { name: 'old-deleted.png', mimeType: 'image/png', buffer: await makeTestPng(page, 120, 80, 'red') },
+    { name: 'still-visible.png', mimeType: 'image/png', buffer: await makeTestPng(page, 80, 120, 'green') },
+  ]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  await page.getByRole('button', { name: 'Delete selected pages' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+
+  await page.getByTestId('image-paper').selectOption('letter');
+  await expect(page.getByTestId('image-layout-dirty')).toBeVisible();
+  await page.getByTestId('image-layout-apply').click();
+  await expect(page.getByTestId('image-layout-dirty')).toHaveCount(0);
+  const onePage = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(onePage.getPageCount()).toBe(1);
+  expect(onePage.getPage(0).getWidth()).toBeCloseTo(612, 1);
+
+  // Undo revives an image that was deliberately not re-encoded while hidden.
+  // Warn before exporting or mixing A4 and Letter pages; no silent change.
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await expect(page.getByTestId('image-layout-dirty')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Export PDF' })).toBeDisabled();
+  await page.getByTestId('image-layout-apply').click();
+  await expect(page.getByTestId('image-layout-dirty')).toHaveCount(0);
+  const restored = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(restored.getPageCount()).toBe(2);
+  expect(restored.getPages().map(p => Math.round(p.getWidth()))).toEqual([612, 612]);
+});
