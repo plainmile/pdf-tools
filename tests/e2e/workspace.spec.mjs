@@ -456,7 +456,7 @@ test('Chinese workspace keeps specific file count and type errors rather than a 
   await page.getByTestId('file-input').setInputFiles({
     name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not a PDF'),
   });
-  await expect(page.getByRole('alert')).toContainText('请选择 PDF、JPG、PNG 或 WebP 文件');
+  await expect(page.getByRole('alert')).toContainText('请选择 PDF、JPG、PNG、WebP、BMP 或静态 AVIF 文件');
   await expect(page.getByTestId('page-tile')).toHaveCount(0);
 });
 
