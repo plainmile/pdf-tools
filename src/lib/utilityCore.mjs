@@ -186,7 +186,9 @@ export function parseTextBlocks(source, markdown = false) {
 // Intentionally a minimal CommonMark subset: never execute HTML, remote images or scripts.
 export function stripMarkdownInline(source) {
   return source.replace(/!?\[([^\]]+)\]\([^\n)]+\)/g, '$1')
-    .replace(/(?:\*\*|__|\*|_|~~|`)/g, '').replace(/<[^>]+>/g, '');
+    .replace(/(?:\*\*|__|\*|_|~~|`)/g, '')// Remove actual HTML-looking tags and comments, but never erase
+    // comparisons such as "value < 3 && count > 2" in technical Markdown.
+    .replace(/<!--[\s\S]*?-->|<\/?[A-Za-z][^>]*>/g, '');
 }
 export function textContentToLines(content) {
   // PDF is positioned text, not a logical document. Sort approximately by baseline and X.
