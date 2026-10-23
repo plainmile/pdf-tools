@@ -559,6 +559,10 @@ test('empty workspace retains undo and a successful reimport does not inherit hi
   await page.getByTestId('file-input').setInputFiles({
     name: 'replacement.pdf', mimeType: 'application/pdf', buffer: await makePdf([501]),
   });
+  await expect(page.getByTestId('reimport-confirmation')).toHaveAttribute('aria-label', 'Discard the last Undo history?');
+  await expect(page.getByTestId('reimport-confirmation')).toContainText('permanently discard the deleted pages');
+  await expect(page.getByTestId('undo-all-deleted')).toBeDisabled();
+  await page.getByTestId('confirm-reimport').click();
   await expect(page.getByTestId('page-tile')).toHaveCount(1);
   await expect(page.getByText('from 1 file')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
@@ -1819,4 +1823,57 @@ test('Chinese odd/even selection after grouped and reordered multi-file PDF uses
     viewport: document.documentElement.clientWidth,
   }));
   expect(width.scroll).toBeLessThanOrEqual(width.viewport + 2);
+});
+
+test('accidental valid PDF drop after deleting all pages must not erase the recoverable source', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/workspace/');
+  const original = await makePdf([317, 419]);
+  await page.getByTestId('file-input').setInputFiles({
+    name: '原始资料.pdf', mimeType: 'application/pdf', buffer: original,
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await page.getByRole('button', { name: '全选' }).click();
+  await page.getByRole('button', { name: '删除页面' }).click();
+  await expect(page.getByTestId('undo-all-deleted')).toBeVisible();
+
+  const dropped = (await makePdf([555])).toString('base64');
+  await page.evaluate(data => {
+    const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+    const drag = new DataTransfer();
+    drag.items.add(new File([bytes], '误拖入.pdf', { type: 'application/pdf' }));
+    document.querySelector('[data-testid="dropzone"]').dispatchEvent(
+      new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: drag }));
+  }, dropped);
+  await expect(page.getByTestId('reimport-confirmation')).toContainText('原来已删除的页面目前仍可撤销恢复');
+  await expect(page.getByTestId('page-tile')).toHaveCount(0);
+  await expect(page.getByTestId('undo-all-deleted')).toBeDisabled();
+  await page.getByTestId('cancel-reimport').click();
+  await expect(page.getByTestId('reimport-confirmation')).toHaveCount(0);
+  await expect(page.getByTestId('undo-all-deleted')).toBeEnabled();
+  await page.getByTestId('undo-all-deleted').click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  const restored = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
+  expect(restored.getPages().map(p => p.getWidth())).toEqual([317, 419]);
+  const size = await page.evaluate(() => ({ w: document.documentElement.scrollWidth, c: document.documentElement.clientWidth }));
+  expect(size.w).toBeLessThanOrEqual(size.c + 2);
+});
+
+test('invalid reimport never asks to discard Undo and does not wipe old PDF pages', async ({ page }) => {
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'recover.pdf', mimeType: 'application/pdf', buffer: await makePdf([320, 331]),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Select all' }).click();
+  await page.getByRole('button', { name: 'Delete selected pages' }).click();
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'broken.pdf', mimeType: 'application/pdf', buffer: Buffer.from('not a PDF'),
+  });
+  await expect(page.getByRole('alert')).toContainText('could not be opened');
+  await expect(page.getByTestId('reimport-confirmation')).toHaveCount(0);
+  await expect(page.getByTestId('undo-all-deleted')).toBeEnabled();
+  await page.getByTestId('undo-all-deleted').click();
+  const restored = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(restored.getPages().map(p => p.getWidth())).toEqual([320, 331]);
 });
