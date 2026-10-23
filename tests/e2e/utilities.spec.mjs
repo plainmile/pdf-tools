@@ -780,7 +780,7 @@ test('Chinese typed-only unsaved draft can be cleared only after explicit confir
   await page.getByTestId('utility-text-clear').click();
   await expect(page.getByTestId('utility-clear-confirm')).toContainText('尚未妥善保存');
   await page.getByTestId('utility-clear-keep').click();
-  await expect(page.getByTestId('utility-text')).toContainText('待保存的内容');
+  await expect(page.getByTestId('utility-text')).toHaveValue(/待保存的内容/);
   await page.getByTestId('utility-text-clear').click();
   await page.getByTestId('utility-clear-confirm-button').click();
   await expect(page.getByTestId('utility-text')).toHaveValue('');
