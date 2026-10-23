@@ -352,7 +352,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     if (!chosen.length) return withBusy(async () => { throw new Error(t.selectionNeeded); });
     return exportPages(chosen, `${fileBase}-selected-${chosen.length}-pages.pdf`, interpolate(t.extracted, { pages: chosen.length }));
   };
-  const splitIntoZip = () => withBusy(async () => {
+  const downloadSplit = () => withBusy(async () => {
     if (!pages.length) throw new Error(t.noFile);
     if (imageLayoutDirty) throw new Error(t.imageMustApply);
     const pieces = splitMode === 'ranges'
@@ -364,13 +364,23 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setSplitProgress({ phase: 'parts', done: 0, total: pieces.length });
     let size = 0;
     try {
-      const zip = new JSZip();
+      // A single selected section should be a PDF download, not a ZIP that
+      // forces the user to extract the only file. Keep the same output budget.
+      const zip = pieces.length > 1 ? new JSZip() : null;
       for (let index = 0; index < pieces.length; index++) {
         if (controller.signal.aborted) throw new Error('Split cancelled.');
         const range = pieces[index];
         const contents = await composePdf(sources, getRangePages(pages, range), { watermark, signal: controller.signal });
         if (controller.signal.aborted) throw new Error('Split cancelled.');
         size = enforceSplitZipBudget(size, contents.length);
+        if (!zip) {
+          saveDownload(contents, `${fileBase}-pages-${range.start}-${range.end}.pdf`);
+          // A one-piece export covering the entire edited workspace is
+          // equivalent to Export PDF; don't warn about work already saved.
+          if (range.start === 1 && range.end === pages.length) setLastDownloadedRevision(documentRevision);
+          setNotice(t.splitSingleSaved);
+          return;
+        }
         zip.file(`part-${String(index + 1).padStart(2, '0')}-pages-${range.start}-${range.end}.pdf`, contents);
         setSplitProgress({ phase: 'parts', done: index + 1, total: pieces.length });
         await new Promise(resolve => setTimeout(resolve, 0));
@@ -713,7 +723,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                      ? interpolate(t.splitPartsProgress, { done: splitProgress.done, total: splitProgress.total })
                      : interpolate(t.splitZipProgress, { percent: splitProgress.percent })}</p>}
                    {busy && splitProgress && <button type="button" className="button button-secondary button-small" data-testid="split-cancel" disabled={splitCancelling} onClick={() => { splitAbortRef.current?.abort(); setSplitCancelling(true); }}>{splitCancelling ? t.splitCancelling : t.splitCancel}</button>}
-                  <button type="button" className="button button-primary split-download" onClick={splitIntoZip} disabled={busy || splitEstimate === null || imageLayoutDirty}>{busy ? t.creating : t.downloadZip} ↓</button>
+                  <button type="button" className="button button-primary split-download" onClick={downloadSplit} disabled={busy || splitEstimate === null || imageLayoutDirty}>{busy ? t.creating : splitEstimate === 1 ? t.downloadSingle : t.downloadZip} ↓</button>
                 </div>
               </section>
             )}
