@@ -4,7 +4,7 @@ import {
   movePage, movePageGroup, shiftPage, rotatePages, deletePages, parsePageRanges,
   chunkPageRanges, getRangePages, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources,
-  reversePages, sortPagesByFilename,
+  reversePages, sortPagesByFilename, duplicatePages, insertPageAfter,
 } from '../../src/lib/pageOperations.mjs';
 
 const pages = Object.freeze([
@@ -114,4 +114,36 @@ test('image-batch filename sorting is numeric, stable, reversible and never alte
   assert.deepEqual(ids(reversePages(sorted)), ['10', '2b', '2a']);
   assert.deepEqual(ids(imagePages), ['10', '2a', '2b']);
   assert.strictEqual(reversePages([]).length, 0);
+});
+
+test('duplicate selected pages immediately after originals using distinct IDs; Undo/Redo preserve all page data', () => {
+  let id = 0;
+  const result = duplicatePages(pages, ['a', 'c'], () => 'copy-' + (++id));
+  assert.deepEqual(ids(result), ['a', 'copy-1', 'b', 'c', 'copy-2']);
+  assert.deepEqual(ids(pages), ['a', 'b', 'c']);
+  assert.notStrictEqual(result[1], pages[0]);
+  assert.equal(result[1].sourceId, pages[0].sourceId);
+  assert.equal(result[1].pageIndex, pages[0].pageIndex);
+  assert.equal(result[1].rotation, pages[0].rotation);
+  const initial = makeHistoryState(pages);
+  const changed = commitHistory(initial, result);
+  assert.deepEqual(ids(undoHistory(changed).present), ids(pages));
+  assert.deepEqual(ids(redoHistory(undoHistory(changed)).present), ids(result));
+  assert.strictEqual(duplicatePages(pages, ['missing'], () => 'n'), pages);
+});
+
+test('duplicating pages never silently exceeds the 600-page workspace cap', () => {
+  assert.throws(() => duplicatePages(pages, ['a'], () => 'extra', 3), /At most 3 pages/);
+  assert.deepEqual(ids(pages), ['a', 'b', 'c']);
+  const result = duplicatePages(pages, ['b'], () => 'new', 4);
+  assert.deepEqual(ids(result), ['a', 'b', 'new', 'c']);
+});
+
+test('blank insertion is deterministic and does not mutate source pages', () => {
+  const blank = { id: 'blank', sourceId: 'generated', pageIndex: 0, rotation: 0 };
+  assert.deepEqual(ids(insertPageAfter(pages, 1, blank)), ['a', 'b', 'blank', 'c']);
+  assert.deepEqual(ids(insertPageAfter(pages, 2, blank)), ['a', 'b', 'c', 'blank']);
+  assert.deepEqual(ids(pages), ['a', 'b', 'c']);
+  assert.throws(() => insertPageAfter(pages, 3, blank), /Invalid/);
+  assert.throws(() => insertPageAfter(pages, -2, blank), /Invalid/);
 });
