@@ -245,6 +245,24 @@ export function hasInteractivePdfForm(doc) {
   }
 }
 
+/** Document bookmarks live under catalog /Outlines, not inside the page
+ * dictionaries copied by composePdf. Detect nonempty or malformed trees
+ * so exported books cannot silently promise preserved chapter navigation.
+ */
+export function hasPdfBookmarks(doc) {
+  const name = PDFName.of('Outlines');
+  if (!doc?.catalog?.get(name)) return false;
+  try {
+    const root = doc.catalog.lookupMaybe(name, PDFDict);
+    if (!root) return true;
+    const count = root.get(PDFName.of('Count'))?.asNumber?.();
+    return root.has(PDFName.of('First')) || root.has(PDFName.of('Last')) ||
+      (Number.isFinite(count) && count !== 0);
+  } catch {
+    return true; // Malformed outline data still warrants a preservation warning.
+  }
+}
+
 export async function readSourceFile(file, options = {}) {
   if (!isSupportedFile(file)) throw new Error(`${file.name}: choose PDF, JPG, PNG, WebP, BMP or static AVIF files.`);
   if (!file.size || file.size > LIMITS.maxFileBytes) {
@@ -268,6 +286,7 @@ export async function readSourceFile(file, options = {}) {
   if (!pageCount) throw new Error(`${file.name}: this document has no pages.`);
   return { id: temporaryWorkspaceId(), name: file.name, bytes, pageCount, isImage, inputSize: file.size,
     hasInteractiveForms: !isImage && hasInteractivePdfForm(doc),
+    hasOutlineBookmarks: !isImage && hasPdfBookmarks(doc),
     imageLayout: isImage ? { ...IMAGE_PDF_LAYOUT_DEFAULT, ...options.imageLayout } : null,
     // Retain only in browser RAM, so the user can change paper settings without
     // re-uploading a photo or losing the existing page order/undo history.
