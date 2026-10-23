@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import JSZip from 'jszip';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
+import PageZoomDialog from './PageZoomDialog.jsx';
 import { LIMITS, composePdf, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId, createBlankPageSource, retainedSourceBytes, retainedSourcesBytes } from '../lib/pdfEngine.mjs';
 import { sanitizeFilename, workspaceFilenameStem } from '../lib/utilityCore.mjs';
 import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLayout.mjs';
@@ -11,7 +12,7 @@ import {
   getRangePages, reversePages, sortPagesByFilename, groupPagesBySource, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
-function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview }) {
+function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview, onOpen, outputPosition, busy }) {
   const targetRef = useRef(null);
   const canvasRef = useRef(null);
   const [visible, setVisible] = useState(false);
@@ -82,12 +83,17 @@ function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPre
   }, [getPreviewDoc, pageRef.pageIndex, pageRef.rotation, source, visible]);
 
   return (
-    <div className="page-preview" ref={targetRef}>
+    <button type="button" className="page-preview" ref={targetRef}
+      data-testid="page-preview-open" disabled={busy || !source}
+      aria-label={interpolate(t.previewOpen, { n: outputPosition })}
+      title={interpolate(t.previewOpen, { n: outputPosition })}
+      onClick={() => onOpen(pageRef.id)}>
       {visible && <canvas ref={canvasRef} width={0} height={0} style={failed ? { display: 'none' } : undefined} role="img" aria-label={locale === 'zh' ? `${source?.name ?? 'PDF'} 第 ${pageRef.pageIndex + 1} 页预览` : `${source?.name ?? 'PDF'} page ${pageRef.pageIndex + 1} preview`} />}
       {visible && failed && <div className="preview-fallback" aria-label={t.previewFail}>{t.previewFail}</div>}
       {!visible && <div className="preview-loading" aria-hidden="true" />}
       {watermarkPreview && <span className="page-watermark-preview" aria-hidden="true">{watermarkPreview}</span>}
-    </div>
+      <span className="preview-expand-mark" aria-hidden="true">⤢</span>
+    </button>
   );
 }
 
@@ -108,6 +114,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [movePlacement, setMovePlacement] = useState('before');
   const [jumpInput, setJumpInput] = useState('');
   const [pendingJump, setPendingJump] = useState(null);
+  const [previewPageId, setPreviewPageId] = useState(null);
   const [downloadNameInput, setDownloadNameInput] = useState('');
   const [busy, setBusy] = useState(false);
   // `setBusy` is a UI update, not a lock. Same-tick file drops can both read
@@ -139,6 +146,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const selectedCount = selected.size;
   const bytesInMemory = useMemo(() => retainedSourcesBytes(sources), [sources]);
   const sourceLookup = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources]);
+  const zoomPageIndex = pages.findIndex(page => page.id === previewPageId);
+  const zoomPageRef = zoomPageIndex >= 0 ? pages[zoomPageIndex] : null;
+  const zoomSource = zoomPageRef ? sourceLookup.get(zoomPageRef.sourceId) : null;
+  const navigateZoom = (step) => {
+    const target = pages[zoomPageIndex + step];
+    if (target) setPreviewPageId(target.id);
+  };
   const sourceGroups = useMemo(() => groupPagesBySource(pages), [pages]);
   // Judge active photo pages by their own original layout. A previously deleted
   // photo can reappear after Undo, even when newer images use different paper.
@@ -552,6 +566,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
 
   const clearAll = () => {
     setClearConfirm(false);
+    setPreviewPageId(null);
     setWatermarkEnabled(false); setWatermarkText(''); setExportSettingsOpen(mode === 'watermark-pdf');
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
     setPageView('order'); setCollapsedSources(new Set());
@@ -596,7 +611,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           onChange={event => toggleSelection(pageRef.id, index, Boolean(event.nativeEvent?.shiftKey), group)}
           aria-label={locale === 'zh' ? `${t.selectPage} ${index + 1} 页` : `Select page ${index + 1}`} /></label>
         <span className="tile-sequence" data-testid="group-output-position">{interpolate(t.groupOutputPosition, { n: index + 1 })}</span>
-        <PageThumbnail source={source} pageRef={pageRef} getPreviewDoc={getPreviewDoc} locale={locale} t={t} watermarkPreview={watermarkPreview} />
+        <PageThumbnail source={source} pageRef={pageRef} getPreviewDoc={getPreviewDoc} locale={locale} t={t}
+          watermarkPreview={watermarkPreview} onOpen={setPreviewPageId} outputPosition={index + 1} busy={busy} />
         <div className="tile-info" title={source?.name}>
           <strong>{pageName(pageRef.pageIndex + 1)}</strong><small>{source?.name ?? t.document}</small>
         </div>
@@ -632,6 +648,11 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   return (
     <div className="pdf-workspace" data-testid="pdf-workspace">
       <UnsavedNavigationGuard active={navigationWouldLoseWork} locale={locale} />
+      {zoomPageRef && zoomSource && <PageZoomDialog
+        source={zoomSource} pageRef={zoomPageRef} position={zoomPageIndex + 1}
+        pageCount={pages.length} getPreviewDoc={getPreviewDoc}
+        locale={locale} t={t} watermarkPreview={watermarkPreview}
+        onClose={() => setPreviewPageId(null)} onNavigate={navigateZoom} />}
       <div className="workspace-bar">
         <div className="workspace-heading"><span className="workspace-app-icon" aria-hidden="true">▤</span><div><strong>{t.app}</strong><span>{t.local}</span></div></div>
         <span className="workspace-status"><span className="status-dot" aria-hidden="true" />{t.local}</span>
@@ -932,7 +953,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                         onDragEnd={() => { setDragged(null); setDropTarget(null); }}>
                         <label className="page-tile-checkbox"><input type="checkbox" checked={selected.has(pageRef.id)} disabled={busy} onChange={(event) => toggleSelection(pageRef.id, index, Boolean(event.nativeEvent?.shiftKey))} aria-label={locale === 'zh' ? `${t.selectPage} ${index + 1} 页` : `Select page ${index + 1}`} /></label>
                         <div className="tile-sequence">{String(index + 1).padStart(2, '0')}</div>
-                        <PageThumbnail source={source} pageRef={pageRef} getPreviewDoc={getPreviewDoc} locale={locale} t={t} watermarkPreview={watermarkPreview} />
+                        <PageThumbnail source={source} pageRef={pageRef} getPreviewDoc={getPreviewDoc} locale={locale} t={t}
+          watermarkPreview={watermarkPreview} onOpen={setPreviewPageId} outputPosition={index + 1} busy={busy} />
                         <div className="tile-info" title={source?.name}><strong>{pageName(pageRef.pageIndex + 1)}</strong><small>{source?.name ?? t.document}</small></div>
                         <div className="tile-moves"><button type="button" disabled={index === 0 || busy} title={t.moveLeft.replace('{n}', index + 1)} aria-label={interpolate(t.moveLeft, { n: index + 1 })} onClick={() => commit((previous) => shiftPage(previous, pageRef.id, -1))}>←</button><span title={t.dragTitle} aria-hidden="true">⠿</span><button type="button" disabled={index === pages.length - 1 || busy} title={interpolate(t.moveRight, { n: index + 1 })} aria-label={interpolate(t.moveRight, { n: index + 1 })} onClick={() => commit((previous) => shiftPage(previous, pageRef.id, 1))}>→</button></div>
                       </div>
