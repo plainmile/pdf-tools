@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { imageTypeFor, isSupportedFile, compressedImageDimensions, composePdf } from '../../src/lib/pdfEngine.mjs';
+import { imageTypeFor, isSupportedFile, compressedImageDimensions, composePdf, temporaryWorkspaceId } from '../../src/lib/pdfEngine.mjs';
 import { PDFDocument } from 'pdf-lib';
 
 test('recognize JPEG/PNG/WebP images even with missing or generic MIME types', () => {
@@ -117,4 +117,21 @@ test('long PDF export reports real pages and rejects cancellation without return
   });
   assert.equal((await PDFDocument.load(good)).getPageCount(), 12);
   assert.deepEqual(progress.at(-1), [12, 12]);
+});
+
+test('temporary workspace IDs work on HTTP LAN origins without crypto.randomUUID', () => {
+  let called = 0;
+  const api = {
+    getRandomValues(bytes) {
+      called++;
+      for (let index = 0; index < bytes.length; index++) bytes[index] = (called * 31 + index) & 0xff;
+      return bytes;
+    },
+  };
+  const a = temporaryWorkspaceId(api);
+  const b = temporaryWorkspaceId(api);
+  assert.notEqual(a, b);
+  assert.match(a, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.equal(temporaryWorkspaceId({ randomUUID: () => 'original-api' }), 'original-api');
+  assert.throws(() => temporaryWorkspaceId({}), /generate unique page identifiers/);
 });
