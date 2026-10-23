@@ -1388,3 +1388,51 @@ test('Chinese form-risk warning appears on focused page tools but plain PDFs sta
   await expect(page.getByTestId('page-tile')).toHaveCount(2);
   await expect(page.getByTestId('workspace-form-risk')).toHaveCount(0);
 });
+
+test('book-length jump targets the true output position without reordering or changing selections', async ({ page }) => {
+  test.setTimeout(70000);
+  const book = await makePdf(Array.from({length: 125}, (_, index) => 300 + index));
+  await page.goto('/organize-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'long-book.pdf', mimeType: 'application/pdf', buffer: book,
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(125);
+  await page.getByRole('checkbox', { name: 'Select page 2' }).check();
+  await page.getByTestId('workspace-view-grouped').click();
+  await expect(page.getByTestId('source-group')).toHaveCount(1);
+  await page.getByTestId('page-jump-panel').locator('summary').click();
+  await page.getByTestId('page-jump-input').fill('１２１');
+  await page.getByTestId('page-jump-submit').click();
+  await expect(page.getByTestId('workspace-view-order')).toHaveAttribute('aria-pressed', 'true');
+  const target = page.locator('[data-testid="page-grid"] [data-export-position="121"]');
+  await expect(target).toBeInViewport({ timeout: 15000 });
+  await expect(target).toHaveAttribute('aria-label', 'Output page 121');
+  await expect(page.getByRole('checkbox', { name: 'Select page 2' })).toBeChecked();
+  const exported = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(exported.getPageCount()).toBe(125);
+  expect(exported.getPage(120).getWidth()).toBe(420);
+  expect(exported.getPage(1).getWidth()).toBe(301);
+});
+
+test('invalid Chinese jump never alters page selection or causes mobile overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'many-pages.pdf', mimeType: 'application/pdf', buffer: await makePdf(Array.from({ length: 24 }, (_, n) => 280 + n)),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(24);
+  await page.getByTestId('page-jump-panel').locator('summary').click();
+  await page.getByTestId('page-jump-input').fill('99');
+  await page.getByTestId('page-jump-submit').click();
+  await expect(page.getByRole('alert')).toContainText('1 到 24');
+  await page.getByTestId('page-jump-input').fill('２３');
+  await page.getByTestId('page-jump-submit').click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.locator('[data-testid="page-grid"] [data-export-position="23"]')).toBeInViewport();
+  const size = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth,
+  }));
+  expect(size.scroll).toBeLessThanOrEqual(size.viewport + 2);
+  const pdf = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
+  expect(pdf.getPages().map(p => p.getWidth())).toEqual(Array.from({ length: 24 }, (_, n) => 280 + n));
+});
