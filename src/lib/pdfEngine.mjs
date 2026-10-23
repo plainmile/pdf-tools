@@ -1,6 +1,6 @@
 import {
   PDFDocument, degrees, pushGraphicsState, popGraphicsState,
-  moveTo, lineTo, closePath, clip, endPath,
+  moveTo, lineTo, closePath, clip, endPath, PDFDict, PDFArray, PDFName,
 } from 'pdf-lib';
 import { renderWatermarkPng, watermarkTextFromOptions, watermarkPagePlacement, WATERMARK_OPACITY } from './watermark.mjs';
 import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement, stripJpegPrivateMetadata } from './jpegExif.mjs';
@@ -226,6 +226,25 @@ export function compressedImageDimensions(type, bytes) {
   return null;
 }
 
+/** Detect real interactive form fields (including XFA) before page copying.
+ * pdf-lib's copyPages preserves page appearance but does not promise to carry
+ * the document-level AcroForm tree to a new PDF. Never report a safe copy
+ * when a malformed/nonstandard AcroForm cannot be inspected.
+ */
+export function hasInteractivePdfForm(doc) {
+  const acroName = PDFName.of('AcroForm');
+  if (!doc?.catalog?.get(acroName)) return false;
+  try {
+    const form = doc.catalog.lookupMaybe(acroName, PDFDict);
+    if (!form) return true;
+    const fields = form.lookupMaybe(PDFName.of('Fields'), PDFArray);
+    return (fields?.size() ?? 0) > 0 || form.has(PDFName.of('XFA'));
+  } catch {
+    // Fail safe for nonstandard forms rather than promising perfect output.
+    return true;
+  }
+}
+
 export async function readSourceFile(file, options = {}) {
   if (!isSupportedFile(file)) throw new Error(`${file.name}: choose PDF, JPG, PNG, WebP, BMP or static AVIF files.`);
   if (!file.size || file.size > LIMITS.maxFileBytes) {
@@ -248,6 +267,7 @@ export async function readSourceFile(file, options = {}) {
   const pageCount = doc.getPageCount();
   if (!pageCount) throw new Error(`${file.name}: this document has no pages.`);
   return { id: temporaryWorkspaceId(), name: file.name, bytes, pageCount, isImage, inputSize: file.size,
+    hasInteractiveForms: !isImage && hasInteractivePdfForm(doc),
     imageLayout: isImage ? { ...IMAGE_PDF_LAYOUT_DEFAULT, ...options.imageLayout } : null,
     // Retain only in browser RAM, so the user can change paper settings without
     // re-uploading a photo or losing the existing page order/undo history.
