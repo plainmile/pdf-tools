@@ -1752,3 +1752,71 @@ test('Chinese mobile and grouped source preview are accessible without horizonta
   expect(browserSize.canvasCount).toBe(0);
   expect(browserSize.scroll).toBeLessThanOrEqual(browserSize.client + 2);
 });
+
+test('quick odd/even selection handles 125-page real PDF beyond 50-range limit and rotates only odd output pages', async ({ page }) => {
+  test.setTimeout(65000);
+  await page.goto('/rotate-pdf/');
+  const widths = Array.from({ length: 125 }, (_, n) => 300 + n);
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'duplex-scanned-pages.pdf', mimeType: 'application/pdf', buffer: await makePdf(widths),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(125);
+  await page.getByTestId('selection-range-panel').locator('summary').click();
+  const shortcuts = page.getByTestId('selection-pattern-buttons');
+  await expect(shortcuts).toBeVisible();
+  await page.getByTestId('select-even-pages').click();
+  await expect(page.locator('.selection-info strong')).toHaveText('62 pages selected');
+  await expect(page.getByRole('checkbox', { name: 'Select page 2', exact: true })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Select page 3', exact: true })).not.toBeChecked();
+  await page.getByTestId('invert-page-selection').click();
+  await expect(page.locator('.selection-info strong')).toHaveText('63 pages selected');
+  await expect(page.getByRole('checkbox', { name: 'Select page 1', exact: true })).toBeChecked();
+  await page.getByTestId('select-odd-pages').click();
+  await expect(page.locator('.selection-info strong')).toHaveText('63 pages selected');
+  await page.getByRole('button', { name: 'Rotate clockwise' }).click();
+  await expect(page.locator('.selection-info strong')).toHaveText('63 pages selected');
+  const pdf = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(pdf.getPageCount()).toBe(125);
+  expect(pdf.getPages().map(p => p.getWidth())).toEqual(widths);
+  expect(pdf.getPages().map((p, index) => p.getRotation().angle === (index % 2 === 0 ? 90 : 0))).toEqual(Array(125).fill(true));
+});
+
+test('Chinese odd/even selection after grouped and reordered multi-file PDF uses true export order', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/delete-pages/');
+  await page.getByTestId('file-input').setInputFiles([
+    { name: '甲.pdf', mimeType: 'application/pdf', buffer: await makePdf([301,302,303,304]) },
+    { name: '乙.pdf', mimeType: 'application/pdf', buffer: await makePdf([401,402]) },
+  ]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(6);
+  await page.getByTestId('workspace-view-grouped').click();
+  await expect(page.getByTestId('source-group')).toHaveCount(2);
+  await page.getByTestId('selection-range-panel').locator('summary').click();
+  await page.getByTestId('selection-ranges').fill('2-4');
+  await page.getByTestId('selection-range-apply').click();
+  await expect(page.locator('.selection-info strong')).toContainText('3 页已选中');
+  await page.getByTestId('select-odd-pages').click();
+  await expect(page.getByTestId('selection-ranges')).toHaveValue('');
+  await expect(page.locator('.selection-info strong')).toContainText('3 页已选中');
+  await page.getByTestId('invert-page-selection').click();
+  await expect(page.locator('.selection-info strong')).toContainText('3 页已选中');
+  await page.getByTestId('select-odd-pages').click();
+  await page.getByRole('button', { name: '删除页面' }).click();
+  const remaining = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
+  expect(remaining.getPages().map(p => p.getWidth())).toEqual([302,304,402]);
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(6);
+  await page.getByTestId('workspace-view-order').click();
+  await page.getByRole('button', { name: '向左移动第 6 页' }).click();
+  await page.getByTestId('select-odd-pages').click();
+  await expect(page.getByRole('checkbox', { name: '选择第 5 页', exact: true })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: '选择第 6 页', exact: true })).not.toBeChecked();
+  await page.getByRole('button', { name: '删除页面' }).click();
+  const reordered = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
+  expect(reordered.getPages().map(p => p.getWidth())).toEqual([302,304,401]);
+  const width = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    viewport: document.documentElement.clientWidth,
+  }));
+  expect(width.scroll).toBeLessThanOrEqual(width.viewport + 2);
+});
