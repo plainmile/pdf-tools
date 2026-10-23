@@ -70,7 +70,7 @@ The PDF.js Worker lives at the stable path `/pdfjs/pdf.worker.min.mjs`, while As
 
 ## Workbench reset and exported PDF metadata
 
-- **Clear requires confirmation:** The workspace's irreversible reset explicitly asks before removing imported files, page edits and Undo/Redo history. Cancel keeps the entire edited document intact. This is different from Delete selected pages, which remains Undo-able.
+- **Clear requires confirmation:** The workspace's irreversible reset explicitly asks before removing imported files, page edits and Undo/Redo history. Cancel keeps the entire edited document and its settings intact; confirming also resets image-to-PDF settings to the original A4 portrait, 30 pt margin, full-image contain defaults (preventing previously chosen crop behavior from leaking into a new document). This is different from Delete selected pages, which remains Undo-able.
 - **No automatic PDF branding in document properties:** Newly composed/merged/extracted/split PDFs no longer insert `PlainMile PDF` as Title or Creator. Automatic default Producer metadata is disabled for these new documents too. The visible official-site attribution remains on the web page. This is **not a general PDF metadata-scrubbing service**: embedded XMP, page-level attachments, images, or other structures may retain metadata, so do not rely on it for sensitive redaction.
 
 ## Important safety and editing behavior
