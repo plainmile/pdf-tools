@@ -4,7 +4,7 @@ import {
   movePage, movePageGroup, shiftPage, rotatePages, deletePages, parsePageRanges,
   chunkPageRanges, getRangePages, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources,
-  reversePages, sortPagesByFilename, duplicatePages, insertPageAfter,
+  reversePages, sortPagesByFilename, duplicatePages, insertPageAfter, groupPagesBySource,
 } from '../../src/lib/pageOperations.mjs';
 
 const pages = Object.freeze([
@@ -146,4 +146,27 @@ test('blank insertion is deterministic and does not mutate source pages', () => 
   assert.deepEqual(ids(pages), ['a', 'b', 'c']);
   assert.throws(() => insertPageAfter(pages, 3, blank), /Invalid/);
   assert.throws(() => insertPageAfter(pages, -2, blank), /Invalid/);
+});
+
+test('read-only grouping keeps true PDF export indices for interleaved pages', () => {
+  const groups = groupPagesBySource(pages);
+  assert.deepEqual(groups.map(group => group.sourceId), ['fileA', 'fileB']);
+  assert.deepEqual(groups[0].items.map(item => item.index), [0, 2]);
+  assert.deepEqual(groups[0].items.map(item => item.pageRef.id), ['a', 'c']);
+  assert.deepEqual(groups[1].items.map(item => item.index), [1]);
+  assert.deepEqual(ids(pages), ['a', 'b', 'c']);
+  assert.deepEqual(groupPagesBySource(deletePages(pages, ['b'])).map(group => group.sourceId), ['fileA']);
+  assert.deepEqual(groupPagesBySource([]), []);
+});
+
+test('grouping 600 interleaved pages is order-preserving and linear-size', () => {
+  const many = Array.from({ length: 600 }, (_, index) => ({
+    id: 'page' + index, sourceId: 'source' + index % 12,
+    pageIndex: Math.floor(index / 12), rotation: 0,
+  }));
+  const groups = groupPagesBySource(many);
+  assert.equal(groups.length, 12);
+  assert.ok(groups.every(group => group.items.length === 50));
+  assert.deepEqual(groups[0].items.map(item => item.index), Array.from({ length: 50 }, (_, i) => i * 12));
+  assert.deepEqual(many.map(p => p.id), Array.from({ length: 600 }, (_, i) => 'page' + i));
 });

@@ -8,7 +8,7 @@ import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, chunkPageRanges,
-  getRangePages, reversePages, sortPagesByFilename, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources,
+  getRangePages, reversePages, sortPagesByFilename, groupPagesBySource, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources,
 } from '../lib/pageOperations.mjs';
 
 function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview }) {
@@ -112,6 +112,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [dragged, setDragged] = useState(null);
+  const [pageView, setPageView] = useState('order');
+  const [collapsedSources, setCollapsedSources] = useState(() => new Set());
   const [tab, setTab] = useState(mode === 'split-pdf' ? 'split' : 'organize');
   const [splitMode, setSplitMode] = useState('ranges');
   const [ranges, setRanges] = useState('');
@@ -125,6 +127,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const selectedCount = selected.size;
   const bytesInMemory = useMemo(() => retainedSourcesBytes(sources), [sources]);
   const sourceLookup = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources]);
+  const sourceGroups = useMemo(() => groupPagesBySource(pages), [pages]);
   // Judge active photo pages by their own original layout. A previously deleted
   // photo can reappear after Undo, even when newer images use different paper.
   // A single global "last applied" setting cannot detect that stale page.
@@ -241,6 +244,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         releasePreviewDocuments();
         setSources(nextSources);
         setHistory(makeHistoryState(nextPages));
+        setCollapsedSources(new Set());
       } else {
         setSources((previous) => [...previous, ...nextSources]);
         setHistory((previous) => commitHistory(previous, [...previous.present, ...nextPages]));
@@ -391,6 +395,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setClearConfirm(false);
     setWatermarkEnabled(false); setWatermarkText(''); setExportSettingsOpen(mode === 'watermark-pdf');
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
+    setPageView('order'); setCollapsedSources(new Set());
     setLastDownloadedRevision(null);
     setRanges(''); setChunkSize(''); setSplitMode('ranges');
     // A fresh image-to-PDF workspace must not inherit a previous crop choice.
@@ -411,6 +416,33 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const largeWorkspace = pages.length > 0 && (pages.length >= 250 || bytesInMemory >= 100 * 1024 * 1024);
   const selectedText = locale === 'zh' ? `${selectedCount} ${t.selected}` : `${selectedCount} ${selectedCount === 1 ? 'page' : 'pages'} selected`;
   const pageName = (number) => locale === 'zh' ? `第 ${number} 页` : `Page ${number}`;
+  const toggleSourceCollapsed = (sourceId) => setCollapsedSources(previous => {
+    const next = new Set(previous);
+    if (next.has(sourceId)) next.delete(sourceId); else next.add(sourceId);
+    return next;
+  });
+
+  // A grouped view never alters the document's actual order. Selection and
+  // actions use page IDs; the original indices stay visible as Export page N.
+  const groupedTiles = (group) => group.items.map(({ pageRef, index }) => {
+    const source = sourceLookup.get(pageRef.sourceId);
+    return (
+      <div className={`page-tile page-tile-grouped ${selected.has(pageRef.id) ? 'is-selected' : ''}`}
+        key={pageRef.id} data-testid="page-tile" data-original-page={pageRef.pageIndex + 1}
+        data-export-position={index + 1}>
+        <label className="page-tile-checkbox"><input type="checkbox"
+          checked={selected.has(pageRef.id)} disabled={busy}
+          onChange={event => toggleSelection(pageRef.id, index, Boolean(event.nativeEvent?.shiftKey))}
+          aria-label={locale === 'zh' ? `${t.selectPage} ${index + 1} 页` : `Select page ${index + 1}`} /></label>
+        <span className="tile-sequence" data-testid="group-output-position">{interpolate(t.groupOutputPosition, { n: index + 1 })}</span>
+        <PageThumbnail source={source} pageRef={pageRef} getPreviewDoc={getPreviewDoc} locale={locale} t={t} watermarkPreview={watermarkPreview} />
+        <div className="tile-info" title={source?.name}>
+          <strong>{pageName(pageRef.pageIndex + 1)}</strong><small>{source?.name ?? t.document}</small>
+        </div>
+      </div>
+    );
+  });
+
 
   return (
     <div className="pdf-workspace" data-testid="pdf-workspace">
@@ -553,7 +585,55 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   </div>
                 </div>
                 <p className="input-note" data-testid="blank-position-hint">{t.blankHint}</p>
+                <div className="workspace-view-switch" role="group" aria-label={t.viewBySource} data-testid="workspace-view-switch">
+                  <button type="button" data-testid="workspace-view-order"
+                    className={pageView === 'order' ? 'active' : ''} aria-pressed={pageView === 'order'} disabled={busy}
+                    onClick={() => setPageView('order')}>{t.viewExportOrder}</button>
+                  <button type="button" data-testid="workspace-view-grouped"
+                    className={pageView === 'grouped' ? 'active' : ''} aria-pressed={pageView === 'grouped'} disabled={busy}
+                    onClick={() => setPageView('grouped')}>{t.viewBySource}</button>
+                </div>
                 {onlyImages && <div className="page-action-buttons" data-testid="image-batch-actions"><button type="button" disabled={busy} onClick={() => commit(previous => sortPagesByFilename(previous, sources, locale))}>{t.sortFilename}</button><button type="button" disabled={busy} onClick={() => commit(reversePages)}>{t.reverseOrder}</button></div>}
+                {pageView === 'grouped' ? (
+                  <div className="source-groups" data-testid="source-groups">
+                    <div className="source-group-actions">
+                      <p className="input-note" data-testid="group-view-hint">{t.groupHint}</p>
+                      <button type="button" disabled={busy} data-testid="source-groups-expand-all"
+                        onClick={() => setCollapsedSources(new Set())}>{t.groupExpandAll}</button>
+                      <button type="button" disabled={busy} data-testid="source-groups-collapse-all"
+                        onClick={() => setCollapsedSources(new Set(sourceGroups.map(group => group.sourceId)))}>{t.groupCollapseAll}</button>
+                    </div>
+                    {sourceGroups.map(group => {
+                      const source = sourceLookup.get(group.sourceId);
+                      const collapsed = collapsedSources.has(group.sourceId);
+                      const label = source?.name ?? t.document;
+                      return (
+                        <section className="source-group" data-testid="source-group" key={group.sourceId}
+                          aria-label={label} data-source-id={group.sourceId}>
+                          <div className="source-group-heading">
+                            <button type="button" data-testid="source-group-toggle" disabled={busy}
+                              aria-expanded={!collapsed} aria-controls={`source-pages-${group.sourceId}`}
+                              aria-label={interpolate(collapsed ? t.groupExpand : t.groupCollapse, { name: label })}
+                              onClick={() => toggleSourceCollapsed(group.sourceId)}>
+                              <span aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+                              <span className="source-group-name" title={label}>{label}</span>
+                              <span className="source-group-count">{interpolate(t.groupPageCount, { pages: group.items.length })}</span>
+                            </button>
+                            <button type="button" className="source-group-select" disabled={busy}
+                              data-testid="source-group-select" onClick={() => {
+                                setSelected(previous => new Set([...previous, ...group.items.map(item => item.pageRef.id)]));
+                                lastSelectedIndex.current = null;
+                              }}>{t.all}</button>
+                          </div>
+                          {!collapsed && <div className="page-grid" id={`source-pages-${group.sourceId}`}
+                            data-testid="source-group-pages">{groupedTiles(group)}</div>}
+                        </section>
+                      );
+                    })}
+                    <button type="button" className="button button-secondary button-small" disabled={busy}
+                      onClick={() => inputRef.current?.click()}>{t.addMore}</button>
+                  </div>
+                ) : (
                 <div className="page-grid" data-testid="page-grid">
                   {pages.map((pageRef, index) => {
                     const source = sourceLookup.get(pageRef.sourceId);
@@ -575,7 +655,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   })}
                   <button type="button" className="add-more-tile" disabled={busy} onClick={() => inputRef.current?.click()}><span aria-hidden="true">＋</span>{t.addMore}</button>
                 </div>
-                <p className="page-grid-help">{t.dragHint}</p>
+                )}
+                <p className="page-grid-help">{pageView === 'grouped' ? t.groupHint : t.dragHint}</p>
               </section>
             ) : (
               <section className="split-panel" aria-label={t.splitTitle}>
