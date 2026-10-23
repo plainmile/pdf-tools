@@ -223,12 +223,15 @@ export async function composePdf(sources, pageRefs, options = {}) {
   const destination = await PDFDocument.create();
   const originalDocs = new Map();
   const byId = new Map(sources.map((source) => [source.id, source]));
+  const checkAbort = () => {
+    if (options.signal?.aborted) throw new Error(options.cancelMessage || 'Split cancelled.');
+  };
   for (let index = 0; index < pageRefs.length; index++) {
     const pageRef = pageRefs[index];
     if (options.signal) {
-      // Yield periodically so a user can cancel a long split without locking the UI.
+      // Yield regularly so large exports and splits remain cancellable.
       if (index % 8 === 0) await new Promise(resolve => setTimeout(resolve, 0));
-      if (options.signal.aborted) throw new Error('Split cancelled.');
+      checkAbort();
     }
     let sourceDoc = originalDocs.get(pageRef.sourceId);
     if (!sourceDoc) {
@@ -258,12 +261,15 @@ export async function composePdf(sources, pageRefs, options = {}) {
         x: crop.x, y: crop.y, width: crop.width, height: crop.height, opacity: WATERMARK_OPACITY,
       });
     }
+    if (options.onProgress && (index === 0 || (index + 1) % 8 === 0 || index === pageRefs.length - 1)) {
+      options.onProgress(index + 1, pageRefs.length);
+    }
   }
   destination.setTitle('Organized with PlainMile PDF');
   destination.setCreator('PlainMile PDF');
-  if (options.signal?.aborted) throw new Error('Split cancelled.');
+  checkAbort();
   const result = new Uint8Array(await destination.save({ useObjectStreams: true }));
-  if (options.signal?.aborted) throw new Error('Split cancelled.');
+  checkAbort();
   return result;
 }
 
