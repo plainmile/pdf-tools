@@ -133,6 +133,8 @@ export function interpolate(template, params = {}) {
 export function translateProcessingError(message, locale = 'en') {
   if (locale !== 'zh') return message;
   const error = String(message);
+  if (/Animated (AVIF|WebP) is not supported/i.test(error)) return '不支持动态 AVIF 或 WebP。请使用静态图片，避免只导出动画的第一帧。';
+  if (/This AVIF could not be decoded/i.test(error)) return '当前浏览器无法解码此 AVIF 图片。请确认文件有效，或先转换为 PNG、WebP 后重试。';
   if (/JPEG metadata could not be safely removed/i.test(error)) return 'JPEG 元数据结构异常，无法安全移除隐藏信息。请换一张图片或先导出为不含元数据的新图片。';
   if (/Split cancelled/i.test(error)) return '已取消拆分，没有下载未完成的 ZIP。';
   if (/PDF export cancelled/i.test(error)) return '已取消 PDF 导出，没有下载未完成的文件。';
