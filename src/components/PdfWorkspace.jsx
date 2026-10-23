@@ -384,15 +384,18 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     // the underlying export order.
     const groupPosition = group?.items.findIndex(item => item.pageRef.id === id) ?? -1;
     const anchor = lastGroupedSelection.current;
+    // React can defer state updater evaluation until after the ref is advanced.
+    // Snapshot the export-order anchor before updating it below.
+    const orderAnchor = lastSelectedIndex.current;
     setSelected(previous => {
       const next = new Set(previous);
       if (group && shift && anchor?.sourceId === group.sourceId && groupPosition >= 0) {
         const first = Math.min(groupPosition, anchor.position);
         const last = Math.max(groupPosition, anchor.position);
         for (let n = first; n <= last; n++) next.add(group.items[n].pageRef.id);
-      } else if (!group && shift && lastSelectedIndex.current !== null) {
-        const first = Math.min(index, lastSelectedIndex.current);
-        const last = Math.max(index, lastSelectedIndex.current);
+      } else if (!group && shift && orderAnchor !== null) {
+        const first = Math.min(index, orderAnchor);
+        const last = Math.max(index, orderAnchor);
         for (let n = first; n <= last; n++) next.add(pages[n].id);
       } else if (next.has(id)) next.delete(id);
       else next.add(id);
