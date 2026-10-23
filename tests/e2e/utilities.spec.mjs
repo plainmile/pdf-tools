@@ -111,6 +111,11 @@ test('compression never auto-downloads, blocks a larger PDF, and shows actual by
   await page.getByTestId('utility-run').click();
   await expect(page.getByTestId('compression-download')).toBeEnabled();
   await expect(page.getByTestId('compression-change-label')).toHaveText('Saved');
+  // Changing compression level must NOT discard an expensive undownloaded
+  // output; it remains clearly labelled as a previous result.
+  await page.getByRole('combobox', { name: 'Compression level' }).selectOption('clearer');
+  await expect(page.getByTestId('compression-result-stale')).toContainText('previous result');
+  await expect(page.getByTestId('compression-download')).toBeEnabled();
   await page.getByTestId('compression-preview-action').click();
   await expect(page.getByTestId('compression-preview')).toBeVisible();
   await expect.poll(() => page.getByTestId('compression-preview').locator('canvas').evaluate(canvas => canvas.width), { timeout: 15000 }).toBeGreaterThan(0);
@@ -120,6 +125,13 @@ test('compression never auto-downloads, blocks a larger PDF, and shows actual by
   const compressed = await getDownload(page, () => page.getByTestId('compression-download').click());
   expect(compressed.bytes.byteLength).toBeLessThan(input.byteLength);
   expect((await PDFDocument.load(compressed.bytes)).getPageCount()).toBe(1);
+  // Regenerating with the new setting replaces only after successful work.
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('compression-result-stale')).toHaveCount(0, { timeout: 30000 });
+  await expect(page.getByTestId('compression-download')).toBeEnabled();
+  const clearer = await getDownload(page, () => page.getByTestId('compression-download').click());
+  expect(clearer.bytes.length).toBeLessThan(input.length);
+  expect((await PDFDocument.load(clearer.bytes)).getPageCount()).toBe(1);
 });
 
 test('PDF to TXT and Markdown extract actual text, reject empty scanned pages', async ({ page }) => {
