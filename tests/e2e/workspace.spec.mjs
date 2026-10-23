@@ -89,6 +89,42 @@ test('Chinese watermark page supports custom Chinese text and resets to no water
   expect(watermarkImageCounts(plain)).toEqual([0, 0]);
 });
 
+test('ordinary multi-source PDFs reverse their export order with a single Undo/Redo step', async ({ page }) => {
+  await loadInput(page); // first.pdf: 300, 310; second.pdf: 320
+  await expect(page.getByTestId('page-order-actions')).toBeVisible();
+  await expect(page.getByTestId('reverse-all-pages')).toHaveText('Reverse page order');
+  await page.getByTestId('workspace-view-grouped').click();
+  await page.getByTestId('reverse-all-pages').click();
+  const reversed = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(reversed.getPages().map(pdfPage => pdfPage.getWidth())).toEqual([320, 310, 300]);
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  const restored = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(restored.getPages().map(pdfPage => pdfPage.getWidth())).toEqual([300, 310, 320]);
+
+  await page.getByRole('button', { name: 'Redo' }).click();
+  const redone = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(redone.getPages().map(pdfPage => pdfPage.getWidth())).toEqual([320, 310, 300]);
+});
+
+test('Chinese 375px mobile can reverse an ordinary PDF scan without horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/organize-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'backwards-scan.pdf', mimeType: 'application/pdf', buffer: await makePdf([321, 432, 543]),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(3);
+  await expect(page.getByTestId('reverse-all-pages')).toHaveText('反转页面顺序');
+  await page.getByTestId('reverse-all-pages').click();
+  const saved = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
+  expect(saved.getPages().map(pdfPage => pdfPage.getWidth())).toEqual([543, 432, 321]);
+  const viewport = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    width: document.documentElement.clientWidth,
+  }));
+  expect(viewport.scroll).toBeLessThanOrEqual(viewport.width + 2);
+});
+
 test('watermark respects visible 0/90/180/270 degree rotations and nonzero CropBoxes', async ({ page }) => {
   const { degrees } = await import('pdf-lib');
   const original = await PDFDocument.create();
