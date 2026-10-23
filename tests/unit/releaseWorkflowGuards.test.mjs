@@ -52,5 +52,10 @@ test('production Compose deployment uses /opt/compose/pdf-tools and safely migra
 
   assert.match(docs, /deployment uses `\/opt\/compose\/pdf-tools\/`/);
   assert.match(docs, /cd \/opt\/compose\/pdf-tools/);
+  // The production file is not one of Docker Compose's default auto-discovered names.
+  for (const command of ['ps', 'pull', 'up -d']) {
+    assert.ok(docs.includes('sudo docker compose -f compose.prod.yaml ' + command));
+    assert.ok(!docs.includes('sudo docker compose ' + command));
+  }
   assert.match(agentPolicy, /must live in `\/opt\/compose\/pdf-tools\/`/);
 });
