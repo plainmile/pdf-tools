@@ -650,3 +650,59 @@ test('invalid replacement keeps previously generated undownloaded text PDF', asy
   await expect(page.getByRole('alert')).toContainText('Previous file remains: fixture.pdf');
   await expect(page.getByRole('textbox', { name: 'Extracted text preview' })).toHaveValue(/Retained extracted text/);
 });
+
+test('two same-tick file drops cannot replace an in-flight converter input', async ({ page }) => {
+  await page.goto('/pdf-to-images/');
+  await expect(page.getByTestId('utility-dropzone')).toBeVisible();
+  const first = (await fixturePdf('First document', 1)).toString('base64');
+  const second = (await fixturePdf('Second document', 2)).toString('base64');
+  await page.evaluate(({first, second}) => {
+    const dropzone = document.querySelector('[data-testid="utility-dropzone"]');
+    for (const [name, base64] of [['first.pdf', first], ['second.pdf', second]]) {
+      const bytes = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([bytes], name, { type: 'application/pdf' }));
+      dropzone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    }
+  }, { first, second });
+  await expect(page.getByTestId('utility-file-summary')).toContainText('first.pdf', { timeout: 30000 });
+  await expect(page.getByTestId('utility-file-summary')).toContainText('1 page');
+  const result = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+  expect(result.name).toMatch(/first-page-001\.jpg$/);
+  expect(Array.from(result.bytes.slice(0, 3))).toEqual([255, 216, 255]);
+});
+
+test('two same-turn converter Run clicks produce one real PDF download', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.goto('/add-page-numbers/');
+  await upload(page, await fixturePdf('One job', 320));
+  const downloads = [];
+  page.on('download', d => downloads.push(d));
+  await page.evaluate(() => {
+    const run = document.querySelector('[data-testid="utility-run"]');
+    for (let n = 0; n < 2; n++) run.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  });
+  // Wait for the single result; short browser timing must not make a
+  // successful fast conversion fail merely because the busy state was brief.
+  await expect(page.getByRole('status')).toContainText('Ready', { timeout: 70000 });
+  await expect(page.getByTestId('utility-run')).toBeEnabled();
+  await expect.poll(() => downloads.length, { timeout: 10000 }).toBe(1);
+  const file = downloads[0];
+  expect(file.suggestedFilename()).toBe('fixture-numbered.pdf');
+  const numbered = await PDFDocument.load(await readFile(await file.path()));
+  expect(numbered.getPageCount()).toBe(320);
+});
+
+test('PDF to image parameters cannot change during active conversion', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/pdf-to-images/');
+  await upload(page, await fixturePdf('Image batch controls', 45));
+  await page.getByTestId('utility-page-ranges').fill('1-40');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('utility-cancel')).toBeVisible();
+  await expect(page.getByTestId('utility-page-ranges')).toBeDisabled();
+  await expect(page.getByRole('combobox', { name: 'Image format' })).toBeDisabled();
+  for (const control of await page.locator('.utility-options select').all()) await expect(control).toBeDisabled();
+  await page.getByTestId('utility-cancel').click();
+  await expect(page.getByTestId('utility-run')).toBeEnabled({ timeout: 40000 });
+});
