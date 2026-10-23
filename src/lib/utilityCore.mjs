@@ -213,6 +213,18 @@ export function textContentToLines(content) {
     return { text: text.trim(), fontSize: line.fontSize };
   }).filter(line => line.text);
 }
+/** Surface incomplete PDF text extraction instead of implying success.
+ * A blank page and an image-only/scanned page are indistinguishable by their
+ * text layer alone, so report "no selectable text", not "scanned".
+ */
+export function summarizeTextCoverage(pages) {
+  const missingPages = [];
+  for (let index = 0; index < pages.length; index++) {
+    if (!pages[index].length) missingPages.push(index + 1);
+  }
+  return { total: pages.length, withText: pages.length - missingPages.length, missingPages };
+}
+
 export function linesToReadableText(pages, markdown = false) {
   const heights = pages.flat().map(x => x.fontSize).filter(x => x > 0);
   const normal = heights.length ? heights.sort((a, b) => a - b)[Math.floor((heights.length - 1) / 2)] : 12;

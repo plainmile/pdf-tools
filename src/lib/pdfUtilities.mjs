@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import { pageNumberPlacement } from './pageNumberGeometry.mjs';
 import {
   UTILITY_LIMITS, requestedPages, parseTextBlocks, textContentToLines,
-  linesToReadableText, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
+  linesToReadableText, summarizeTextCoverage, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
   enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled,
 } from './utilityCore.mjs';
 
@@ -143,7 +143,7 @@ export async function compressPdfRaster(pdf, options = {}, reportProgress = () =
   } finally { await source.destroy(); }
 }
 
-export async function extractPdfText(pdf, markdown = false, reportProgress = () => {}, signal) {
+export async function extractPdfText(pdf, markdown = false, reportProgress = () => {}, signal, onAudit = () => {}) {
   const document = await openPdfJs(pdf.bytes);
   const pages = [];
   try {
@@ -155,7 +155,10 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
       reportProgress(i, pdf.count);
     }
   } finally { await document.destroy(); }
-  if (!pages.some(p => p.length)) throw new Error('No selectable text found. Scanned PDFs require OCR, which this tool does not provide.');
+  const coverage = summarizeTextCoverage(pages);
+  if (!coverage.withText) throw new Error('No selectable text found. Scanned PDFs require OCR, which this tool does not provide.');
+  checkCancelled(signal);
+  onAudit(coverage); // Never report a complete extraction when pages were omitted.
   return linesToReadableText(pages, markdown);
 }
 

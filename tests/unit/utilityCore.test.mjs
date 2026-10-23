@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, parseTextBlocks,
-  textContentToLines, linesToReadableText, sanitizeFilename, workspaceFilenameStem,
+  textContentToLines, linesToReadableText, summarizeTextCoverage, sanitizeFilename, workspaceFilenameStem,
   UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
 
@@ -37,6 +37,19 @@ test('PDF positioned text is approximately sorted by vertical position then X', 
   assert.equal(linesToReadableText([lines], false), 'left right\nlast');
   assert.match(linesToReadableText([[{text: 'Large title', fontSize: 24},{text: 'Body',fontSize: 12}]], true), /## Large title/);
 });
+test('partial PDF text extraction reports exactly the pages without selectable text', () => {
+  const allText = [{ text: 'A', fontSize: 12 }];
+  assert.deepEqual(summarizeTextCoverage([allText, [], allText, []]), {
+    total: 4, withText: 2, missingPages: [2, 4],
+  });
+  assert.deepEqual(summarizeTextCoverage([allText, allText]), {
+    total: 2, withText: 2, missingPages: [],
+  });
+  assert.deepEqual(summarizeTextCoverage([[], []]), {
+    total: 2, withText: 0, missingPages: [1, 2],
+  });
+});
+
 test('generated download filename removes unsafe path characters', () => {
   assert.equal(sanitizeFilename('../secret\n local.pdf'), '..-secret-local');
 });

@@ -706,3 +706,46 @@ test('PDF to image parameters cannot change during active conversion', async ({ 
   await page.getByTestId('utility-cancel').click();
   await expect(page.getByTestId('utility-run')).toBeEnabled({ timeout: 40000 });
 });
+
+test('mixed selectable text and genuine scanned-image page warns about omitted text in TXT and Markdown', async ({ page }) => {
+  const encodedScan = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 320; canvas.height = 120;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'white'; ctx.fillRect(0, 0, 320, 120);
+    ctx.fillStyle = 'black'; ctx.font = '28px serif';
+    ctx.fillText('SCANNED IMAGE ONLY', 14, 60);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  doc.addPage([500, 700]).drawText('Searchable cover', { x: 24, y: 610, font, size: 14 });
+  const scan = await doc.embedPng(Buffer.from(encodedScan, 'base64'));
+  doc.addPage([500, 700]).drawImage(scan, { x: 20, y: 300, width: 460, height: 170 });
+  doc.addPage([500, 700]).drawText('Searchable ending', { x: 24, y: 610, font, size: 14 });
+  const bytes = Buffer.from(await doc.save());
+  for (const [route, hint, ext] of [
+    ['/pdf-to-txt/', '1 of 3 pages', 'txt'],
+    ['/zh/pdf-to-markdown/', '共 3 页中有 1 页', 'md'],
+  ]) {
+    await page.goto(route);
+    await upload(page, bytes);
+    const result = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+    expect(result.name).toMatch(new RegExp('\\.' + ext + '$'));
+    const text = result.bytes.toString('utf8');
+    expect(text).toContain('Searchable cover');
+    expect(text).toContain('Searchable ending');
+    expect(text).not.toContain('SCANNED IMAGE ONLY');
+    const warning = page.getByTestId('text-extraction-warning');
+    await expect(warning).toContainText(hint);
+    await expect(warning).toContainText('2');
+  }
+});
+
+test('fully searchable PDF text does not show an incomplete-extraction warning', async ({ page }) => {
+  await page.goto('/pdf-to-txt/');
+  await upload(page, await fixturePdf('Everything searchable', 3));
+  const output = await getDownload(page, () => page.getByTestId('utility-run').click());
+  expect(output.bytes.toString('utf8')).toContain('Everything searchable 3');
+  await expect(page.getByTestId('text-extraction-warning')).toHaveCount(0);
+});
