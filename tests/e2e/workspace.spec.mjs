@@ -1624,3 +1624,25 @@ test('Chinese mobile exact insertion rejects selected destination, then moves pa
   }));
   expect(viewport.scroll).toBeLessThanOrEqual(viewport.client + 2);
 });
+
+test('moving pages preserves chosen page IDs but clears stale Shift-range anchors', async ({ page }) => {
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'book.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf([301,302,303,304,305,306]),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(6);
+  await page.getByRole('checkbox', { name: 'Select page 2', exact: true }).check();
+  await page.getByRole('checkbox', { name: 'Select page 4', exact: true }).check();
+  await page.getByTestId('move-position-panel').locator('summary').click();
+  await page.getByTestId('move-target-input').fill('6');
+  await page.getByTestId('move-position-submit').click();
+  await expect(page.locator('.selection-info strong')).toContainText('2 pages selected');
+  await expect(page.getByRole('status')).toContainText('before the previous output page 6');
+  // The last clicked page before the move was output position 4. Reusing
+  // that old anchor here incorrectly selects pages 1-4, not just page 1.
+  await page.getByRole('checkbox', { name: 'Select page 1', exact: true }).click({ modifiers: ['Shift'] });
+  await expect(page.locator('.selection-info strong')).toContainText('3 pages selected');
+  const saved = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(saved.getPages().map(p => p.getWidth())).toEqual([301,303,305,302,304,306]);
+});
