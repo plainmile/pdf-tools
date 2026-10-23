@@ -89,6 +89,30 @@ test('Chinese watermark page supports custom Chinese text and resets to no water
   expect(watermarkImageCounts(plain)).toEqual([0, 0]);
 });
 
+test('watermark respects visible 0/90/180/270 degree rotations and nonzero CropBoxes', async ({ page }) => {
+  const { degrees } = await import('pdf-lib');
+  const original = await PDFDocument.create();
+  for (const angle of [0, 90, 180, 270]) {
+    const sheet = original.addPage([595, 842]);
+    sheet.setCropBox(21, 37, 510, 700);
+    sheet.setRotation(degrees(angle));
+  }
+  await page.goto('/watermark-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'rotated-and-cropped.pdf', mimeType: 'application/pdf',
+    buffer: Buffer.from(await original.save()),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(4);
+  await page.getByTestId('watermark-toggle').check();
+  await page.getByTestId('watermark-text').fill('PRIVATE REVIEW');
+  const result = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(result.getPages().map(sheet => sheet.getRotation().angle)).toEqual([0, 90, 180, 270]);
+  for (const sheet of result.getPages()) {
+    expect(sheet.getCropBox()).toMatchObject({ x: 21, y: 37, width: 510, height: 700 });
+  }
+  expect(watermarkImageCounts(result)).toEqual([1, 1, 1, 1]);
+});
+
 test('optional watermark is applied to selected extraction and every split PDF', async ({ page }) => {
   await loadInput(page);
   await page.getByTestId('export-options-button').click();
