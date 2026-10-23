@@ -6,6 +6,24 @@ import { renderWatermarkPng, watermarkTextFromOptions, WATERMARK_OPACITY } from 
 import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement, stripJpegPrivateMetadata } from './jpegExif.mjs';
 import { imagePdfPageLayout } from './imagePdfLayout.mjs';
 
+/**
+ * Generate temporary IDs without depending on crypto.randomUUID(), which is
+ * unavailable on HTTP LAN origins in many browsers. getRandomValues() also
+ * works in insecure contexts. IDs are never used for authentication.
+ */
+export function temporaryWorkspaceId(api = globalThis.crypto) {
+  if (typeof api?.randomUUID === 'function') return api.randomUUID();
+  if (typeof api?.getRandomValues !== 'function') {
+    throw new Error('This browser cannot generate unique page identifiers.');
+  }
+  const bytes = new Uint8Array(16);
+  api.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 export const LIMITS = Object.freeze({
   maxFiles: 20,
   maxFileBytes: 100 * 1024 * 1024,
@@ -130,7 +148,7 @@ export async function readSourceFile(file, options = {}) {
   }
   const pageCount = doc.getPageCount();
   if (!pageCount) throw new Error(`${file.name}: this document has no pages.`);
-  return { id: crypto.randomUUID(), name: file.name, bytes, pageCount, isImage, inputSize: file.size,
+  return { id: temporaryWorkspaceId(), name: file.name, bytes, pageCount, isImage, inputSize: file.size,
     // Retain only in browser RAM, so the user can change paper settings without
     // re-uploading a photo or losing the existing page order/undo history.
     originalImageBytes: isImage ? originalBytes : null,
