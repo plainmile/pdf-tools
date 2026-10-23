@@ -239,7 +239,9 @@ export async function composePdf(sources, pageRefs, options = {}) {
   if (!pageRefs.length) throw new Error('There are no pages to export.');
   const watermarkText = watermarkTextFromOptions(options.watermark);
   const watermarkImages = new Map();
-  const destination = await PDFDocument.create();
+  // Page operations create a new document. Do not stamp brand or implicit
+  // creator/producer metadata on the user's exported PDF.
+  const destination = await PDFDocument.create({ updateMetadata: false });
   const originalDocs = new Map();
   const byId = new Map(sources.map((source) => [source.id, source]));
   const checkAbort = () => {
@@ -284,8 +286,6 @@ export async function composePdf(sources, pageRefs, options = {}) {
       options.onProgress(index + 1, pageRefs.length);
     }
   }
-  destination.setTitle('Organized with PlainMile PDF');
-  destination.setCreator('PlainMile PDF');
   checkAbort();
   const result = new Uint8Array(await destination.save({ useObjectStreams: true }));
   checkAbort();
