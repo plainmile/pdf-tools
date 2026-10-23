@@ -34,6 +34,8 @@ docker compose -f compose.yaml up -d
 
 The self-host Compose example is **standalone**: it does not require PlainMile's private `edge` network, netcup SSH secrets, a database, any volumes, or a fixed container name. You may select a different host port with `PDF_TOOLS_PORT=8081 docker compose -f compose.yaml up -d`.
 
+**HTTP LAN self-hosts:** Import IDs use the browser's secure random source with an HTTP-safe fallback (`crypto.getRandomValues`) when `crypto.randomUUID()` is unavailable. You may open the container from another device on your private LAN via `http://LAN-IP:8080`; for any public exposure, use HTTPS and a reverse proxy. This fallback does not make HTTP transport secure.
+
 **Hosting on a public server?** The example binds the HTTP port on all network interfaces; use a HTTPS reverse proxy and restrict direct port exposure in production. To allow *local-only* access, replace `8080:80` with `127.0.0.1:8080:80` or run `docker run -p 127.0.0.1:8080:80 ...`. The original documents never leave visitors' browsers.
 
 For reproducibility, pin a reviewed image digest or immutable commit-SHA tag instead of `latest`. The [GitHub Actions releases](https://github.com/plainmile/pdf-tools/actions/workflows/publish.yml) publish SHA-tagged images after CI succeeds.
