@@ -248,6 +248,12 @@ main { flex: 1; }
 .page-jump-form label { color: var(--text); font-size: 12px; font-weight: 600; }
 .page-jump-form input { display: block; width: 96px; max-width: 100%; padding: 9px 10px; margin-top: 6px; font: inherit; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 5px; }
 .page-jump-form .input-note { flex: 1 1 100%; max-width: 420px; margin: 0; }
+.move-position-panel { border: 1px solid var(--border); background: var(--panel); border-radius: 7px; margin: -5px 0 15px; }
+.move-position-panel > summary { padding: 10px 13px; cursor: pointer; font-size: 12px; color: var(--accent); font-weight: 650; }
+.move-position-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; padding: 0 13px 12px; }
+.move-position-form label { color: var(--text); font-size: 12px; font-weight: 600; min-width: 0; }
+.move-position-form input, .move-position-form select { display: block; width: min(100%, 190px); min-width: 0; margin-top: 6px; padding: 9px 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; border-radius: 5px; }
+.move-position-form .input-note { margin: 0; flex: 1 1 100%; }
 .page-action-buttons { gap: 7px; }
 .page-more-actions { max-width: 100%; }
 .page-more-actions > summary { cursor: pointer; font-size: 11px; font-weight: 650; color: var(--accent); border: 1px solid var(--border); border-radius: 5px; padding: 8px 10px; background: var(--surface); }
