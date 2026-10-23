@@ -156,12 +156,20 @@ A committed `package-lock.json` is recommended for reproducible builds. CI curre
 
 The user has already configured DNS for `pdf.plainmile.com` and an Nginx host on the existing netcup VPS. Preserve this configuration and the existing PlainMile/InfraOpsX services. The **only** expected reverse proxy target is `http://plainmile-pdf-tools:80` on the existing external Docker network named `edge`.
 
-`compose.prod.yaml` defines an independent static Nginx container, no ports bound to the host and no volumes containing user files. The deployment uses `/opt/data/compose/pdf-tools/` on the VPS. Deployment workflow `.github/workflows/deploy.yml` runs after the GHCR Publish Image workflow successfully publishes the reviewed `main` commit, and checks the new container's health and HTTPS site.
+`compose.prod.yaml` defines an independent static Nginx container, no ports bound to the host and no volumes containing user files. The deployment uses `/opt/compose/pdf-tools/` on the VPS. Deployment workflow `.github/workflows/deploy.yml` runs after the GHCR Publish Image workflow successfully publishes the reviewed `main` commit, and checks the new container's health and HTTPS site.
+
+### Compose directory layout and migration
+
+On this VPS, all Docker Compose applications live under `/opt/compose/`. PDF Tools uses **`/opt/compose/pdf-tools/`** for `compose.prod.yaml` and its server-local `.env` (only the pinned `IMAGE_TAG`); this keeps it consistent with the other applications. Custom operational scripts, if any, belong under `/opt/data/scripts/`, **not** beside Compose configurations.
+
+The next successful automated deployment moves the existing **`/opt/data/compose/pdf-tools/`** directory to `/opt/compose/pdf-tools/` **only if the destination does not already exist**. If the destination exists, deployment reuses it and deliberately leaves the old directory untouched for review; it never merges or deletes unknown files. After deployment, confirm the PDF Tools container is healthy and its Compose working-directory label is `/opt/compose/pdf-tools`. You may then manually inspect/remove any unused legacy directory. No document data or database needs to be moved.
+
+The container name `plainmile-pdf-tools`, the existing `edge` Docker network and the shared Nginx reverse proxy stay unchanged. The directory move alone does not expose host ports or restart unrelated services.
 
 ### Configure GitHub Actions secrets (only if they are not already scoped to this repository)
 
 - `DEPLOY_HOST` - netcup SSH hostname/IP
-- `DEPLOY_USER` - SSH user with Docker + write access to `/opt/data/compose/pdf-tools/`
+- `DEPLOY_USER` - SSH user with Docker + write access to `/opt/compose/pdf-tools/`
 - `DEPLOY_PORT` - optional, defaults to 22
 - `DEPLOY_SSH_KEY` - SSH private deployment key (secret; never commit)
 - `DEPLOY_HOST_KEY` - verified, pinned SSH host **public key**, e.g. `ssh-ed25519 AAAA...` (without the hostname)
@@ -172,7 +180,7 @@ Do not copy or reveal secrets through this repository. Do not disable host-key v
 
 ```sh
 # Run on netcup VPS; no Node or npm installation needed.
-cd /opt/data/compose/pdf-tools
+cd /opt/compose/pdf-tools
 sudo docker compose ps
 sudo docker inspect -f '{{.State.Health.Status}}' plainmile-pdf-tools
 sudo docker network inspect edge --format '{{range .Containers}}{{println .Name}}{{end}}'
@@ -185,8 +193,8 @@ If the GitHub Actions deployment cannot authenticate, it must not alter the shar
 
 ```sh
 # On netcup VPS only, after the reviewed GHCR image exists:
-sudo mkdir -p /opt/data/compose/pdf-tools
-cd /opt/data/compose/pdf-tools
+sudo mkdir -p /opt/compose/pdf-tools
+cd /opt/compose/pdf-tools
 # Copy compose.prod.yaml here from the reviewed repository.
 printf 'IMAGE_TAG=REVIEWED_MAIN_SHA\n' | sudo tee .env
 sudo docker compose pull
