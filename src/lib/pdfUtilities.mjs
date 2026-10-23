@@ -167,7 +167,11 @@ export async function addPageNumbers(pdf, opts = {}, reportProgress = () => {}) 
   if (!Number.isSafeInteger(start) || start < 1 || start > 99999) throw new Error('Starting page number must be from 1 to 99999.');
   if (start + doc.getPageCount() - 1 > 99999) throw new Error('Page numbers cannot exceed 99999. Lower the starting number.');
   const position = ['bottom-center', 'bottom-right', 'top-right'].includes(opts.position) ? opts.position : 'bottom-center';
-  for (let i = 0; i < doc.getPageCount(); i++) {
+  const pageCount = doc.getPageCount();
+  for (let i = 0; i < pageCount; i++) {
+    // Yield while numbering books: otherwise the browser cannot dispatch
+    // the Cancel click until all synchronous page annotations are finished.
+    if (i > 0 && i % 8 === 0) await new Promise(resolve => setTimeout(resolve, 0));
     checkCancelled(opts.signal);
     const page = doc.getPage(i);
     const box = page.getCropBox();
@@ -176,9 +180,12 @@ export async function addPageNumbers(pdf, opts = {}, reportProgress = () => {}) 
     // Use visible page coordinates, compensating PDF /Rotate and CropBox origin.
     const placement = pageNumberPlacement(box, page.getRotation().angle, textWidth, size, position);
     page.drawText(text, { x: placement.x, y: placement.y, rotate: degrees(placement.rotation), font, size, color: rgb(.28, .33, .39) });
-    reportProgress(i + 1, doc.getPageCount());
+    reportProgress(i + 1, pageCount);
   }
-  return new Uint8Array(await doc.save({ useObjectStreams: true }));
+  checkCancelled(opts.signal);
+  const bytes = new Uint8Array(await doc.save({ useObjectStreams: true }));
+  checkCancelled(opts.signal);
+  return bytes;
 }
 
 // Latin text uses real searchable PDF text. For arbitrary Unicode/CJK characters,
