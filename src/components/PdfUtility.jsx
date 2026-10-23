@@ -247,7 +247,9 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   }
   function save(outputFile) {
     saveDownload(outputFile.bytes, outputFile.name, outputFile.mime || 'application/pdf');
-    setNotDownloaded(false);
+    // Downloading an earlier PDF does not save the current text draft.
+    // Keep navigation and replacement protections until the current text is generated and downloaded.
+    setNotDownloaded(Boolean(isTextInput && outputFile.textRevision !== textRevision));
   }
   async function processFile() {
     if (operationRef.current || pendingReplacementRef.current) return;
