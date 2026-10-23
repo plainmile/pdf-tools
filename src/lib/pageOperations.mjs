@@ -122,7 +122,13 @@ export function deletePages(pages, ids) {
 
 export function parsePageRanges(input, pageCount, maxRanges = 50) {
   if (!Number.isSafeInteger(pageCount) || pageCount < 1) throw new Error('There are no pages to split.');
-  const parts = input.split(',').map((part) => part.trim());
+  // Browser users often paste ranges with fullwidth Chinese punctuation,
+  // Unicode dashes or digits. Normalize separators without relaxing bounds,
+  // inverted-range checks or the 50-range safety limit.
+  const normalized = input.normalize('NFKC')
+    .replace(/[\uFF0C\u3001\uFF1B;]/g, ',')
+    .replace(/[\u2010-\u2015\u2212]/g, '-');
+  const parts = normalized.split(',').map((part) => part.trim());
   if (!parts.length || parts.some((part) => !part)) throw new Error('Use a range such as 1-3, 4-6.');
   if (parts.length > maxRanges) throw new Error(`A maximum of ${maxRanges} ranges is supported.`);
   return parts.map((part) => {

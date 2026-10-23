@@ -174,7 +174,7 @@ test('Chinese touch-width range selection uses export order and rejects reversed
   await expect(page.getByTestId('page-tile')).toHaveCount(5);
   await page.getByTestId('workspace-view-grouped').click();
   await page.getByTestId('selection-range-panel').locator('summary').click();
-  await page.getByTestId('selection-ranges').fill('1-2, 4');
+  await page.getByTestId('selection-ranges').fill('１－２，４');
   await page.getByTestId('selection-range-apply').click();
   await expect(page.locator('.selection-info strong')).toContainText('3 页已选中');
   await page.getByTestId('selection-ranges').fill('5-1');
@@ -320,7 +320,7 @@ test('Chinese split tool exports current pages without uploading the document', 
   await page.goto('/zh/split-pdf/');
   await page.getByTestId('file-input').setInputFiles(await inputDocuments());
   await expect(page.getByRole('button', { name: '下载拆分文件（ZIP）' })).toBeDisabled();
-  await page.getByRole('textbox', { name: '页码范围' }).fill('1-2, 3');
+  await page.getByRole('textbox', { name: '页码范围' }).fill('１－２，３');
   await expect(page.getByText('预计生成 2 个 PDF 文件。')).toBeVisible();
   const wait = page.waitForEvent('download');
   await page.getByRole('button', { name: '下载拆分文件（ZIP）' }).click();

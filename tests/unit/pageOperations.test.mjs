@@ -51,6 +51,16 @@ test('split into fixed-size chunks', () => {
   assert.deepEqual(chunkPageRanges(7, 3), [{start:1,end:3},{start:4,end:6},{start:7,end:7}]);
 });
 
+test('localized page range punctuation is normalized but still validates bounds', () => {
+  assert.deepEqual(parsePageRanges('１－３，５、７–８', 10), [
+    { start: 1, end: 3 }, { start: 5, end: 5 }, { start: 7, end: 8 },
+  ]);
+  assert.deepEqual([...pageIdsForRanges(pages, '１－２，３')], ['a', 'b', 'c']);
+  assert.throws(() => parsePageRanges('３－１，２', 10), /reversed/);
+  assert.throws(() => parsePageRanges('１，１１', 10), /outside/);
+  assert.throws(() => parsePageRanges('１，，２', 10));
+});
+
 test('reject unsafe or inverted ranges', () => {
   for (const value of ['0', '-1', '4', '2-1', '1-4', '1,', '2-3-4', '1,,2', '999999999999999999999']) {
     assert.throws(() => parsePageRanges(value, 3));
