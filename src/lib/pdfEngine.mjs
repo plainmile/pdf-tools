@@ -1,7 +1,28 @@
-import { PDFDocument, degrees } from 'pdf-lib';
+import {
+  PDFDocument, degrees, pushGraphicsState, popGraphicsState,
+  moveTo, lineTo, closePath, clip, endPath,
+} from 'pdf-lib';
 import { renderWatermarkPng, watermarkTextFromOptions, WATERMARK_OPACITY } from './watermark.mjs';
 import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement, stripJpegPrivateMetadata } from './jpegExif.mjs';
-import { imagePdfPageLayout } from './imagePdfLayout.mjs';
+import { imagePdfPageLayout, IMAGE_PDF_LAYOUT_DEFAULT } from './imagePdfLayout.mjs';
+
+/**
+ * Generate temporary IDs without depending on crypto.randomUUID(), which is
+ * unavailable on HTTP LAN origins in many browsers. getRandomValues() also
+ * works in insecure contexts. IDs are never used for authentication.
+ */
+export function temporaryWorkspaceId(api = globalThis.crypto) {
+  if (typeof api?.randomUUID === 'function') return api.randomUUID();
+  if (typeof api?.getRandomValues !== 'function') {
+    throw new Error('This browser cannot generate unique page identifiers.');
+  }
+  const bytes = new Uint8Array(16);
+  api.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 export const LIMITS = Object.freeze({
   maxFiles: 20,
@@ -127,7 +148,8 @@ export async function readSourceFile(file, options = {}) {
   }
   const pageCount = doc.getPageCount();
   if (!pageCount) throw new Error(`${file.name}: this document has no pages.`);
-  return { id: crypto.randomUUID(), name: file.name, bytes, pageCount, isImage, inputSize: file.size,
+  return { id: temporaryWorkspaceId(), name: file.name, bytes, pageCount, isImage, inputSize: file.size,
+    imageLayout: isImage ? { ...IMAGE_PDF_LAYOUT_DEFAULT, ...options.imageLayout } : null,
     // Retain only in browser RAM, so the user can change paper settings without
     // re-uploading a photo or losing the existing page order/undo history.
     originalImageBytes: isImage ? originalBytes : null,
@@ -147,7 +169,7 @@ export async function reflowImageSources(sources, layout, report = () => {}) {
       }
       const bytes = await imageToPdfBytes({ name: source.name },
         source.originalImageBytes, source.originalImageType, layout);
-      updated.push({ ...source, bytes });
+      updated.push({ ...source, bytes, imageLayout: { ...IMAGE_PDF_LAYOUT_DEFAULT, ...layout } });
     }
     report(index + 1, sources.length);
     // Allow React updates and UI progress during bulk photo reflow.
@@ -189,10 +211,19 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}) {
     const placement = jpegPdfPlacement(layout.image, exifOrientation);
     // EXIF changes the displayed orientation, not the JPEG pixel data or its
     // compression quality. PDF transforms handle all eight incl. mirrors.
+    if (layout.clip) {
+      const { x, y, width, height } = layout.clip;
+      page.pushOperators(
+        pushGraphicsState(), moveTo(x, y), lineTo(x + width, y),
+        lineTo(x + width, y + height), lineTo(x, y + height),
+        closePath(), clip(), endPath(),
+      );
+    }
     page.drawImage(embedded, {
       x: placement.x, y: placement.y, width: placement.width, height: placement.height,
       rotate: degrees(placement.angle),
     });
+    if (layout.clip) page.pushOperators(popGraphicsState());
     return new Uint8Array(await doc.save({ useObjectStreams: true }));
   } catch (error) {
     if (error?.message === 'Image dimensions are too large.' ||
@@ -208,15 +239,20 @@ export async function composePdf(sources, pageRefs, options = {}) {
   if (!pageRefs.length) throw new Error('There are no pages to export.');
   const watermarkText = watermarkTextFromOptions(options.watermark);
   const watermarkImages = new Map();
-  const destination = await PDFDocument.create();
+  // Page operations create a new document. Do not stamp brand or implicit
+  // creator/producer metadata on the user's exported PDF.
+  const destination = await PDFDocument.create({ updateMetadata: false });
   const originalDocs = new Map();
   const byId = new Map(sources.map((source) => [source.id, source]));
+  const checkAbort = () => {
+    if (options.signal?.aborted) throw new Error(options.cancelMessage || 'Split cancelled.');
+  };
   for (let index = 0; index < pageRefs.length; index++) {
     const pageRef = pageRefs[index];
     if (options.signal) {
-      // Yield periodically so a user can cancel a long split without locking the UI.
+      // Yield regularly so large exports and splits remain cancellable.
       if (index % 8 === 0) await new Promise(resolve => setTimeout(resolve, 0));
-      if (options.signal.aborted) throw new Error('Split cancelled.');
+      checkAbort();
     }
     let sourceDoc = originalDocs.get(pageRef.sourceId);
     if (!sourceDoc) {
@@ -246,12 +282,13 @@ export async function composePdf(sources, pageRefs, options = {}) {
         x: crop.x, y: crop.y, width: crop.width, height: crop.height, opacity: WATERMARK_OPACITY,
       });
     }
+    if (options.onProgress && (index === 0 || (index + 1) % 8 === 0 || index === pageRefs.length - 1)) {
+      options.onProgress(index + 1, pageRefs.length);
+    }
   }
-  destination.setTitle('Organized with PlainMile PDF');
-  destination.setCreator('PlainMile PDF');
-  if (options.signal?.aborted) throw new Error('Split cancelled.');
+  checkAbort();
   const result = new Uint8Array(await destination.save({ useObjectStreams: true }));
-  if (options.signal?.aborted) throw new Error('Split cancelled.');
+  checkAbort();
   return result;
 }
 

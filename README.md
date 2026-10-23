@@ -34,6 +34,8 @@ docker compose -f compose.yaml up -d
 
 The self-host Compose example is **standalone**: it does not require PlainMile's private `edge` network, netcup SSH secrets, a database, any volumes, or a fixed container name. You may select a different host port with `PDF_TOOLS_PORT=8081 docker compose -f compose.yaml up -d`.
 
+**HTTP LAN self-hosts:** Import IDs use the browser's secure random source with an HTTP-safe fallback (`crypto.getRandomValues`) when `crypto.randomUUID()` is unavailable. You may open the container from another device on your private LAN via `http://LAN-IP:8080`; for any public exposure, use HTTPS and a reverse proxy. This fallback does not make HTTP transport secure.
+
 **Hosting on a public server?** The example binds the HTTP port on all network interfaces; use a HTTPS reverse proxy and restrict direct port exposure in production. To allow *local-only* access, replace `8080:80` with `127.0.0.1:8080:80` or run `docker run -p 127.0.0.1:8080:80 ...`. The original documents never leave visitors' browsers.
 
 For reproducibility, pin a reviewed image digest or immutable commit-SHA tag instead of `latest`. The [GitHub Actions releases](https://github.com/plainmile/pdf-tools/actions/workflows/publish.yml) publish SHA-tagged images after CI succeeds.
@@ -46,17 +48,39 @@ docker image inspect ghcr.io/plainmile/pdf-tools:latest \
 # Expected: https://pdf.plainmile.com/
 ```
 
+## Report a problem or suggest a workflow
+
+Use the visible **Report an issue / 反馈问题** link in the website footer, or open [GitHub Issues](https://github.com/plainmile/pdf-tools/issues/new/choose). Include the page URL, exact non-sensitive steps, expected versus actual result, browser, and approximate file type/size/page count. **Do not upload or paste original documents, extracted text, file names, account details, or other personal information.** Reproduce with a synthetic document whenever possible. The tool runs locally; issue reports are public and are not part of document processing.
+
 ## Features
 
 - Merge PDFs at the page level, including interleaving pages from different files.
 - Drag individual thumbnails or selected groups of pages to reorder; Shift selection and touch/keyboard move buttons are supported.
 - Select, rotate, delete, extract and undo/redo up to 20 edits.
 - Split by page ranges (`1-3, 4-6`) or every N pages, bundled in a ZIP download.
-- Convert JPG, PNG and WebP to A4 PDF pages and mix with other PDFs.
+- Convert JPG, PNG and WebP to PDF pages with A4 / US Letter / fit-to-image sizes, automatic / portrait / landscape orientation and four margin presets. Choose **fit entire image** (no crop) or **fill available paper area** (centered crop; never stretches). Fit-to-image always shows the entire source image. Supports mixed images/PDFs, per-page thumbnails, drag ordering, explicit numeric filename sorting and reverse ordering with Undo.
 - Optional text watermarks: **off by default**. Open Export options near the download button, enable the checkbox and enter your own text (English or Chinese). The light diagonal overlay is added on export only and also works for extracted/split PDFs. No automatic company watermark.
 - No upload API, account, server-side PDF processing, analytics or advertising code.
 - Human-written bilingual English / Simplified Chinese SEO pages: `/workspace/`, `/merge-pdf/`, `/split-pdf/`, `/organize-pdf/`, `/rotate-pdf/`, `/extract-pages/`, `/delete-pages/`, `/image-to-pdf/`, `/watermark-pdf/`, `/privacy/` plus `/zh/` counterparts. Hreflang and canonical tags provided.
 - Three appearance modes: follow system, light, dark. Preference saved locally if the browser allows localStorage; all modes are CSS token-based.
+
+## Deployment cache safety
+
+The PDF.js Worker lives at the stable path `/pdfjs/pdf.worker.min.mjs`, while Astro application chunks have versioned filenames. Nginx requires the Worker to be revalidated (`Cache-Control: no-cache`) on each navigation to prevent a stale Worker from becoming incompatible with the updated PDF.js client after an upgrade. Versioned JS/CSS assets continue to use short-lived normal caching. The Docker CI smoke test verifies the Worker MIME type and cache response headers.
+
+## Workbench reset and exported PDF metadata
+
+- **Clear requires confirmation:** The workspace's irreversible reset explicitly asks before removing imported files, page edits and Undo/Redo history. Cancel keeps the entire edited document and its settings intact; confirming also resets image-to-PDF settings to the original A4 portrait, 30 pt margin, full-image contain defaults (preventing previously chosen crop behavior from leaking into a new document). This is different from Delete selected pages, which remains Undo-able.
+- **No automatic PDF branding in document properties:** Newly composed/merged/extracted/split PDFs no longer insert `PlainMile PDF` as Title or Creator. Automatic default Producer metadata is disabled for these new documents too. The visible official-site attribution remains on the web page. This is **not a general PDF metadata-scrubbing service**: embedded XMP, page-level attachments, images, or other structures may retain metadata, so do not rely on it for sensitive redaction.
+
+## Important safety and editing behavior
+
+- **Merge/organize/rotate/extract/split** create a *new* PDF by copying pages. Interactive forms, signed documents, embedded attachments and some annotations may be lost, or signatures invalidated. These operations are not certified archival or preservation workflows. Keep the original and compare important exports.
+- **Image-to-PDF paper choices:** A4 / Letter / image-sized; portrait, landscape or auto for fixed paper, while image-sized always follows each image. Margins: 0/12/30/48 pt. The default remains A4 portrait, 30 pt, full image. Cover mode explicitly crops overflowing image edges to the printable area, not outside the page. Any layout changes to loaded photos must be applied before exporting; Undo and page order are preserved.
+- **Mobile navigation:** Four top-level tool links stay visible and keyboard-accessible in a horizontally scrollable row on narrow screens; the header no longer hides them without replacement.
+- **Image ordering:** Image-only workspaces offer natural numeric filename ordering (`photo2` before `photo10`) and reverse order; drag/individual move controls remain available. Neither automatic sort nor irreversible mutation occurs upon import.
+- **Undo-safe settings:** Each photo source records the paper/orientation/margins/placement actually applied. Undo that revives a previously deleted image with an older page layout blocks export until the images are reflowed; a newer photo cannot silently mark older paper as applied.\n- **Unexpected settings and long exports:** Switching to fit-to-image explicitly resets the previously selected destructive cover/crop mode, so switching back to A4 does not silently crop. Importing a new photo after removing earlier photos resets the active layout even if other PDF pages remain. For exports of 24+ pages, the UI reports progress and offers cooperative cancellation; a cancelled operation never triggers a partial download.
+- **Compression is intentionally lossy:** Every page becomes JPEG content; searchable text, forms, annotations, links and signatures are not preserved. For a smaller result, the user may preview its real first page before downloading; this preview is lazy and never downloads or uploads any file. The output is offered only when its *measured* size is smaller. Never treat this as a lossless compression or secure redaction service.
 
 ## Limits and known non-goals
 
@@ -180,6 +204,10 @@ MIT License. See [LICENSE](LICENSE). Source: https://github.com/plainmile/pdf-to
 5. E2E Docker containers use `--rm` and explicit `if: always()` cleanup. GitHub-hosted Runners are discarded after the job. Diagnostics are kept only on failure, for one day. The separate public QA workflow is **manual-only** to avoid duplicate Runner jobs.
 
 The repository is public; GitHub's **standard hosted Runners** are free for public repositories, but artifact/package storage can still be limited. No always-on QA Runner or daemon is configured on netcup.
+
+## Workflow design references
+
+Borrow the practical interaction patterns found in PDF24, iLovePDF and Smallpdf, without cloning their branding or page layout: surface relevant controls before converting; show the actual order and preview; preserve original files; clearly separate reversible page editing from lossy conversions; explain file/page safety limits beside the action; and offer optional follow-on tools after a successful result. All processing remains browser-local; there are no user accounts or uploads.
 
 ## V1 browser-local utility tools
 

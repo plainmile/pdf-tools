@@ -73,6 +73,8 @@ jobs:
           curl -fsS http://127.0.0.1:18081/merge-pdf/ >/dev/null
           curl -fsSI http://127.0.0.1:18081/pdfjs/pdf.worker.min.mjs > /tmp/pdf-worker-headers.txt
           grep -iq 'content-type: application/javascript' /tmp/pdf-worker-headers.txt
+          grep -iq 'cache-control: no-cache' /tmp/pdf-worker-headers.txt
+          ! grep -Eiq 'cache-control:.*max-age=604800' /tmp/pdf-worker-headers.txt
           test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18081/unknown-route)" = "404"
       - name: Browser E2E against production image (Playwright in Docker)
         run: |

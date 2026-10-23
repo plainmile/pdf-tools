@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { imagePdfPageLayout, IMAGE_PDF_LAYOUT_DEFAULT } from '../../src/lib/imagePdfLayout.mjs';
+import { imagePdfPageLayout, IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../../src/lib/imagePdfLayout.mjs';
 
 function near(a, b) { assert.ok(Math.abs(a - b) < 0.02, String(a) + ' != ' + String(b)); }
 
 test('old image PDF defaults remain A4 portrait with 30 pt margins', () => {
-  assert.deepEqual(IMAGE_PDF_LAYOUT_DEFAULT, { paper: 'a4', orientation: 'portrait', margin: 30 });
+  assert.deepEqual(IMAGE_PDF_LAYOUT_DEFAULT, { paper: 'a4', orientation: 'portrait', margin: 30, imageSizing: 'contain' });
   const p = imagePdfPageLayout(240, 160);
   near(p.width, 595.28);
   near(p.height, 841.89);
@@ -45,9 +45,33 @@ test('fit-to-picture preserves exact proportions and leaves chosen borders', () 
 });
 
 test('invalid settings cannot silently make a clipped or invalid PDF', () => {
-  for (const bad of [{ paper: 'tabloid' }, { orientation: 'upside-down' }, { margin: 1000 }, { margin: -1 }]) {
+  for (const bad of [{ paper: 'tabloid' }, { orientation: 'upside-down' }, { margin: 1000 }, { margin: -1 }, { imageSizing: 'stretch' }]) {
     assert.throws(() => imagePdfPageLayout(400, 600, bad), /Unsupported/);
   }
   assert.throws(() => imagePdfPageLayout(0, 600), /Invalid image/);
   assert.throws(() => imagePdfPageLayout(NaN, 600), /Invalid image/);
+});
+
+test('contain never crops while cover fills and clips to the printable margin', () => {
+  const contained = imagePdfPageLayout(1200, 300, { paper: 'letter', orientation: 'portrait', margin: 48 });
+  const covered = imagePdfPageLayout(1200, 300, { paper: 'letter', orientation: 'portrait', margin: 48, imageSizing: 'cover' });
+  assert.equal(contained.clip, null);
+  assert.ok(contained.image.x >= 48 && contained.image.y >= 48);
+  assert.deepEqual(covered.clip, { x: 48, y: 48, width: 516, height: 696 });
+  assert.ok(covered.image.x < 48);
+  near(covered.image.height, 696);
+  const fit = imagePdfPageLayout(1200, 300, { paper: 'fit', margin: 12, imageSizing: 'cover' });
+  assert.equal(fit.clip, null);
+  near(fit.image.x, 12);
+  near(fit.image.y, 12);
+});
+
+test('undo can reactivate a photo with older applied settings', () => {
+  const oldA4 = { ...IMAGE_PDF_LAYOUT_DEFAULT };
+  const letter = { ...oldA4, paper: 'letter', margin: 12 };
+  assert.equal(sameImagePdfLayout(oldA4, oldA4), true);
+  assert.equal(sameImagePdfLayout(oldA4, { ...oldA4 }), true);
+  assert.equal(sameImagePdfLayout(oldA4, letter), false);
+  assert.equal(sameImagePdfLayout(null, letter), false);
+  assert.equal(sameImagePdfLayout({ ...letter, imageSizing: 'cover' }, letter), false);
 });

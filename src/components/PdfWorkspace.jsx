@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import JSZip from 'jszip';
-import { LIMITS, composePdf, isSupportedFile, readSourceFile, reflowImageSources, saveDownload } from '../lib/pdfEngine.mjs';
+import { LIMITS, composePdf, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId } from '../lib/pdfEngine.mjs';
 import { sanitizeFilename } from '../lib/utilityCore.mjs';
-import { IMAGE_PDF_LAYOUT_DEFAULT } from '../lib/imagePdfLayout.mjs';
+import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLayout.mjs';
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, shiftPage, rotatePages, deletePages, parsePageRanges, chunkPageRanges,
-  getRangePages, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources,
+  getRangePages, reversePages, sortPagesByFilename, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources,
 } from '../lib/pageOperations.mjs';
 
 function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview }) {
@@ -96,14 +96,17 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const lastSelectedIndex = useRef(null);
   const previewDocuments = useRef(new Map());
   const splitAbortRef = useRef(null);
+  const exportAbortRef = useRef(null);
   const [sources, setSources] = useState([]);
   const [history, setHistory] = useState(() => makeHistoryState());
   const [selected, setSelected] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
+  const [clearConfirm, setClearConfirm] = useState(false);
   const [splitProgress, setSplitProgress] = useState(null);
   const [splitCancelling, setSplitCancelling] = useState(false);
+  const [exportProgress, setExportProgress] = useState(null);
+  const [exportCancelling, setExportCancelling] = useState(false);
   const [imageLayout, setImageLayout] = useState(() => ({ ...IMAGE_PDF_LAYOUT_DEFAULT }));
-  const [appliedImageLayout, setAppliedImageLayout] = useState(() => ({ ...IMAGE_PDF_LAYOUT_DEFAULT }));
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [dragged, setDragged] = useState(null);
@@ -120,13 +123,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const selectedCount = selected.size;
   const bytesInMemory = useMemo(() => sources.reduce((total, item) => total + item.inputSize, 0), [sources]);
   const sourceLookup = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources]);
-  // Hidden source bytes are intentionally retained for Undo, but should not
-  // force new-paper reflow when every corresponding image page was deleted.
-  const imageSourcesLoaded = pages.some(page => sourceLookup.get(page.sourceId)?.isImage);
-  const imageLayoutDirty = mode === 'image-to-pdf' && imageSourcesLoaded &&
-    (imageLayout.paper !== appliedImageLayout.paper ||
-      imageLayout.orientation !== appliedImageLayout.orientation ||
-      imageLayout.margin !== appliedImageLayout.margin);
+  // Judge active photo pages by their own original layout. A previously deleted
+  // photo can reappear after Undo, even when newer images use different paper.
+  // A single global "last applied" setting cannot detect that stale page.
+  const activeImageSources = new Set(pages.filter(page => sourceLookup.get(page.sourceId)?.isImage).map(page => page.sourceId));
+  const imageLayoutDirty = mode === 'image-to-pdf' && [...activeImageSources]
+    .some(id => !sameImagePdfLayout(sourceLookup.get(id)?.imageLayout, imageLayout));
   const activeNames = useMemo(() => {
     const ids = new Set(pages.map(page => page.sourceId));
     return sources.filter(source => ids.has(source.id)).map(source => source.name);
@@ -135,6 +137,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     `plainmile-${activeNames.length}-files`;
   const filename = `${fileBase}-${mode === 'image-to-pdf' ? 'images' : 'organized'}.pdf`;
   const activeSourceCount = useMemo(() => countActiveSources(pages), [pages]);
+  const onlyImages = pages.length > 1 && pages.every(page => sourceLookup.get(page.sourceId)?.isImage);
+  const hasOriginalPdf = pages.some(page => !sourceLookup.get(page.sourceId)?.isImage);
   const splitNeedsInput = splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim();
   const splitEstimate = useMemo(() => {
     if (!pages.length || (splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim())) return null;
@@ -169,7 +173,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     }
     previewDocuments.current.clear();
   }, []);
-  useEffect(() => () => { splitAbortRef.current?.abort(); releasePreviewDocuments(); }, [releasePreviewDocuments]);
+  useEffect(() => () => { splitAbortRef.current?.abort(); exportAbortRef.current?.abort(); releasePreviewDocuments(); }, [releasePreviewDocuments]);
 
   const resetSelection = () => { setSelected(new Set()); lastSelectedIndex.current = null; };
   const commit = (operation, preserveSelection = false) => {
@@ -177,12 +181,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     if (!preserveSelection) resetSelection();
     setNotice('');
     setError('');
+    setClearConfirm(false);
   };
 
   const addFiles = async (incoming) => {
     const items = [...(incoming ?? [])];
     if (!items.length || busy) return;
-    setError(''); setNotice(''); setBusy(true);
+    setError(''); setNotice(''); setClearConfirm(false); setBusy(true);
     // Once every page has been deleted, a successful new import starts a fresh
     // workspace. Keep the old undo history intact until that import succeeds.
     const replacingDeletedPages = pages.length === 0 && sources.length > 0;
@@ -202,7 +207,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         if (pages.length + nextPages.length + source.pageCount > LIMITS.maxPages) throw new Error(interpolate(t.errorPages, { n: LIMITS.maxPages }));
         nextSources.push(source);
         for (let pageIndex = 0; pageIndex < source.pageCount; pageIndex++) {
-          nextPages.push({ id: crypto.randomUUID(), sourceId: source.id, pageIndex, rotation: 0 });
+          nextPages.push({ id: temporaryWorkspaceId(), sourceId: source.id, pageIndex, rotation: 0 });
         }
       }
       if (!pages.length) {
@@ -211,9 +216,6 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         setRanges('');
         setChunkSize('');
         setSplitMode('ranges');
-      }
-      if ((replacingDeletedPages || sources.length === 0 || !sources.some(source => source.isImage)) && mode === 'image-to-pdf') {
-        setAppliedImageLayout(imageLayout);
       }
       if (replacingDeletedPages) {
         releasePreviewDocuments();
@@ -234,7 +236,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
 
   const withBusy = async (task) => {
     if (busy) return;
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true); setError(''); setNotice(''); setClearConfirm(false);
     try { await task(); }
     catch (reason) { setError(translateProcessingError(reason instanceof Error ? reason.message : t.errorGeneric, locale)); }
     finally { setBusy(false); }
@@ -245,23 +247,39 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     // Rebuild must succeed for every photo before replacing ANY document.
     releasePreviewDocuments();
     setSources(updated);
-    setAppliedImageLayout({ ...imageLayout });
     setNotice(t.imageApplied);
   });
 
-  const exportAll = () => withBusy(async () => {
-    if (!pages.length) throw new Error(t.noFile);
+  // Long PDF exports now share the split tool's cancellation behavior.
+  // PDF serialization itself may not yield, but no partial download is ever offered.
+  const exportPages = (chosen, outputName, successMessage) => withBusy(async () => {
+    if (!chosen.length) throw new Error(t.noFile);
     if (imageLayoutDirty) throw new Error(t.imageMustApply);
-    saveDownload(await composePdf(sources, pages, { watermark }), filename);
-    setNotice(t.exported);
+    const controller = new AbortController();
+    exportAbortRef.current = controller;
+    setExportCancelling(false);
+    const largeExport = chosen.length >= 24;
+    if (largeExport) setExportProgress({ done: 0, total: chosen.length });
+    try {
+      const bytes = await composePdf(sources, chosen, {
+        watermark, signal: controller.signal, cancelMessage: 'PDF export cancelled.',
+        onProgress: (done, total) => { if (largeExport && !controller.signal.aborted) setExportProgress({ done, total }); },
+      });
+      if (controller.signal.aborted) throw new Error('PDF export cancelled.');
+      saveDownload(bytes, outputName);
+      setNotice(successMessage);
+    } finally {
+      exportAbortRef.current = null;
+      setExportProgress(null);
+      setExportCancelling(false);
+    }
   });
-  const exportSelected = () => withBusy(async () => {
+  const exportAll = () => exportPages(pages, filename, t.exported);
+  const exportSelected = () => {
     const chosen = pages.filter((page) => selected.has(page.id));
-    if (!chosen.length) throw new Error(t.selectionNeeded);
-    if (imageLayoutDirty) throw new Error(t.imageMustApply);
-    saveDownload(await composePdf(sources, chosen, { watermark }), `${fileBase}-selected-${chosen.length}-pages.pdf`);
-    setNotice(interpolate(t.extracted, { pages: chosen.length }));
-  });
+    if (!chosen.length) return withBusy(async () => { throw new Error(t.selectionNeeded); });
+    return exportPages(chosen, `${fileBase}-selected-${chosen.length}-pages.pdf`, interpolate(t.extracted, { pages: chosen.length }));
+  };
   const splitIntoZip = () => withBusy(async () => {
     if (!pages.length) throw new Error(t.noFile);
     if (imageLayoutDirty) throw new Error(t.imageMustApply);
@@ -321,10 +339,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   };
 
   const clearAll = () => {
+    setClearConfirm(false);
     setWatermarkEnabled(false); setWatermarkText(''); setExportSettingsOpen(mode === 'watermark-pdf');
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
     setRanges(''); setChunkSize(''); setSplitMode('ranges');
-    setAppliedImageLayout({ ...imageLayout });
+    // A fresh image-to-PDF workspace must not inherit a previous crop choice.
+    setImageLayout({ ...IMAGE_PDF_LAYOUT_DEFAULT });
     releasePreviewDocuments();
   };
 
@@ -360,6 +380,20 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           <button className="button button-primary button-small" type="button" disabled={!pages.length || busy || imageLayoutDirty} onClick={exportAll} aria-label={t.export}>{busy ? t.working : t.export} ↓</button>
         </div>
       </div>
+      {clearConfirm && sources.length > 0 && !busy && <div className="workspace-clear-confirm" role="group" aria-label={t.clearConfirmTitle} data-testid="clear-confirmation">
+        <p>{t.clearConfirmDescription}</p>
+        <div className="workspace-clear-buttons">
+          <button type="button" className="button button-secondary button-small" data-testid="cancel-clear" onClick={() => setClearConfirm(false)}>{t.cancelClear}</button>
+          <button type="button" className="button button-secondary button-small muted-danger" data-testid="confirm-clear" onClick={clearAll}>{t.confirmClear}</button>
+        </div>
+      </div>}
+      {busy && exportProgress && <div className="export-progress-row" data-testid="export-progress-row">
+        <p className="utility-note" data-testid="export-progress" role="status" aria-live="polite">{interpolate(t.exportProgress, exportProgress)}</p>
+        <button type="button" className="button button-secondary button-small" data-testid="export-cancel"
+          disabled={exportCancelling} onClick={() => { exportAbortRef.current?.abort(); setExportCancelling(true); }}>
+          {exportCancelling ? t.exportCancelling : t.exportCancel}
+        </button>
+      </div>}
       {mode === 'image-to-pdf' && (
         <section className="export-options-panel" data-testid="image-page-settings" aria-label={t.imageSettings}>
           <div className="export-options-header"><strong>{t.imageSettings}</strong><span>{t.imageSettingsHint}</span></div>
@@ -369,7 +403,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                 onChange={event => setImageLayout(value => ({ ...value, paper: event.target.value,
                   // "Fit to image" should follow each photo by default, without
                   // silently inheriting the previous portrait/landscape paper orientation.
-                  orientation: event.target.value === 'fit' ? 'auto' : value.orientation }))}>
+                  orientation: event.target.value === 'fit' ? 'auto' : value.orientation,
+                  imageSizing: event.target.value === 'fit' ? 'contain' : value.imageSizing }))}>
                 <option value="a4">A4</option>
                 <option value="letter">US Letter</option>
                 <option value="fit">{t.imageFit}</option>
@@ -394,6 +429,18 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
               </select>
             </label>
           </div>
+          <div className="utility-options">
+            <label><span>{t.imageSizing}</span>
+              <select data-testid="image-sizing" aria-label={t.imageSizing}
+                disabled={busy || imageLayout.paper === 'fit'}
+                value={imageLayout.imageSizing}
+                onChange={event => setImageLayout(value => ({ ...value, imageSizing: event.target.value }))}>
+                <option value="contain">{t.imageContain}</option>
+                <option value="cover">{t.imageCover}</option>
+              </select>
+            </label>
+          </div>
+          <p className="input-note" data-testid="image-sizing-hint">{imageLayout.paper === "fit" ? t.imageFitSizingHint : imageLayout.imageSizing === "cover" ? t.imageCoverHint : t.imageContainHint}</p>
           {imageLayoutDirty && <p className="utility-note" data-testid="image-layout-dirty">{t.imageLayoutDirty}</p>}
           {imageLayoutDirty && <button type="button" className="button button-secondary" data-testid="image-layout-apply"
             disabled={busy} onClick={applyImageLayout}>{busy ? t.working : t.imageApply}</button>}
@@ -419,6 +466,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       <div className="workspace-content" onDragOver={(event) => { if (Array.from(event.dataTransfer.types ?? []).includes('Files')) event.preventDefault(); }} onDrop={(event) => { if (event.dataTransfer.files?.length) { event.preventDefault(); void addFiles(event.dataTransfer.files); } }}>
         {error && <div className="notice notice-error" role="alert">{error}<button type="button" aria-label={t.dismiss} onClick={() => setError('')}>×</button></div>}
         {notice && <div className="notice notice-success" role="status">{notice}<button type="button" aria-label={t.dismiss} onClick={() => setNotice('')}>×</button></div>}
+        {hasOriginalPdf && <p className="utility-note" data-testid="workspace-document-caution">{t.documentCaution}</p>}
         {largeWorkspace && <p className="utility-note" data-testid="workspace-large-warning">{t.bigDocWarning}</p>}
         {!pages.length ? (
           <div className="dropzone" data-testid="dropzone" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); void addFiles(event.dataTransfer.files); }}>
@@ -428,7 +476,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
             <p className="drop-limits">{t.limits}</p><div className="empty-privacy">✓ {t.private}</div>
             {sources.length > 0 && <p className="utility-note" data-testid="empty-history-hint">{t.emptyHistoryHint}</p>}
             {history.past.length > 0 && <button type="button" className="button button-secondary button-small" data-testid="undo-all-deleted" disabled={busy} onClick={() => { setHistory(undoHistory); resetSelection(); setError(''); setNotice(''); }}>{t.undo}</button>}
-            {sources.length > 0 && <button type="button" className="button button-secondary button-small" onClick={clearAll} disabled={busy}>{t.reset}</button>}
+            {sources.length > 0 && <button type="button" className="button button-secondary button-small" onClick={() => setClearConfirm(true)} disabled={busy}>{t.reset}</button>}
           </div>
         ) : (
           <>
@@ -437,7 +485,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
               <div className="history-buttons">
                 <button type="button" disabled={!history.past.length || busy} onClick={() => { setHistory(undoHistory); resetSelection(); }} aria-label={t.undo} title={t.undo}>↶ {t.undo}</button>
                 <button type="button" disabled={!history.future.length || busy} onClick={() => { setHistory(redoHistory); resetSelection(); }} aria-label={t.redo} title={t.redo}>↷ {t.redo}</button>
-                <button type="button" disabled={busy} className="muted-danger" onClick={clearAll}>{t.clear}</button>
+                <button type="button" disabled={busy} className="muted-danger" onClick={() => setClearConfirm(true)}>{t.clear}</button>
               </div>
             </div>
             {tab === 'organize' ? (
@@ -451,6 +499,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     <button type="button" disabled={!selectedCount || busy} className="muted-danger" onClick={() => commit((previous) => deletePages(previous, selected))} aria-label={locale === 'en' ? 'Delete selected pages' : t.del}>× {t.del}</button>
                   </div>
                 </div>
+                {onlyImages && <div className="page-action-buttons" data-testid="image-batch-actions"><button type="button" disabled={busy} onClick={() => commit(previous => sortPagesByFilename(previous, sources, locale))}>{t.sortFilename}</button><button type="button" disabled={busy} onClick={() => commit(reversePages)}>{t.reverseOrder}</button></div>}
                 <div className="page-grid" data-testid="page-grid">
                   {pages.map((pageRef, index) => {
                     const source = sourceLookup.get(pageRef.sourceId);

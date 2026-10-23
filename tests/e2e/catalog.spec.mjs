@@ -123,3 +123,25 @@ test('every standalone converter has visible bilingual file-drop guidance', asyn
     }
   }
 });
+
+test('localized footer provides a clear privacy-safe issue reporting route', async ({ page }) => {
+  for (const [route, label] of [['/', 'Report an issue'], ['/zh/', '反馈问题']]) {
+    await page.goto(route);
+    const report = page.locator('[data-report-issue]');
+    await expect(report).toHaveText(label + ' ↗');
+    await expect(report).toHaveAttribute('href', 'https://github.com/plainmile/pdf-tools/issues/new/choose');
+    await expect(report).toHaveAttribute('rel', /noopener noreferrer/);
+  }
+});
+
+test('375px mobile tool pages retain visible, keyboard-usable top navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/image-to-pdf/');
+  const nav = page.getByRole('navigation', { name: '主要导航' });
+  await expect(nav.getByRole('link', { name: '合并 PDF' })).toBeVisible();
+  await expect(nav.getByRole('link', { name: '拆分 PDF' })).toBeVisible();
+  const fits = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
+  expect(fits).toBe(true);
+  await nav.getByRole('link', { name: '拆分 PDF' }).click();
+  await expect(page).toHaveURL(/\/zh\/split-pdf\/$/);
+});

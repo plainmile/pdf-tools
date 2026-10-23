@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { imageTypeFor, isSupportedFile, compressedImageDimensions } from '../../src/lib/pdfEngine.mjs';
+import { imageTypeFor, isSupportedFile, compressedImageDimensions, composePdf, temporaryWorkspaceId } from '../../src/lib/pdfEngine.mjs';
+import { PDFDocument } from 'pdf-lib';
 
 test('recognize JPEG/PNG/WebP images even with missing or generic MIME types', () => {
   for (const [name, type] of [['photo.JPG', 'image/jpeg'], ['figure.png', 'image/png'], ['cover.WebP', 'image/webp']]) {
@@ -89,4 +90,66 @@ test('WebP preflight refuses malformed, truncated or unsized RIFF headers', () =
   const spoof = new Uint8Array(valid);
   new DataView(spoof.buffer).setUint32(16, 0xfffffffe, true);
   assert.throws(() => compressedImageDimensions('image/webp', spoof), /Invalid image header/);
+});
+
+test('long PDF export reports real pages and rejects cancellation without returning partial PDF', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([300, 500]);
+  const source = { id: 'original', bytes: new Uint8Array(await doc.save()) };
+  const pages = Array.from({ length: 12 }, (_, index) =>
+    ({ id: String(index), sourceId: 'original', pageIndex: 0, rotation: 0 }));
+  const abort = new AbortController();
+  const progress = [];
+  await assert.rejects(
+    composePdf([source], pages, {
+      signal: abort.signal,
+      cancelMessage: 'PDF export cancelled.',
+      onProgress: (done, total) => {
+        progress.push([done, total]);
+        if (done === 1) abort.abort();
+      },
+    }),
+    /PDF export cancelled/,
+  );
+  assert.deepEqual(progress, [[1, 12]]);
+  const good = await composePdf([source], pages, {
+    onProgress: (done, total) => progress.push([done, total]),
+  });
+  assert.equal((await PDFDocument.load(good)).getPageCount(), 12);
+  assert.deepEqual(progress.at(-1), [12, 12]);
+});
+
+test('temporary workspace IDs work on HTTP LAN origins without crypto.randomUUID', () => {
+  let called = 0;
+  const api = {
+    getRandomValues(bytes) {
+      called++;
+      for (let index = 0; index < bytes.length; index++) bytes[index] = (called * 31 + index) & 0xff;
+      return bytes;
+    },
+  };
+  const a = temporaryWorkspaceId(api);
+  const b = temporaryWorkspaceId(api);
+  assert.notEqual(a, b);
+  assert.match(a, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.equal(temporaryWorkspaceId({ randomUUID: () => 'original-api' }), 'original-api');
+  assert.throws(() => temporaryWorkspaceId({}), /generate unique page identifiers/);
+});
+
+test('page copying must not silently brand or inherit confidential PDF document metadata', async () => {
+  const original = await PDFDocument.create();
+  original.setTitle('PRIVATE REPORT - INTERNAL');
+  original.setCreator('Sensitive source application');
+  original.addPage([320, 420]);
+  const input = new Uint8Array(await original.save());
+  const output = await composePdf([
+    { id: 'source', bytes: input },
+  ], [{ id: 'page', sourceId: 'source', pageIndex: 0, rotation: 0 }]);
+  const generated = await PDFDocument.load(output, { updateMetadata: false });
+  assert.equal(generated.getPageCount(), 1);
+  assert.equal(generated.getTitle(), undefined);
+  assert.equal(generated.getCreator(), undefined);
+  assert.equal(generated.getProducer(), undefined);
+  const fileBytes = Buffer.from(output).toString('latin1');
+  assert.ok(!fileBytes.includes('PlainMile PDF'), 'No hidden project brand in exported document');
 });

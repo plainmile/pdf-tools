@@ -12,7 +12,7 @@ const COPY = {
     download: 'Download result', compressionMethod: 'Compression level', compressionLow: 'Smaller size (lossier)', compressionMid: 'Balanced', compressionHigh: 'Clearer (larger)',
     compressionWarning: 'This method converts every PDF page into a JPEG image. Text stops being searchable or selectable. Forms, annotations, hyperlinks and signatures are not preserved. Keep the original and inspect the output.',
     original: 'Original', result: 'Result', saved: 'Saved', increased: 'Size increase', unchanged: 'No change', noSaving: 'No size reduction. This file was not downloaded; try a lower resolution or keep the original.',
-    compressionReady: 'The output is smaller. Check text sharpness before using it.',
+    compressionReady: 'The output is smaller. Check text sharpness before using it.', previewCompressed: 'Preview compressed page 1', hidePreview: 'Hide preview',
     noSavingEarly: 'Stopped early: JPEG data already exceeds the original size. Keep the original or lower the resolution.',
     compressionLowerBound: 'At least', previewAction: 'Generate PDF preview', previewTitle: 'Generated PDF preview', previewFirst: 'Previewing page 1 of {pages}', previewFailed: 'Preview unavailable; you can still download the PDF.', downloadPdf: 'Download PDF',
     textWarning: 'Extracts existing selectable PDF text only, not OCR. Columns, tables and heading formatting may not be preserved. Check the exported text.',
@@ -24,7 +24,7 @@ const COPY = {
     numbersHint: 'Adds selectable numbers to every page and preserves page size. Review annotations and digital signatures before using this modified file.',
     ready: 'Ready to download', noPdf: 'Select a PDF first.', noText: 'Enter text to convert.', sizeLimit: 'PDF up to 100 MB / 1,000 pages; TXT / Markdown up to 5 MB.', limitText: 'TXT / Markdown up to 5 MB; PDF output: up to 1,000 pages (300 image-based pages for CJK).', limitImages: 'PDF up to 100 MB / 1,000 pages; up to 60 selected image pages per batch.', limitCompression: 'PDF up to 100 MB / 120 pages; JPEG output safety budget 96 MB.', limitGeneral: 'PDF up to 100 MB / 1,000 pages.', heavyWarning: 'Large document: processing hundreds of pages may take time and require substantial device memory. Close other heavy tabs if necessary.', progressLabel: 'Processed {done} of {total} pages', tooMuchText: 'Text exceeds 5 MB.',
     noteUnicode: 'This PDF uses rasterized pages for non-Latin characters. Text in the result cannot be selected.', noteSearch: 'Output text is selectable.',
-    invalidFile: 'Please select a supported file and retry.', resultPreview: 'Extracted text preview', dropHint: 'Or drag a file here. Nothing is uploaded.', imported: 'Imported', multipleFiles: 'This converter accepts one file at a time. No file was replaced; choose a single file.', batchLabel: 'Image batch {current} of {total}', batchPrev: 'Previous pages', batchNext: 'Next pages', batchCustom: 'Custom page selection', cancel: 'Cancel', cancelling: 'Cancelling…', cancelled: 'Cancelled', packaging: 'Packaging ZIP: {percent}%', replacedFailed: 'Import failed. Previous file remains: {name}.', modified: 'Edited after import', nextStep: 'Continue with another PDF tool', overlap: 'Page numbers are drawn over existing content. Check footers, stamps and existing numbers before using the result.',
+    invalidFile: 'Please select a supported file and retry.', resultPreview: 'Extracted text preview', dropHint: 'Or drag a file here. Nothing is uploaded.', imported: 'Imported', multipleFiles: 'This converter accepts one file at a time. No file was replaced; choose a single file.', batchLabel: 'Image batch {current} of {total}', batchPrev: 'Previous pages', batchNext: 'Next pages', batchCustom: 'Custom page selection', cancel: 'Cancel', cancelling: 'Cancelling…', cancelled: 'Cancelled', packaging: 'Packaging ZIP: {percent}%', replacedFailed: 'Import failed. Previous file remains: {name}.', modified: 'Edited after import', nextStep: 'Browse other tools (files do not transfer automatically)', overlap: 'Page numbers are drawn over existing content. Check footers, stamps and existing numbers before using the result.',
   },
   zh: {
     label: '仅在浏览器本地处理', file: '选择 PDF 文件', textFile: '导入 TXT / Markdown', uploaded: '已读取', pages: '页', choose: '选择文件', start: '开始处理', run: '转换并下载', busy: '正在本机处理…',
@@ -34,7 +34,7 @@ const COPY = {
     download: '下载结果', compressionMethod: '压缩强度', compressionLow: '更小体积（画质较低）', compressionMid: '平衡', compressionHigh: '画质较清晰（体积较大）',
     compressionWarning: '此压缩方式会将 PDF 各页重新渲染为 JPEG 图片。输出将失去文本搜索和选中能力，也无法保留表单、注释、链接及数字签名。请保存原文件并检查输出画质。',
     original: '原文件', result: '输出文件', saved: '节省', increased: '体积增加', unchanged: '无变化', noSaving: '未缩小文件，因此没有自动下载。可尝试降低清晰度，或保留原文件。',
-    compressionReady: '输出文件确实更小。请先核对文字清晰度。',
+    compressionReady: '输出文件确实更小。请先核对文字清晰度。', previewCompressed: '预览压缩后的首页', hidePreview: '收起预览',
     noSavingEarly: '已提前停止：JPEG 数据已不小于原文件，继续转换也不能节省空间。请保留原文件或降低清晰度。',
     compressionLowerBound: '至少', previewAction: '生成 PDF 预览', previewTitle: '生成的 PDF 预览', previewFirst: '第 1 页预览（共 {pages} 页）', previewFailed: '无法生成预览，但仍可下载 PDF。', downloadPdf: '下载 PDF',
     textWarning: '只提取 PDF 中已有的可选择文字，不具备 OCR。多栏、表格和段落顺序可能不准确，请核对导出内容。',
@@ -46,7 +46,7 @@ const COPY = {
     numbersHint: '在每页添加可选择的数字，保持纸张尺寸。重要文件请检查注释、数字签名等内容。',
     ready: '文件已经生成', noPdf: '请先选择 PDF 文件。', noText: '请输入待转换的文字。', sizeLimit: 'PDF 最多 100 MB / 1000 页；TXT / Markdown 最多 5 MB。', limitText: 'TXT / Markdown 最多 5 MB；输出最多 1000 页（中文等图片化内容最多 300 页）。', limitImages: 'PDF 最多 100 MB / 1000 页；每批最多导出选定的 60 页图片。', limitCompression: 'PDF 最多 100 MB / 120 页；JPEG 数据累计上限 96 MB。', limitGeneral: 'PDF 最多 100 MB / 1000 页。', heavyWarning: '大文档提示：处理数百页时可能占用较多设备内存，并需要更长时间。建议关闭其他高负载标签页。', progressLabel: '已处理 {done} / {total} 页', tooMuchText: '文本内容超过 5 MB。',
     noteUnicode: '由于含有非拉丁文字，此 PDF 输出为图片页，无法选择和搜索文字。', noteSearch: '输出文字可选择和搜索。',
-    invalidFile: '请选择受支持的文件后重试。', resultPreview: '提取文字预览', dropHint: '也可以将文件拖到这里，不会上传至服务器。', imported: '已导入', multipleFiles: '此转换工具每次只接受一个文件。当前文件未改变，请只选择一个文件。', batchLabel: '图片批次 {current} / {total}', batchPrev: '上一批', batchNext: '下一批', batchCustom: '自定义页码范围', cancel: '取消处理', cancelling: '正在取消…', cancelled: '已取消', packaging: '正在打包 ZIP：{percent}%', replacedFailed: '导入失败，当前仍是旧文件：{name}。', modified: '导入后已修改', nextStep: '继续使用其他 PDF 工具', overlap: '页码会直接叠加在原页面上，可能遮挡页脚、印章或已有页码，使用前请核对。',
+    invalidFile: '请选择受支持的文件后重试。', resultPreview: '提取文字预览', dropHint: '也可以将文件拖到这里，不会上传至服务器。', imported: '已导入', multipleFiles: '此转换工具每次只接受一个文件。当前文件未改变，请只选择一个文件。', batchLabel: '图片批次 {current} / {total}', batchPrev: '上一批', batchNext: '下一批', batchCustom: '自定义页码范围', cancel: '取消处理', cancelling: '正在取消…', cancelled: '已取消', packaging: '正在打包 ZIP：{percent}%', replacedFailed: '导入失败，当前仍是旧文件：{name}。', modified: '导入后已修改', nextStep: '查看其他工具（文件不会自动带入）', overlap: '页码会直接叠加在原页面上，可能遮挡页脚、印章或已有页码，使用前请核对。',
   },
 };
 
@@ -124,12 +124,13 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const [notice, setNotice] = useState('');
   const [output, setOutput] = useState(null);
   const [preview, setPreview] = useState('');
+  const [showCompressionPreview, setShowCompressionPreview] = useState(false);
   const [progress, setProgress] = useState(null);
   const [dragging, setDragging] = useState(false);
   const [textFileName, setTextFileName] = useState('');
   const [batchIndex, setBatchIndex] = useState(0);
 
-  function clearOutput() { setOutput(null); setNotice(''); setError(''); setPreview(''); setProgress(null); }
+  function clearOutput() { setOutput(null); setNotice(''); setError(''); setPreview(''); setProgress(null); setShowCompressionPreview(false); }
   function reset() { if (busy) return; setPdf(null); setSourceText(''); setPages(''); setTextFileName(''); setTextEdited(false); setBatchIndex(0); clearOutput(); }
   async function acceptFile(file) {
     if (!file || busy) return;
@@ -295,6 +296,14 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         {progress && (busy || notice) && <p className="utility-note" data-testid="utility-progress" aria-live="polite">{'packaging' in progress ? t.packaging.replace('{percent}', progress.packaging) : t.progressLabel.replace('{done}', progress.done).replace('{total}', progress.total)}</p>}
         {isCompress && output && <div className="utility-result" data-testid="compression-result">
           <div className="utility-comparison"><div><span>{t.original}</span><strong>{formatBytes(output.stats.original)}</strong></div><div><span>{t.result}</span><strong>{output.stats.lowerBound ? `${t.compressionLowerBound} ` : ''}{formatBytes(output.stats.candidate)}</strong></div><div><span data-testid="compression-change-label">{output.stats.smaller ? t.saved : output.stats.candidate > output.stats.original ? t.increased : t.unchanged}</span><strong data-testid="compression-change-value" className={output.stats.smaller ? 'utility-smaller' : output.stats.candidate > output.stats.original ? 'utility-not-smaller' : ''}>{Math.abs(output.stats.percent)}%</strong></div></div>
+          {output.bytes && <button type="button" className="button button-secondary" data-testid="compression-preview-action"
+            aria-expanded={showCompressionPreview} aria-controls="compression-preview-content"
+            onClick={() => setShowCompressionPreview(value => !value)}>
+            {showCompressionPreview ? t.hidePreview : t.previewCompressed}
+          </button>}
+          {showCompressionPreview && output.bytes && <div id="compression-preview-content" data-testid="compression-preview">
+            <PdfFirstPagePreview bytes={output.bytes} pageCount={pdf.count} t={t} locale={locale} />
+          </div>}
           <button type="button" className="button button-primary" data-testid="compression-download" disabled={!output.stats.smaller || !output.bytes} onClick={() => save(output)}>{t.download} ↓</button>
         </div>}
         {isTextInput && output?.bytes && <div className="utility-result" data-testid="text-pdf-result">
@@ -304,7 +313,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         </div>}
         {error && <div className="notice notice-error" role="alert">{error}</div>}
         {notice && <div className="notice notice-success" role="status">{notice}</div>}
-        {notice && <p className="utility-note" data-testid="utility-next-step"><a href={locale === 'zh' ? '/zh/workspace/' : '/workspace/'}>{t.nextStep} →</a></p>}
+        {notice && <p className="utility-note" data-testid="utility-next-step"><a href={locale === 'zh' ? '/zh/#all-tools' : '/#all-tools'}>{t.nextStep} →</a></p>}
         {isTextOutput && preview && <div className="utility-preview"><label className="utility-field-label" htmlFor="utility-preview">{t.resultPreview}</label><textarea id="utility-preview" readOnly rows={8} value={preview} /></div>}
       </div>
       <div className="workspace-foot"><span>✓ {t.privacy}</span></div>

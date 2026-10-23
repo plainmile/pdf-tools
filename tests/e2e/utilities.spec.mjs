@@ -69,6 +69,7 @@ test('compression never auto-downloads, blocks a larger PDF, and shows actual by
     throw new Error('Compression output missing. Alerts: ' + JSON.stringify(await page.getByRole('alert').allTextContents()));
   });
   await expect(page.getByTestId('compression-download')).toBeDisabled();
+  await expect(page.getByTestId('compression-preview-action')).toHaveCount(0);
   await expect(page.getByRole('status')).toContainText('Stopped early');
   await expect(page.getByTestId('compression-change-label')).toHaveText('Size increase');
   await expect(page.getByTestId('compression-result')).toContainText('At least');
@@ -95,6 +96,11 @@ test('compression never auto-downloads, blocks a larger PDF, and shows actual by
   await page.getByTestId('utility-run').click();
   await expect(page.getByTestId('compression-download')).toBeEnabled();
   await expect(page.getByTestId('compression-change-label')).toHaveText('Saved');
+  await page.getByTestId('compression-preview-action').click();
+  await expect(page.getByTestId('compression-preview')).toBeVisible();
+  await expect.poll(() => page.getByTestId('compression-preview').locator('canvas').evaluate(canvas => canvas.width), { timeout: 15000 }).toBeGreaterThan(0);
+  await page.getByTestId('compression-preview-action').click();
+  await expect(page.getByTestId('compression-preview')).toHaveCount(0);
   await expect(page.getByTestId('compression-change-value')).not.toContainText('-');
   const compressed = await getDownload(page, () => page.getByTestId('compression-download').click());
   expect(compressed.bytes.byteLength).toBeLessThan(input.byteLength);
@@ -342,7 +348,8 @@ test('image conversion exposes cancel and a ZIP packaging stage', async ({ page 
   const download = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
   expect(download.name).toMatch(/\.zip$/);
   await expect(page.getByTestId('utility-progress')).toContainText('Packaging ZIP');
-  await expect(page.getByTestId('utility-next-step')).toContainText('Continue with another PDF tool');
+  await expect(page.getByTestId('utility-next-step')).toContainText('files do not transfer automatically');
+  await expect(page.getByTestId('utility-next-step').getByRole('link')).toHaveAttribute('href', '/#all-tools');
 });
 
 test('page number tool warns that overlay can overlap content', async ({ page }) => {
@@ -521,4 +528,18 @@ test('changing Markdown after rendering invalidates the old PDF and download', a
   await upload(page, result.bytes);
   const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
   expect(extracted.bytes.toString('utf8')).toContain('Changed document');
+});
+
+test('follow-up link is honest about file handoff and leads to the full tool catalog', async ({ page }) => {
+  for (const [route, catalog, message] of [
+    ['/txt-to-pdf/', '/#all-tools', 'files do not transfer automatically'],
+    ['/zh/txt-to-pdf/', '/zh/#all-tools', '文件不会自动带入'],
+  ]) {
+    await page.goto(route);
+    await page.getByTestId('utility-text').fill('Hello, this is a synthetic test.');
+    await page.getByTestId('utility-run').click();
+    const action = page.getByTestId('utility-next-step').getByRole('link');
+    await expect(action).toContainText(message);
+    await expect(action).toHaveAttribute('href', catalog);
+  }
 });

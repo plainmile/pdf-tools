@@ -8,7 +8,7 @@ export const unlocalize = (pathname = '/') => pathname.replace(/^\/zh(?=\/|$)/, 
 export const siteCopy = {
   en: {
     nav: { workspace: 'Workspace', merge: 'Merge PDF', split: 'Split PDF', tools: 'All tools', open: 'Open workspace', privacy: 'Privacy', theme: 'Appearance', system: 'System', light: 'Light', dark: 'Dark', language: 'Language' },
-    footer: { officialSite: 'Official site', github: 'GitHub source code', tagline: 'Simple PDF tools that respect your files.', local: 'Files stay on your device. Nothing is uploaded.', other: 'PlainMile' },
+    footer: { officialSite: 'Official site', github: 'GitHub source code', report: 'Report an issue', tagline: 'Simple PDF tools that respect your files.', local: 'Files stay on your device. Nothing is uploaded.', other: 'PlainMile' },
     home: {
       eyebrow: 'PDF TOOLS · FREE TO USE', title: 'Work with PDF pages, your way.',
       lead: 'Combine documents, move pages into the right order, rotate, remove or split them. See the result before you save.',
@@ -31,7 +31,7 @@ export const siteCopy = {
   },
   zh: {
     nav: { workspace: 'PDF 工作台', merge: '合并 PDF', split: '拆分 PDF', tools: '全部工具', open: '打开工作台', privacy: '隐私说明', theme: '外观', system: '跟随系统', light: '浅色', dark: '深色', language: '语言' },
-    footer: { officialSite: '官方网站', github: 'GitHub 开源代码', tagline: '简单实用、尊重隐私的 PDF 工具。', local: '文件只在设备本地处理，不上传服务器。', other: 'PlainMile 主站' },
+    footer: { officialSite: '官方网站', github: 'GitHub 开源代码', report: '反馈问题', tagline: '简单实用、尊重隐私的 PDF 工具。', local: '文件只在设备本地处理，不上传服务器。', other: 'PlainMile 主站' },
     home: {
       eyebrow: 'PDF 工具 · 免费使用', title: '整理 PDF 页面，就这么简单。',
       lead: '合并多个文件、自由调整页面顺序、旋转、删除或拆分。先预览，再下载，不需要上传文件。',
@@ -75,7 +75,7 @@ export const chineseTools = {
 
 export const workspaceCopy = {
   en: {
-    imageSettings: 'Image page settings', imageSettingsHint: 'Choose before importing, or apply changes to imported photos below.', imagePaper: 'Paper size', imageFit: 'Fit to image', imageFitAutoHint: 'Fit-to-image follows each photo shape automatically.', imageOrientation: 'Page orientation', imagePortrait: 'Portrait', imageLandscape: 'Landscape', imageAuto: 'Auto (match each image)', imageMargin: 'Page margins', imageMarginNone: 'No margins (0 pt)', imageMarginNarrow: 'Narrow (12 pt)', imageMarginNormal: 'Standard (30 pt)', imageMarginWide: 'Wide (48 pt)', imageLayoutDirty: 'These settings have not been applied to the loaded photos. Apply them before exporting.', imageApply: 'Apply to imported photos', imageApplied: 'Photo page settings applied. Page order and selections were preserved.', imageMustApply: 'Apply updated page settings before adding more files or exporting.', outputName: 'Download filename',
+    imageSizing: 'Image placement', imageContain: 'Fit entire image (no crop)', imageCover: 'Fill printable area (crop edges)', imageContainHint: 'Entire image is visible; blank space may appear.', imageCoverHint: 'Image fills the area; some edges will be cropped.', imageFitSizingHint: 'Fit-to-image always keeps the full original image.', sortFilename: 'Sort images by filename', reverseOrder: 'Reverse image order', documentCaution: 'Page copying creates a new PDF. Interactive forms, annotations, embedded attachments and digital signatures may be lost or invalidated. Review important documents after export.', imageSettings: 'Image page settings', imageSettingsHint: 'Choose before importing, or apply changes to imported photos below.', imagePaper: 'Paper size', imageFit: 'Fit to image', imageFitAutoHint: 'Fit-to-image follows each photo shape automatically.', imageOrientation: 'Page orientation', imagePortrait: 'Portrait', imageLandscape: 'Landscape', imageAuto: 'Auto (match each image)', imageMargin: 'Page margins', imageMarginNone: 'No margins (0 pt)', imageMarginNarrow: 'Narrow (12 pt)', imageMarginNormal: 'Standard (30 pt)', imageMarginWide: 'Wide (48 pt)', imageLayoutDirty: 'These settings have not been applied to the loaded photos. Apply them before exporting.', imageApply: 'Apply to imported photos', imageApplied: 'Photo page settings applied. Page order and selections were preserved.', imageMustApply: 'Apply updated page settings before adding more files or exporting.', outputName: 'Download filename',
     exportOptions: 'Export options', exportOptionsHint: 'No watermark is added unless you enable it.', watermarkOn: 'Watermark on',
     watermarkLabel: 'Add text watermark (optional)', watermarkTextLabel: 'Watermark text', watermarkPlaceholder: 'e.g. CONFIDENTIAL',
     watermarkHelp: 'Light diagonal text on every exported page. Thumbnail previews are approximate.',
@@ -83,12 +83,12 @@ export const workspaceCopy = {
     app: 'PDF page workspace', local: 'ON-DEVICE PROCESSING', organize: 'Organize', split: 'Split', add: 'Add files', export: 'Export PDF', working: 'Working…',
     dropTitle: 'Drop PDF files or images here', dropSub: 'Or choose files from your device', choose: 'Choose PDF or images', opening: 'Opening files…',
     limits: 'PDF, JPG, PNG, WebP · Up to 20 files · 100 MB each · 600 pages total', private: 'Your files stay on this device.', reset: 'Clear workspace and start over',
-    page: 'page', pages: 'pages', file: 'file', files: 'files', from: 'from', selected: 'selected', undo: 'Undo', redo: 'Redo', clear: 'Clear',
+    page: 'page', pages: 'pages', file: 'file', files: 'files', from: 'from', selected: 'selected', undo: 'Undo', redo: 'Redo', clear: 'Clear', clearConfirmTitle: 'Clear the PDF workspace?', clearConfirmDescription: 'This permanently removes all loaded files, page edits and undo history. Continue?', cancelClear: 'Keep editing', confirmClear: 'Clear everything',
     all: 'Select all', none: 'Deselect', rotateLeft: 'Rotate left', rotateRight: 'Rotate right', extract: 'Extract', del: 'Delete',
     dragHint: 'Drag thumbnails to reorder. To move several pages, select them first and drag one of the selected pages. Shift-click selects a range. On touch screens or with a keyboard, use the move buttons.',
     addMore: 'Add more files', pageName: 'Page', document: 'Document', previewFail: 'Preview unavailable', selectPage: 'Select page', moveLeft: 'Move page {n} left', moveRight: 'Move page {n} right', dragTitle: 'Drag to reorder',
     splitTitle: 'Choose how to split', splitHint: 'Specify the pages you want in each result; we will not choose a split point for you. Pages follow the current workspace order. Up to 50 output PDFs.',
-    splitOutputBudget: 'Up to 128 MB of generated PDF files per ZIP to protect browser memory.', splitPartsProgress: 'Creating PDF {done} of {total}', splitZipProgress: 'Packaging ZIP: {percent}%', splitCancel: 'Cancel split', splitCancelling: 'Cancelling…',
+    splitOutputBudget: 'Up to 128 MB of generated PDF files per ZIP to protect browser memory.', splitPartsProgress: 'Creating PDF {done} of {total}', splitZipProgress: 'Packaging ZIP: {percent}%', splitCancel: 'Cancel split', splitCancelling: 'Cancelling…', exportProgress: 'Exporting page {done} of {total}', exportCancel: 'Cancel export', exportCancelling: 'Cancelling…',
     byRanges: 'Split by page ranges', pageRanges: 'Page ranges', rangeHint: 'Example: 1-3, 4-5, 6. Each range becomes one PDF.', every: 'Split every N pages', perFile: 'Pages per PDF', downloadZip: 'Download split PDFs (ZIP)', creating: 'Creating PDFs…',
     foot: 'All document processing stays in your browser', footLimit: '200 MB combined · No password-protected PDFs', bigDocWarning: 'Large PDF: previews are loaded as you scroll. Hundreds of pages can still consume significant device memory. Export may take longer.',
     emptyHistoryHint: 'All pages were removed. Undo to restore them, or add a file to begin a new workspace (the old undo history will be cleared).',
@@ -100,7 +100,7 @@ export const workspaceCopy = {
     invalidRange: 'Check the page ranges or pages per file (maximum 50 output PDFs).', estimate: '{files} PDF file(s) will be generated.',
   },
   zh: {
-    imageSettings: '图片页面设置', imageSettingsHint: '可在导入前设置；导入后更改时，需点击下方按钮重新应用到已有照片。', imagePaper: '纸张尺寸', imageFit: '适合图片', imageFitAutoHint: '适合图片时自动匹配每张照片方向，无法手动强制横竖版。', imageOrientation: '页面方向', imagePortrait: '纵向', imageLandscape: '横向', imageAuto: '自动匹配图片方向', imageMargin: '页面边距', imageMarginNone: '无边距（0 pt）', imageMarginNarrow: '窄（12 pt）', imageMarginNormal: '标准（30 pt）', imageMarginWide: '宽（48 pt）', imageLayoutDirty: '新设置尚未应用到已导入的照片。请先应用设置，再导出 PDF。', imageApply: '应用到已导入照片', imageApplied: '已更新照片页面设置，原有页面顺序和选择不变。', imageMustApply: '请先应用修改后的页面设置，再添加文件或导出。', outputName: '下载文件名',
+    imageSizing: '图片适配方式', imageContain: '完整显示（不裁剪）', imageCover: '填满可用区域（裁剪边缘）', imageContainHint: '完整显示图片，可能留白。', imageCoverHint: '填满页面可用区域，但可能裁剪边缘。', imageFitSizingHint: '适合图片模式保留完整原图，不会裁剪。', sortFilename: '按文件名排序', reverseOrder: '反转图片顺序', documentCaution: '复制 PDF 页面会创建新文档，交互表单、注释、嵌入附件和数字签名可能丢失或失效。重要文件请核对导出结果。', imageSettings: '图片页面设置', imageSettingsHint: '可在导入前设置；导入后更改时，需点击下方按钮重新应用到已有照片。', imagePaper: '纸张尺寸', imageFit: '适合图片', imageFitAutoHint: '适合图片时自动匹配每张照片方向，无法手动强制横竖版。', imageOrientation: '页面方向', imagePortrait: '纵向', imageLandscape: '横向', imageAuto: '自动匹配图片方向', imageMargin: '页面边距', imageMarginNone: '无边距（0 pt）', imageMarginNarrow: '窄（12 pt）', imageMarginNormal: '标准（30 pt）', imageMarginWide: '宽（48 pt）', imageLayoutDirty: '新设置尚未应用到已导入的照片。请先应用设置，再导出 PDF。', imageApply: '应用到已导入照片', imageApplied: '已更新照片页面设置，原有页面顺序和选择不变。', imageMustApply: '请先应用修改后的页面设置，再添加文件或导出。', outputName: '下载文件名',
     exportOptions: '导出选项', exportOptionsHint: '默认无水印，只有主动开启后才会添加。', watermarkOn: '水印已开启',
     watermarkLabel: '添加文字水印（可选）', watermarkTextLabel: '水印文字', watermarkPlaceholder: '例如：内部资料',
     watermarkHelp: '导出时在每页添加居中斜向的浅色水印，缩略图为近似预览。',
@@ -108,12 +108,12 @@ export const workspaceCopy = {
     app: 'PDF 页面工作台', local: '文件仅在本机处理', organize: '整理页面', split: '拆分文件', add: '添加文件', export: '导出 PDF', working: '正在处理…',
     dropTitle: '将 PDF 或图片拖入此处', dropSub: '也可以从您的设备中选择文件', choose: '选择 PDF 或图片', opening: '正在读取…',
     limits: 'PDF、JPG、PNG、WebP · 最多 20 个文件 · 单文件 100 MB · 共 600 页', private: '文件始终留在您的设备上。', reset: '清空工作台，重新开始',
-    page: '页', pages: '页', file: '个文件', files: '个文件', from: '来自', selected: '页已选中', undo: '撤销', redo: '重做', clear: '清空',
+    page: '页', pages: '页', file: '个文件', files: '个文件', from: '来自', selected: '页已选中', undo: '撤销', redo: '重做', clear: '清空', clearConfirmTitle: '确定清空 PDF 工作台？', clearConfirmDescription: '这会永久清除所有已加载文件、页面编辑及撤销历史。是否继续？', cancelClear: '继续编辑', confirmClear: '确认全部清空',
     all: '全选', none: '取消选择', rotateLeft: '向左旋转', rotateRight: '向右旋转', extract: '提取页面', del: '删除页面',
     dragHint: '拖拽缩略图可调整顺序。先多选再拖动选中页面，可成组移动；按住 Shift 点击可选择连续页面。触屏或键盘操作可用每页下方的左右按钮。',
     addMore: '继续添加文件', pageName: '第', document: '文档', previewFail: '无法预览', selectPage: '选择第', moveLeft: '向左移动第 {n} 页', moveRight: '向右移动第 {n} 页', dragTitle: '拖动可调整顺序',
     splitTitle: '选择拆分方式', splitHint: '请自己指定拆分范围或每份页数；我们不会替您选择拆分点。页码按当前工作台顺序计算，每个 ZIP 最多包含 50 个 PDF。',
-    splitOutputBudget: '每个 ZIP 的 PDF 输出累计不得超过 128 MB，以保护浏览器内存。', splitPartsProgress: '正在生成第 {done}/{total} 个 PDF', splitZipProgress: '正在打包 ZIP：{percent}%', splitCancel: '取消拆分', splitCancelling: '正在取消…',
+    splitOutputBudget: '每个 ZIP 的 PDF 输出累计不得超过 128 MB，以保护浏览器内存。', splitPartsProgress: '正在生成第 {done}/{total} 个 PDF', splitZipProgress: '正在打包 ZIP：{percent}%', splitCancel: '取消拆分', splitCancelling: '正在取消…', exportProgress: '正在导出第 {done} / {total} 页', exportCancel: '取消导出', exportCancelling: '正在取消…',
     byRanges: '按页码范围拆分', pageRanges: '页码范围', rangeHint: '例如：1-3, 4-5, 6。每个范围独立生成一个 PDF。', every: '每 N 页拆分一次', perFile: '每个 PDF 的页数', downloadZip: '下载拆分文件（ZIP）', creating: '正在生成…',
     foot: '所有文档操作均在浏览器本地完成', footLimit: '合计最多 200 MB · 暂不支持加密 PDF', bigDocWarning: '大文档提示：仅在滚动到页面时生成缩略图，但数百页仍可能消耗较多内存，导出也可能较慢。',
     emptyHistoryHint: '所有页面都已删除。可点击“撤销”恢复；如果添加新文件，将开始新工作台，并清除旧操作的撤销记录。',
@@ -135,6 +135,7 @@ export function translateProcessingError(message, locale = 'en') {
   const error = String(message);
   if (/JPEG metadata could not be safely removed/i.test(error)) return 'JPEG 元数据结构异常，无法安全移除隐藏信息。请换一张图片或先导出为不含元数据的新图片。';
   if (/Split cancelled/i.test(error)) return '已取消拆分，没有下载未完成的 ZIP。';
+  if (/PDF export cancelled/i.test(error)) return '已取消 PDF 导出，没有下载未完成的文件。';
   if (/Split PDF outputs exceed the 128 MB/i.test(error)) return '拆分输出累计超过 128 MB 安全上限，请减少或调整拆分范围。';
   if (/enter watermark text|watermark text must|watermarks require|canvas is unavailable for watermark|could not create the watermark image|invalid PDF page dimensions for watermark/i.test(error)) return '请填写有效的水印文字，或关闭水印功能。';
   if (/50 output|50 ranges|maximum of 50/i.test(error)) return '一次最多生成 50 个 PDF 或使用 50 段页码范围，请减少输出文件数。';
