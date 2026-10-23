@@ -5,6 +5,12 @@ export const IMAGE_PDF_LAYOUT_DEFAULT = Object.freeze({
   imageSizing: 'contain',
 });
 
+/** Compare each image's applied page settings to the form after Undo/Redo. */
+export function sameImagePdfLayout(a, b) {
+  return Boolean(a && b) && ['paper', 'orientation', 'margin', 'imageSizing']
+    .every(key => a[key] === b[key]);
+}
+
 const PAPER_SIZES = Object.freeze({
   a4: [595.28, 841.89],
   letter: [612, 792],
