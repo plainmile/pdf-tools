@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { imagePdfPageLayout, IMAGE_PDF_LAYOUT_DEFAULT } from '../../src/lib/imagePdfLayout.mjs';
+import { imagePdfPageLayout, IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../../src/lib/imagePdfLayout.mjs';
 
 function near(a, b) { assert.ok(Math.abs(a - b) < 0.02, String(a) + ' != ' + String(b)); }
 
@@ -64,4 +64,14 @@ test('contain never crops while cover fills and clips to the printable margin', 
   assert.equal(fit.clip, null);
   near(fit.image.x, 12);
   near(fit.image.y, 12);
+});
+
+test('undo can reactivate a photo with older applied settings', () => {
+  const oldA4 = { ...IMAGE_PDF_LAYOUT_DEFAULT };
+  const letter = { ...oldA4, paper: 'letter', margin: 12 };
+  assert.equal(sameImagePdfLayout(oldA4, oldA4), true);
+  assert.equal(sameImagePdfLayout(oldA4, { ...oldA4 }), true);
+  assert.equal(sameImagePdfLayout(oldA4, letter), false);
+  assert.equal(sameImagePdfLayout(null, letter), false);
+  assert.equal(sameImagePdfLayout({ ...letter, imageSizing: 'cover' }, letter), false);
 });
