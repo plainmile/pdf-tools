@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { imageTypeFor, isSupportedFile, compressedImageDimensions, composePdf, temporaryWorkspaceId, createBlankPageSource, hasInteractivePdfForm, LIMITS, retainedSourceBytes, retainedSourcesBytes, reflowImageSources } from '../../src/lib/pdfEngine.mjs';
-import { PDFDocument, degrees } from 'pdf-lib';
+import { imageTypeFor, isSupportedFile, compressedImageDimensions, composePdf, temporaryWorkspaceId, createBlankPageSource, hasInteractivePdfForm, hasPdfBookmarks, LIMITS, retainedSourceBytes, retainedSourcesBytes, reflowImageSources } from '../../src/lib/pdfEngine.mjs';
+import { PDFDocument, PDFName, PDFHexString, degrees } from 'pdf-lib';
 
 test('recognize JPEG/PNG/WebP images even with missing or generic MIME types', () => {
   for (const [name, type] of [['photo.JPG', 'image/jpeg'], ['figure.png', 'image/png'], ['cover.WebP', 'image/webp']]) {
@@ -284,6 +284,39 @@ test('reject animated WebP rather than silently dropping later frames', () => {
   bytes.write('VP8X', 12); bytes.writeUInt32LE(10, 16);
   bytes[20] = 0x02; // animation flag
   assert.throws(() => compressedImageDimensions('image/webp', bytes), /Animated WebP/);
+});
+
+test('chapter bookmarks are detected and page-only PDF exports cannot preserve the outline tree', async () => {
+  const original = await PDFDocument.create();
+  const page = original.addPage([430, 600]);
+  original.addPage([440, 600]);
+  assert.equal(hasPdfBookmarks(original), false);
+  const root = original.context.obj({ Type: PDFName.of('Outlines'), Count: 1 });
+  const rootRef = original.context.register(root);
+  const chapter = original.context.obj({
+    Title: PDFHexString.fromText('Chapter one'),
+    Parent: rootRef,
+    Dest: [page.ref, PDFName.of('Fit')],
+  });
+  const chapterRef = original.context.register(chapter);
+  root.set(PDFName.of('First'), chapterRef);
+  root.set(PDFName.of('Last'), chapterRef);
+  original.catalog.set(PDFName.of('Outlines'), rootRef);
+  assert.equal(hasPdfBookmarks(original), true);
+  const bytes = new Uint8Array(await original.save());
+  assert.equal(hasPdfBookmarks(await PDFDocument.load(bytes)), true);
+  const output = await composePdf([{ id: 'book', bytes }], [
+    { id: 'one', sourceId: 'book', pageIndex: 0, rotation: 0 },
+    { id: 'two', sourceId: 'book', pageIndex: 1, rotation: 0 },
+  ]);
+  const exported = await PDFDocument.load(output);
+  assert.equal(exported.getPageCount(), 2);
+  assert.equal(hasPdfBookmarks(exported), false);
+  // An empty bookmark catalog is not a false positive.
+  const empty = await PDFDocument.create();
+  empty.addPage([300, 400]);
+  empty.catalog.set(PDFName.of('Outlines'), empty.context.register(empty.context.obj({ Type: PDFName.of('Outlines'), Count: 0 })));
+  assert.equal(hasPdfBookmarks(empty), false);
 });
 
 test('detect interactive AcroForm fields but not a normal or empty-form PDF', async () => {
