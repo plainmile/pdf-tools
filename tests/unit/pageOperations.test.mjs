@@ -4,6 +4,7 @@ import {
   movePage, movePageGroup, shiftPage, rotatePages, deletePages, parsePageRanges,
   chunkPageRanges, getRangePages, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources,
+  reversePages, sortPagesByFilename,
 } from '../../src/lib/pageOperations.mjs';
 
 const pages = Object.freeze([
@@ -99,4 +100,18 @@ test('the active file count ignores hidden sources retained only for Undo', () =
   assert.equal(countActiveSources(deletePages(pages, ['b'])), 1);
   assert.equal(countActiveSources(deletePages(pages, ['a', 'b', 'c'])), 0);
   assert.equal(countActiveSources([...pages, { ...pages[0], id: 'd' }]), 2);
+});
+
+test('image-batch filename sorting is numeric, stable, reversible and never alters inputs', () => {
+  const imagePages = [
+    { id: '10', sourceId: 'z', pageIndex: 0 },
+    { id: '2a', sourceId: 'a', pageIndex: 0 },
+    { id: '2b', sourceId: 'a', pageIndex: 1 },
+  ];
+  const files = [{ id: 'z', name: 'scan10.png' }, { id: 'a', name: 'scan2.png' }];
+  const sorted = sortPagesByFilename(imagePages, files);
+  assert.deepEqual(ids(sorted), ['2a', '2b', '10']);
+  assert.deepEqual(ids(reversePages(sorted)), ['10', '2b', '2a']);
+  assert.deepEqual(ids(imagePages), ['10', '2a', '2b']);
+  assert.strictEqual(reversePages([]).length, 0);
 });
