@@ -93,7 +93,7 @@ Imported PDFs/photos and typed text are kept only in the current browser tab. Wh
 
 ## Limits and known non-goals
 
-- Workspace: up to 20 input files, 100 MiB per file, 200 MiB combined, 600 pages. Only visible/nearby page thumbnails are rendered. Large books can still require substantial device memory; smaller/mobile devices may fail earlier. Images must not exceed 36 megapixels.
+- Workspace: up to 20 input files, 100 MiB per file, **200 MiB of retained document source bytes**, 600 pages. For each photo, retained bytes include **both the uploaded original** (for paper-setting reflow/Undo) **and the generated PDF**, rather than counting only the compressed upload. For PDF inputs, the stored PDF buffer is counted once. For generated blank pages, their source PDF is counted too. Import and Apply photo settings fail without changing the current workspace when this bound would be exceeded. Only visible/nearby page thumbnails are rendered. Large books can still require substantial device memory; smaller/mobile devices may fail earlier. Images must not exceed 36 megapixels.
 - Import requires PDFs supported by `pdf-lib`; malformed, encrypted or password-protected PDFs are rejected. Some valid but unusual PDFs may be rejected.
 - PDF form-field compatibility, annotations, complex digital signatures and metadata preservation are not guaranteed when pages are copied. **Review exported documents carefully.**
 - Not a PDF to Word, OCR, secure redaction or cryptographic signature tool. Compression is lossy rasterization, not lossless optimization.
@@ -237,7 +237,7 @@ Borrow the practical interaction patterns found in PDF24, iLovePDF and Smallpdf,
 - **PDF to JPG/PNG:** PDFs up to 100 MiB/1,000 pages, but each browser export is limited to **60 selected pages**. A 500-page document can export `301-360`; export the next batch separately. Each canvas is capped at **12 megapixels**. The final ZIP is held in browser memory; use batches to control RAM.
 - **Image-based PDF compression:** PDFs up to 100 MiB, **120 pages per document** per run. Larger books should be split first. JPEG recompression rasterizes text and can lose hyperlinks/annotations, so this cap is intentionally lower than for text extraction. Files are downloaded only when the result is smaller.
 - **TXT/Markdown import:** up to **5 MiB UTF-8**. Latin-only text can produce up to 1,000 PDF pages; Unicode/CJK image-based rendering is capped at 300 pages because it uses significantly more memory. The 5 MiB input ceiling does not guarantee every document will fit into the output page limit.
-- Limits are browser-side safety ceilings, **not** a promise that every device can handle the maximum. No file bytes are transmitted to the server. Long operations show page progress, and batch rendering releases each page's canvas and PDF.js worker memory.
+- **Memory note:** The retained-source limit does not measure temporary image canvases, PDF.js preview-worker copies, serialization or ZIP/export allocations. Those can use additional RAM; a 200 MiB budget is not a guarantee that a low-memory device can open every permitted combination of files.\n- Limits are browser-side safety ceilings, **not** a promise that every device can handle the maximum. No file bytes are transmitted to the server. Long operations show page progress, and batch rendering releases each page's canvas and PDF.js worker memory.
 
 This project is licensed under **MIT**, and the website footer links to the open-source repository: https://github.com/plainmile/pdf-tools.
 

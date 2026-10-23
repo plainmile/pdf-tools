@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import JSZip from 'jszip';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
-import { LIMITS, composePdf, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId, createBlankPageSource } from '../lib/pdfEngine.mjs';
+import { LIMITS, composePdf, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId, createBlankPageSource, retainedSourceBytes, retainedSourcesBytes } from '../lib/pdfEngine.mjs';
 import { sanitizeFilename } from '../lib/utilityCore.mjs';
 import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLayout.mjs';
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
@@ -123,7 +123,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const watermark = { enabled: watermarkEnabled, text: watermarkText };
   const watermarkPreview = watermarkEnabled && watermarkText.trim() ? watermarkText.trim() : null;
   const selectedCount = selected.size;
-  const bytesInMemory = useMemo(() => sources.reduce((total, item) => total + item.inputSize, 0), [sources]);
+  const bytesInMemory = useMemo(() => retainedSourcesBytes(sources), [sources]);
   const sourceLookup = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources]);
   // Judge active photo pages by their own original layout. A previously deleted
   // photo can reappear after Undo, even when newer images use different paper.
@@ -215,9 +215,16 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       if ((replacingDeletedPages ? 0 : bytesInMemory) + incomingBytes > LIMITS.maxCombinedBytes) throw new Error(t.errorCombined);
       const nextSources = [];
       const nextPages = [];
+      // Input-size preflight protects before reading; after conversion validate
+      // the true retained size (PDF + original photo for undo/reflow).
+      let additionalRetainedBytes = 0;
       for (const file of items) {
         const source = await readSourceFile(file, { imageLayout });
         if (pages.length + nextPages.length + source.pageCount > LIMITS.maxPages) throw new Error(interpolate(t.errorPages, { n: LIMITS.maxPages }));
+        additionalRetainedBytes += retainedSourceBytes(source);
+        if ((replacingDeletedPages ? 0 : bytesInMemory) + additionalRetainedBytes > LIMITS.maxCombinedBytes) {
+          throw new Error(t.errorCombined);
+        }
         nextSources.push(source);
         for (let pageIndex = 0; pageIndex < source.pageCount; pageIndex++) {
           nextPages.push({ id: temporaryWorkspaceId(), sourceId: source.id, pageIndex, rotation: 0 });
@@ -275,7 +282,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     const source = sourceLookup.get(reference.sourceId);
     const blank = await createBlankPageSource(source, reference,
       locale === 'zh' ? '空白页.pdf' : 'Blank page.pdf');
-    if (bytesInMemory + blank.inputSize > LIMITS.maxCombinedBytes) throw new Error(t.errorCombined);
+    if (bytesInMemory + retainedSourceBytes(blank) > LIMITS.maxCombinedBytes) throw new Error(t.errorCombined);
     const newRef = { id: temporaryWorkspaceId(), sourceId: blank.id, pageIndex: 0, rotation: 0 };
     setSources(previous => [...previous, blank]);
     setHistory(previous => commitHistory(previous, insertPageAfter(previous.present, afterIndex, newRef)));
@@ -284,7 +291,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   });
 
   const applyImageLayout = () => withBusy(async () => {
-    const updated = await reflowImageSources(sources, imageLayout);
+    const updated = await reflowImageSources(sources, imageLayout, () => {}, t.errorCombined);
     // Rebuild must succeed for every photo before replacing ANY document.
     releasePreviewDocuments();
     setSources(updated);
@@ -525,7 +532,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         ) : (
           <>
             <div className="workspace-subbar">
-              <div className="file-count"><strong>{locale === 'zh' ? `${pages.length} 页` : `${pages.length} ${pages.length === 1 ? 'page' : 'pages'}`}</strong><span>{locale === 'zh' ? ` · 来自 ${activeSourceCount} 个文件` : ` from ${activeSourceCount} ${activeSourceCount === 1 ? 'file' : 'files'}`}</span></div>
+              <div className="file-count" data-retained-bytes={bytesInMemory}><strong>{locale === 'zh' ? `${pages.length} 页` : `${pages.length} ${pages.length === 1 ? 'page' : 'pages'}`}</strong><span>{locale === 'zh' ? ` · 来自 ${activeSourceCount} 个文件` : ` from ${activeSourceCount} ${activeSourceCount === 1 ? 'file' : 'files'}`}</span></div>
               <div className="history-buttons">
                 <button type="button" disabled={!history.past.length || busy} onClick={() => { setHistory(undoHistory); resetSelection(); }} aria-label={t.undo} title={t.undo}>↶ {t.undo}</button>
                 <button type="button" disabled={!history.future.length || busy} onClick={() => { setHistory(redoHistory); resetSelection(); }} aria-label={t.redo} title={t.redo}>↷ {t.redo}</button>

@@ -34,6 +34,30 @@ export const LIMITS = Object.freeze({
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
+/**
+ * Count document buffers actually retained by the workspace, not only the
+ * compressed file size supplied at upload. WebP can decode into a much larger
+ * embedded PNG/PDF; photos also retain ORIGINAL bytes for safe reflow.
+ *
+ * This budget measures retained source buffers, not transient canvas pixels,
+ * preview worker copies, serialization buffers or exports. Those can peak
+ * higher on low-memory devices.
+ */
+export function retainedSourceBytes(source) {
+  const pdfBytes = source?.bytes?.byteLength;
+  const originalBytes = source?.originalImageBytes?.byteLength ?? 0;
+  if (![pdfBytes, originalBytes].every(Number.isSafeInteger) ||
+      pdfBytes < 1 || originalBytes < 0) {
+    throw new Error('Invalid retained document source.');
+  }
+  return pdfBytes + originalBytes;
+}
+
+export function retainedSourcesBytes(sources) {
+  return sources.reduce((sum, source) => sum + retainedSourceBytes(source), 0);
+}
+
+
 // File drag-and-drop often supplies an empty or generic MIME type. Validate actual
 // bytes in the parsers rather than rejecting otherwise valid .jpg/.png/.webp files.
 export function imageTypeFor(file) {
@@ -190,8 +214,9 @@ export async function createBlankPageSource(source, pageRef, name = 'blank-page.
   };
 }
 
-export async function reflowImageSources(sources, layout, report = () => {}) {
+export async function reflowImageSources(sources, layout, report = () => {}, budgetError = 'Retained document data exceeds the 200 MiB workspace budget.') {
   const updated = [];
+  let retainedBytes = 0;
   for (let index = 0; index < sources.length; index++) {
     const source = sources[index];
     if (!source.isImage) {
@@ -204,6 +229,10 @@ export async function reflowImageSources(sources, layout, report = () => {}) {
         source.originalImageBytes, source.originalImageType, layout);
       updated.push({ ...source, bytes, imageLayout: { ...IMAGE_PDF_LAYOUT_DEFAULT, ...layout } });
     }
+    // Validate the entire prospective image reflow BEFORE updating React state.
+    // A change in page size/cropping can produce considerably larger PDF data.
+    retainedBytes += retainedSourceBytes(updated[updated.length - 1]);
+    if (retainedBytes > LIMITS.maxCombinedBytes) throw new Error(budgetError);
     report(index + 1, sources.length);
     // Allow React updates and UI progress during bulk photo reflow.
     if (index % 2 === 0) await new Promise(resolve => setTimeout(resolve, 0));

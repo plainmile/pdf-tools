@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { imageTypeFor, isSupportedFile, compressedImageDimensions, composePdf, temporaryWorkspaceId, createBlankPageSource } from '../../src/lib/pdfEngine.mjs';
+import { imageTypeFor, isSupportedFile, compressedImageDimensions, composePdf, temporaryWorkspaceId, createBlankPageSource, LIMITS, retainedSourceBytes, retainedSourcesBytes, reflowImageSources } from '../../src/lib/pdfEngine.mjs';
 import { PDFDocument, degrees } from 'pdf-lib';
 
 test('recognize JPEG/PNG/WebP images even with missing or generic MIME types', () => {
@@ -175,4 +175,36 @@ test('generated blank page follows visible page size/rotation but contains none 
   const straight = await PDFDocument.load(turned.bytes);
   assert.deepEqual(straight.getPage(0).getSize(), { width: 300, height: 420 });
   await assert.rejects(createBlankPageSource(source, { sourceId: 'src', pageIndex: 3 }), /no longer exists/);
+});
+
+test('retained source accounting includes expanded PDF and original photo bytes, not just upload size', () => {
+  const MiB = 1024 ** 2;
+  // Lightweight byteLength fixtures avoid allocating hundreds of MiB in CI.
+  const compressedWebp = {
+    isImage: true, inputSize: 1 * MiB,
+    bytes: { byteLength: 155 * MiB }, // converted PNG-backed PDF
+    originalImageBytes: { byteLength: 1 * MiB },
+  };
+  const originalPdf = { isImage: false, inputSize: 45 * MiB, bytes: { byteLength: 45 * MiB } };
+  const blank = { isGeneratedBlank: true, bytes: { byteLength: 512 } };
+  assert.equal(retainedSourceBytes(compressedWebp), 156 * MiB);
+  assert.equal(retainedSourceBytes(originalPdf), 45 * MiB);
+  assert.equal(retainedSourceBytes(blank), 512);
+  assert.equal(retainedSourcesBytes([compressedWebp, originalPdf, blank]), 201 * MiB + 512);
+  assert.ok(retainedSourcesBytes([compressedWebp, originalPdf]) > LIMITS.maxCombinedBytes);
+  assert.ok(compressedWebp.inputSize + originalPdf.inputSize < LIMITS.maxCombinedBytes);
+  assert.throws(() => retainedSourceBytes({ inputSize: 100 }), /Invalid retained document source/);
+});
+
+test('bulk reflow refuses an oversized retained workspace before committing any changed source', async () => {
+  const MiB = 1024 ** 2;
+  const unchanged = [
+    { isImage: false, id: 'a', bytes: { byteLength: 120 * MiB } },
+    { isImage: false, id: 'b', bytes: { byteLength: 85 * MiB } },
+  ];
+  await assert.rejects(reflowImageSources(unchanged, {}), /200 MiB workspace budget/);
+  assert.equal(unchanged.length, 2);
+  assert.equal(unchanged[0].bytes.byteLength, 120 * MiB);
+  const small = [{ isImage: false, bytes: new Uint8Array([1, 2, 3]) }];
+  assert.deepEqual(await reflowImageSources(small, {}), small);
 });
