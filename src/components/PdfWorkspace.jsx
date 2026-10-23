@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import JSZip from 'jszip';
 import { LIMITS, composePdf, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId } from '../lib/pdfEngine.mjs';
 import { sanitizeFilename } from '../lib/utilityCore.mjs';
-import { IMAGE_PDF_LAYOUT_DEFAULT } from '../lib/imagePdfLayout.mjs';
+import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLayout.mjs';
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
@@ -106,7 +106,6 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [exportProgress, setExportProgress] = useState(null);
   const [exportCancelling, setExportCancelling] = useState(false);
   const [imageLayout, setImageLayout] = useState(() => ({ ...IMAGE_PDF_LAYOUT_DEFAULT }));
-  const [appliedImageLayout, setAppliedImageLayout] = useState(() => ({ ...IMAGE_PDF_LAYOUT_DEFAULT }));
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [dragged, setDragged] = useState(null);
@@ -123,13 +122,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const selectedCount = selected.size;
   const bytesInMemory = useMemo(() => sources.reduce((total, item) => total + item.inputSize, 0), [sources]);
   const sourceLookup = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources]);
-  // Hidden source bytes are intentionally retained for Undo, but should not
-  // force new-paper reflow when every corresponding image page was deleted.
-  const imageSourcesLoaded = pages.some(page => sourceLookup.get(page.sourceId)?.isImage);
-  const imageLayoutDirty = mode === 'image-to-pdf' && imageSourcesLoaded &&
-    (imageLayout.paper !== appliedImageLayout.paper ||
-      imageLayout.orientation !== appliedImageLayout.orientation ||
-      imageLayout.margin !== appliedImageLayout.margin || imageLayout.imageSizing !== appliedImageLayout.imageSizing);
+  // Judge active photo pages by their own original layout. A previously deleted
+  // photo can reappear after Undo, even when newer images use different paper.
+  // A single global "last applied" setting cannot detect that stale page.
+  const activeImageSources = new Set(pages.filter(page => sourceLookup.get(page.sourceId)?.isImage).map(page => page.sourceId));
+  const imageLayoutDirty = mode === 'image-to-pdf' && [...activeImageSources]
+    .some(id => !sameImagePdfLayout(sourceLookup.get(id)?.imageLayout, imageLayout));
   const activeNames = useMemo(() => {
     const ids = new Set(pages.map(page => page.sourceId));
     return sources.filter(source => ids.has(source.id)).map(source => source.name);
@@ -217,9 +215,6 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         setChunkSize('');
         setSplitMode('ranges');
       }
-      if ((replacingDeletedPages || sources.length === 0 || !imageSourcesLoaded) && mode === 'image-to-pdf') {
-        setAppliedImageLayout(imageLayout);
-      }
       if (replacingDeletedPages) {
         releasePreviewDocuments();
         setSources(nextSources);
@@ -250,7 +245,6 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     // Rebuild must succeed for every photo before replacing ANY document.
     releasePreviewDocuments();
     setSources(updated);
-    setAppliedImageLayout({ ...imageLayout });
     setNotice(t.imageApplied);
   });
 
@@ -346,7 +340,6 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setWatermarkEnabled(false); setWatermarkText(''); setExportSettingsOpen(mode === 'watermark-pdf');
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
     setRanges(''); setChunkSize(''); setSplitMode('ranges');
-    setAppliedImageLayout({ ...imageLayout });
     releasePreviewDocuments();
   };
 
