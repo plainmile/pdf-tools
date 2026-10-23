@@ -70,7 +70,7 @@ export const chineseTools = {
   'txt-to-pdf': { title: 'TXT 转 PDF', short: '纯文本生成 PDF', headline: '把 TXT 文本转换成 PDF。', description: '在浏览器中粘贴或导入 TXT，生成 A4 PDF。英文尽量保持文字可选中，中文使用本地字体渲染为图片页。', details: '支持 UTF-8 文本。含中文等非拉丁字符时输出为图片页，无法搜索文字；源文本不会上传。', steps: ['输入或导入 TXT', '核对文本内容', '下载 PDF'] },
   'markdown-to-pdf': { title: 'Markdown 转 PDF', short: '支持简单标题、列表和代码', headline: '将基础 Markdown 生成 PDF。', description: '本地转换基础 Markdown 的标题、段落、列表、引用和代码块；暂不支持复杂表格、HTML 与远程图片。', details: '为了安全和轻量化，使用简单 Markdown 子集。含中文等非拉丁文字的输出为图片页，不可搜索。', steps: ['粘贴或导入 Markdown', '检查标题和内容', '下载 PDF'] },
   'add-page-numbers': { title: '添加 PDF 页码', short: '设置位置和起始页码', headline: '为 PDF 每一页添加页码。', description: '为 PDF 增加可选择的页码，支持指定起始数字、位置和字号；全部在本地完成，不上传文件。', details: '可选择页码从几开始，并放在底部中间、右下角或右上角。重要文件请检查数字签名等内容。', steps: ['选择 PDF', '设置起始数字和位置', '下载带页码的 PDF'] },
-  'image-to-pdf': { title: '图片转 PDF', short: 'JPG、PNG、WebP 与自定义纸张', headline: '将图片整理为 PDF。', description: '将 JPG、PNG、WebP 图片转为 PDF。支持 A4、Letter、适合图片、横竖方向与边距；可调整页面顺序。', details: '可在导入前设置纸张、方向和边距，也可以在导入后重新应用设置。JPG 会移除常见 EXIF、XMP、IPTC 和注释元数据（可能包含 GPS），保留照片方向和原有压缩画质；不处理已有 PDF 的元数据。', steps: ['选择纸张、方向和边距', '添加图片并按需调整顺序', '核对预览后导出 PDF'] },
+  'image-to-pdf': { title: '图片转 PDF', short: 'JPG、PNG、WebP、BMP、静态 AVIF', headline: '将图片整理为 PDF。', description: '把 JPG、PNG、WebP、BMP 和静态 AVIF 图片转为 PDF。支持 A4、Letter、适合图片、横竖方向和边距；AVIF 需要浏览器解码能力。', details: '可在导入前设置纸张、方向和边距，也可以在导入后重新应用设置。JPG 会移除常见 EXIF、XMP、IPTC 和注释元数据（可能包含 GPS），保留照片方向和原有压缩画质；不处理已有 PDF 的元数据。', steps: ['选择纸张、方向和边距', '添加图片并按需调整顺序', '核对预览后导出 PDF'] },
 };
 
 export const workspaceCopy = {
