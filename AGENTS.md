@@ -2,6 +2,7 @@
 
 - The product lives at `pdf.plainmile.com` and in a separate `plainmile/pdf-tools` repository. Never edit the existing paycheck site's code or CI as part of the PDF work.
 - All PDF processing is in-browser; never upload, log, store or transmit files, filenames, extracted text, or generated PDF content.
+- Self-hosted LAN users may open the site over HTTP on a private IP, where `crypto.randomUUID` is not exposed; use `getRandomValues` for temporary IDs as a fallback. Do not mistake HTTP compatibility for public-network security.
 - The site is a bilingual English / Simplified Chinese, privacy-first Astro + React static app with no user account or server-side PDF service. Public URLs are `/` and `/zh/` with parallel routes. English and Chinese content must be human-readable, not browser auto-translation.
 - Deploy via a Docker-built static site served by Nginx. No host-installed Node/npm. Keep the shared `edge` Docker network and preserve existing website routing.
 - Use feature branches + PRs + CI. Never bypass main protection or merge while unit/build/E2E tests are failing.
