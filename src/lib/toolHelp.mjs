@@ -65,7 +65,7 @@ export const toolHelp = {
       ['Can I move page numbers to the top?', 'Yes. Choose a supported position and font size before downloading the new PDF.'],
     ],
     'image-to-pdf': [
-      ['Can I combine JPG, PNG and WebP images?', 'Yes. Add images together and reorder them; you can also mix them with existing PDF pages in the visual workspace.'],
+      ['Can I combine JPG, PNG, WebP, BMP and AVIF images?', 'Yes. BMP and static AVIF can be combined with JPG, PNG and WebP if the browser decodes them. Animation is not supported; animated AVIF/WebP is rejected rather than silently losing frames. Add images together and reorder or mix with PDF pages.'],
       ['Can I use Letter, landscape or no margins?', 'Yes. Choose A4, US Letter or fit-to-image paper, portrait/landscape/automatic orientation and 0, 12, 30 or 48 pt margins. Changes made after import must be applied before exporting.'],
       ['Will the images be stretched?', 'Images are fitted within the selected page and preserve their original proportions.'],
       ['Will my phone photo location be included?', 'For imported JPGs, common EXIF, XMP, IPTC and comment metadata is removed before PDF embedding. GPS may be in those fields. This is not a general metadata-removal tool for existing PDFs.'],
@@ -135,7 +135,7 @@ export const toolHelp = {
       ['页码可以放在页面顶部吗？', '可以。可选择提供的页码位置和字号，然后下载新 PDF。'],
     ],
     'image-to-pdf': [
-      ['JPG、PNG、WebP 能混合生成 PDF 吗？', '可以。选择多张图片，调整顺序，也可以与已有 PDF 页面放在同一个工作台中。'],
+      ['JPG、PNG、WebP、BMP、AVIF 能混合生成 PDF 吗？', '可以。选择 JPG、PNG、WebP、BMP 和静态 AVIF，调整顺序，也可以和 PDF 页面混用。AVIF 需要当前浏览器支持解码；动态 AVIF/WebP 将被拒绝，避免丢失动画帧。'],
       ['能用 Letter、横向纸张或无边距吗？', '可以。支持 A4、US Letter、适合图片，纵向、横向或自动方向，以及 0、12、30、48 pt 边距。导入后修改设置需先点击“应用到已导入照片”。'],
       ['图片会被强行拉伸吗？', '不会。图片会按比例放入所选纸张，不会为了填满页面而拉伸。'],
       ['手机照片的定位信息会留在 PDF 中吗？', '导入 JPG 时，会移除常见 EXIF、XMP、IPTC 和 JPEG 注释元数据，其中可能有 GPS 位置信息。这并不是对已有 PDF 的通用元数据清除工具。'],
