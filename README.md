@@ -52,11 +52,18 @@ docker image inspect ghcr.io/plainmile/pdf-tools:latest \
 - Drag individual thumbnails or selected groups of pages to reorder; Shift selection and touch/keyboard move buttons are supported.
 - Select, rotate, delete, extract and undo/redo up to 20 edits.
 - Split by page ranges (`1-3, 4-6`) or every N pages, bundled in a ZIP download.
-- Convert JPG, PNG and WebP to A4 PDF pages and mix with other PDFs.
+- Convert JPG, PNG and WebP to PDF pages with A4 / US Letter / fit-to-image sizes, automatic / portrait / landscape orientation and four margin presets. Choose **fit entire image** (no crop) or **fill available paper area** (centered crop; never stretches). Fit-to-image always shows the entire source image. Supports mixed images/PDFs, per-page thumbnails, drag ordering, explicit numeric filename sorting and reverse ordering with Undo.
 - Optional text watermarks: **off by default**. Open Export options near the download button, enable the checkbox and enter your own text (English or Chinese). The light diagonal overlay is added on export only and also works for extracted/split PDFs. No automatic company watermark.
 - No upload API, account, server-side PDF processing, analytics or advertising code.
 - Human-written bilingual English / Simplified Chinese SEO pages: `/workspace/`, `/merge-pdf/`, `/split-pdf/`, `/organize-pdf/`, `/rotate-pdf/`, `/extract-pages/`, `/delete-pages/`, `/image-to-pdf/`, `/watermark-pdf/`, `/privacy/` plus `/zh/` counterparts. Hreflang and canonical tags provided.
 - Three appearance modes: follow system, light, dark. Preference saved locally if the browser allows localStorage; all modes are CSS token-based.
+
+## Important safety and editing behavior
+
+- **Merge/organize/rotate/extract/split** create a *new* PDF by copying pages. Interactive forms, signed documents, embedded attachments and some annotations may be lost, or signatures invalidated. These operations are not certified archival or preservation workflows. Keep the original and compare important exports.
+- **Image-to-PDF paper choices:** A4 / Letter / image-sized; portrait, landscape or auto for fixed paper, while image-sized always follows each image. Margins: 0/12/30/48 pt. The default remains A4 portrait, 30 pt, full image. Cover mode explicitly crops overflowing image edges to the printable area, not outside the page. Any layout changes to loaded photos must be applied before exporting; Undo and page order are preserved.
+- **Image ordering:** Image-only workspaces offer natural numeric filename ordering (`photo2` before `photo10`) and reverse order; drag/individual move controls remain available. Neither automatic sort nor irreversible mutation occurs upon import.
+- **Compression is intentionally lossy:** Every page becomes JPEG content; searchable text, forms, annotations, links and signatures are not preserved. The output is offered only when its *measured* size is smaller. Never treat this as a lossless compression or secure redaction service.
 
 ## Limits and known non-goals
 
@@ -180,6 +187,10 @@ MIT License. See [LICENSE](LICENSE). Source: https://github.com/plainmile/pdf-to
 5. E2E Docker containers use `--rm` and explicit `if: always()` cleanup. GitHub-hosted Runners are discarded after the job. Diagnostics are kept only on failure, for one day. The separate public QA workflow is **manual-only** to avoid duplicate Runner jobs.
 
 The repository is public; GitHub's **standard hosted Runners** are free for public repositories, but artifact/package storage can still be limited. No always-on QA Runner or daemon is configured on netcup.
+
+## Workflow design references
+
+Borrow the practical interaction patterns found in PDF24, iLovePDF and Smallpdf, without cloning their branding or page layout: surface relevant controls before converting; show the actual order and preview; preserve original files; clearly separate reversible page editing from lossy conversions; explain file/page safety limits beside the action; and offer optional follow-on tools after a successful result. All processing remains browser-local; there are no user accounts or uploads.
 
 ## V1 browser-local utility tools
 
