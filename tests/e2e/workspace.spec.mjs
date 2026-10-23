@@ -92,7 +92,7 @@ test('Chinese watermark page supports custom Chinese text and resets to no water
 test('ordinary multi-source PDFs reverse their export order with a single Undo/Redo step', async ({ page }) => {
   await loadInput(page); // first.pdf: 300, 310; second.pdf: 320
   await expect(page.getByTestId('page-order-actions')).toBeVisible();
-  await expect(page.getByTestId('reverse-all-pages')).toHaveText('Reverse page order');
+  await expect(page.getByTestId('reverse-all-pages')).toHaveText('Reverse all pages');
   await page.getByTestId('workspace-view-grouped').click();
   await page.getByTestId('reverse-all-pages').click();
   const reversed = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
@@ -114,7 +114,7 @@ test('Chinese 375px mobile can reverse an ordinary PDF scan without horizontal o
     name: 'backwards-scan.pdf', mimeType: 'application/pdf', buffer: await makePdf([321, 432, 543]),
   });
   await expect(page.getByTestId('page-tile')).toHaveCount(3);
-  await expect(page.getByTestId('reverse-all-pages')).toHaveText('反转页面顺序');
+  await expect(page.getByTestId('reverse-all-pages')).toHaveText('所有页面倒序');
   await page.getByTestId('reverse-all-pages').click();
   const saved = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
   expect(saved.getPages().map(pdfPage => pdfPage.getWidth())).toEqual([543, 432, 321]);
