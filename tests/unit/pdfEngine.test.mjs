@@ -208,3 +208,80 @@ test('bulk reflow refuses an oversized retained workspace before committing any 
   const small = [{ isImage: false, bytes: new Uint8Array([1, 2, 3]) }];
   assert.deepEqual(await reflowImageSources(small, {}), small);
 });
+
+const SMALL_STATIC_AVIF_BASE64 = 'AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAADrbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAAAAAAAOcGl0bQAAAAAAAQAAAB5pbG9jAAAAAEQAAAEAAQAAAAEAAAETAAAANQAAAChpaW5mAAAAAAABAAAAGmluZmUCAAAAAAEAAGF2MDFDb2xvcgAAAABqaXBycAAAAEtpcGNvAAAAFGlzcGUAAAAAAAAACQAAAAcAAAAQcGl4aQAAAAADCAgIAAAADGF2MUOBAAwAAAAAE2NvbHJuY2x4AAEADQAGgAAAABdpcG1hAAAAAAAAAAEAAQQBAoMEAAAAPW1kYXQSAAoIGAyjNEBDQaEyJxTHh4ZlAgggnlVAAADLqtUprV8YScAKQg6O4/UNdK4pmP7BYE7WQA==';
+
+function validBmp(width = 3, height = 2) {
+  const padding = (4 - ((width * 3) % 4)) % 4;
+  const stride = width * 3 + padding;
+  const bytes = Buffer.alloc(54 + stride * height);
+  bytes.write('BM');
+  bytes.writeUInt32LE(bytes.length, 2);
+  bytes.writeUInt32LE(54, 10);
+  bytes.writeUInt32LE(40, 14);
+  bytes.writeInt32LE(width, 18);
+  bytes.writeInt32LE(height, 22);
+  bytes.writeUInt16LE(1, 26);
+  bytes.writeUInt16LE(24, 28);
+  bytes.writeUInt32LE(0, 30);
+  for (let offset = 54; offset < bytes.length; offset += 3) {
+    bytes[offset] = 20; bytes[offset + 1] = 90; bytes[offset + 2] = 240;
+  }
+  return bytes;
+}
+
+test('recognize BMP and still AVIF with MIME aliases and missing MIME types', () => {
+  for (const [name, type] of [['scan.BMP', 'image/bmp'], ['modern.avif', 'image/avif']]) {
+    assert.equal(imageTypeFor({ name, type: 'application/octet-stream' }), type);
+    assert.equal(isSupportedFile({ name, type: '' }), true);
+  }
+  assert.equal(imageTypeFor({ name: 'old.bmp', type: 'image/x-ms-bmp' }), 'image/bmp');
+  assert.equal(imageTypeFor({ name: 'old.bmp', type: 'image/x-bmp' }), 'image/bmp');
+  assert.equal(isSupportedFile({ name: 'unsupported.heic', type: '' }), false);
+  assert.equal(isSupportedFile({ name: 'vector.svg', type: 'image/svg+xml' }), false);
+});
+
+test('validate authentic static AVIF headers and reject animation, spoofing or excessive dimensions', () => {
+  const original = Buffer.from(SMALL_STATIC_AVIF_BASE64, 'base64');
+  assert.deepEqual(compressedImageDimensions('image/avif', original), { width: 9, height: 7 });
+  assert.throws(() => compressedImageDimensions('image/avif', Buffer.from('invalid')), /Invalid image header/);
+  const animated = Buffer.from(original);
+  animated.write('avis', 8);
+  assert.throws(() => compressedImageDimensions('image/avif', animated), /Animated AVIF/);
+  const spoof = Buffer.from(original);
+  spoof.write('mif1', 8);
+  spoof.write('mif1', 16);
+  assert.throws(() => compressedImageDimensions('image/avif', spoof), /Invalid image header/);
+  const large = Buffer.from(original);
+  const ispeIndex = large.indexOf(Buffer.from('ispe'));
+  assert.ok(ispeIndex > 0);
+  large.writeUInt32BE(20000, ispeIndex + 8);
+  large.writeUInt32BE(20000, ispeIndex + 12);
+  assert.throws(() => compressedImageDimensions('image/avif', large), /Image dimensions are too large/);
+});
+
+test('validate BMP dimensions before decode and fail closed on malformed or huge files', () => {
+  const bmp = validBmp(3, 2);
+  assert.deepEqual(compressedImageDimensions('image/bmp', bmp), { width: 3, height: 2 });
+  const flipped = Buffer.from(bmp);
+  flipped.writeInt32LE(-2, 22);
+  assert.deepEqual(compressedImageDimensions('image/bmp', flipped), { width: 3, height: 2 });
+  const huge = Buffer.from(bmp);
+  huge.writeInt32LE(20_000, 18);
+  huge.writeInt32LE(20_000, 22);
+  assert.equal(compressedImageDimensions('image/bmp', huge).width * compressedImageDimensions('image/bmp', huge).height > LIMITS.maxImagePixels, true);
+  const compressed = Buffer.from(bmp);
+  compressed.writeUInt32LE(1, 30);
+  assert.throws(() => compressedImageDimensions('image/bmp', compressed), /Invalid image header/);
+  const bad = Buffer.from(bmp);
+  bad.write('ZZ');
+  assert.throws(() => compressedImageDimensions('image/bmp', bad), /Invalid image header/);
+});
+
+test('reject animated WebP rather than silently dropping later frames', () => {
+  const bytes = Buffer.alloc(30);
+  bytes.write('RIFF'); bytes.writeUInt32LE(22, 4); bytes.write('WEBP', 8);
+  bytes.write('VP8X', 12); bytes.writeUInt32LE(10, 16);
+  bytes[20] = 0x02; // animation flag
+  assert.throws(() => compressedImageDimensions('image/webp', bytes), /Animated WebP/);
+});

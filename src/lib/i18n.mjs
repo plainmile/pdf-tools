@@ -70,7 +70,7 @@ export const chineseTools = {
   'txt-to-pdf': { title: 'TXT 转 PDF', short: '纯文本生成 PDF', headline: '把 TXT 文本转换成 PDF。', description: '在浏览器中粘贴或导入 TXT，生成 A4 PDF。英文尽量保持文字可选中，中文使用本地字体渲染为图片页。', details: '支持 UTF-8 文本。含中文等非拉丁字符时输出为图片页，无法搜索文字；源文本不会上传。', steps: ['输入或导入 TXT', '核对文本内容', '下载 PDF'] },
   'markdown-to-pdf': { title: 'Markdown 转 PDF', short: '支持简单标题、列表和代码', headline: '将基础 Markdown 生成 PDF。', description: '本地转换基础 Markdown 的标题、段落、列表、引用和代码块；暂不支持复杂表格、HTML 与远程图片。', details: '为了安全和轻量化，使用简单 Markdown 子集。含中文等非拉丁文字的输出为图片页，不可搜索。', steps: ['粘贴或导入 Markdown', '检查标题和内容', '下载 PDF'] },
   'add-page-numbers': { title: '添加 PDF 页码', short: '设置位置和起始页码', headline: '为 PDF 每一页添加页码。', description: '为 PDF 增加可选择的页码，支持指定起始数字、位置和字号；全部在本地完成，不上传文件。', details: '可选择页码从几开始，并放在底部中间、右下角或右上角。重要文件请检查数字签名等内容。', steps: ['选择 PDF', '设置起始数字和位置', '下载带页码的 PDF'] },
-  'image-to-pdf': { title: '图片转 PDF', short: 'JPG、PNG、WebP 与自定义纸张', headline: '将图片整理为 PDF。', description: '将 JPG、PNG、WebP 图片转为 PDF。支持 A4、Letter、适合图片、横竖方向与边距；可调整页面顺序。', details: '可在导入前设置纸张、方向和边距，也可以在导入后重新应用设置。JPG 会移除常见 EXIF、XMP、IPTC 和注释元数据（可能包含 GPS），保留照片方向和原有压缩画质；不处理已有 PDF 的元数据。', steps: ['选择纸张、方向和边距', '添加图片并按需调整顺序', '核对预览后导出 PDF'] },
+  'image-to-pdf': { title: '图片转 PDF', short: 'JPG、PNG、WebP、BMP、静态 AVIF', headline: '将图片整理为 PDF。', description: '把 JPG、PNG、WebP、BMP 和静态 AVIF 图片转为 PDF。支持 A4、Letter、适合图片、横竖方向和边距；AVIF 需要浏览器解码能力。', details: '可在导入前设置纸张、方向和边距，也可以在导入后重新应用设置。JPG 会移除常见 EXIF、XMP、IPTC 和注释元数据（可能包含 GPS），保留照片方向和原有压缩画质；不处理已有 PDF 的元数据。', steps: ['选择纸张、方向和边距', '添加图片并按需调整顺序', '核对预览后导出 PDF'] },
 };
 
 export const workspaceCopy = {
@@ -82,7 +82,7 @@ export const workspaceCopy = {
     watermarkNeedsText: 'Enter text to apply a watermark, or switch it off to export without one.',
     app: 'PDF page workspace', local: 'ON-DEVICE PROCESSING', organize: 'Organize', split: 'Split', add: 'Add files', export: 'Export PDF', working: 'Working…',
     dropTitle: 'Drop PDF files or images here', dropSub: 'Or choose files from your device', choose: 'Choose PDF or images', opening: 'Opening files…',
-    limits: 'PDF, JPG, PNG, WebP · Up to 20 files · 100 MB each · 600 pages total', private: 'Your files stay on this device.', reset: 'Clear workspace and start over',
+    limits: 'PDF, JPG, PNG, WebP, BMP, static AVIF · Up to 20 files · 100 MB each · 600 pages total', private: 'Your files stay on this device.', reset: 'Clear workspace and start over',
     page: 'page', pages: 'pages', file: 'file', files: 'files', from: 'from', selected: 'selected', undo: 'Undo', redo: 'Redo', clear: 'Clear', clearConfirmTitle: 'Clear the PDF workspace?', clearConfirmDescription: 'This permanently removes all loaded files, page edits and undo history. Continue?', cancelClear: 'Keep editing', confirmClear: 'Clear everything',
     all: 'Select all', none: 'Deselect', rotateLeft: 'Rotate left', rotateRight: 'Rotate right', extract: 'Extract', del: 'Delete', duplicateSelected: 'Duplicate selected', duplicated: 'Duplicated {pages} selected page(s) after the originals.', insertBlank: 'Insert blank page', blankInserted: 'Added a blank page using the neighboring page size.', blankHint: 'One page selected: insert after it. None: append at the end. Select at most one page.',
     dragHint: 'Drag thumbnails to reorder. To move several pages, select them first and drag one of the selected pages. Shift-click selects a range. On touch screens or with a keyboard, use the move buttons.',
@@ -95,7 +95,7 @@ export const workspaceCopy = {
     noFile: 'Add at least one PDF or image first.', selectionNeeded: 'Select at least one page to extract.',
     loaded: 'Added {files} file(s) and {pages} page(s).', exported: 'Export complete. Your original files were not changed.',
     extracted: 'Exported {pages} selected page(s).', zipped: 'Created {files} PDF file(s) in a ZIP archive.', cleared: 'Workspace cleared.',
-    errorGeneric: 'Could not complete the operation.', errorFiles: 'You can work with at most {n} files.', errorTypes: 'Choose PDF, JPG, PNG or WebP files.', errorCombined: 'The PDFs and original images retained in this workspace exceed the 200 MiB safety limit. Remove some pages/files or use smaller images.', errorPages: 'At most {n} pages can be added.', dismiss: 'Dismiss message',
+    errorGeneric: 'Could not complete the operation.', errorFiles: 'You can work with at most {n} files.', errorTypes: 'Choose PDF, JPG, PNG, WebP, BMP or static AVIF files. Animation is not supported.', errorCombined: 'The PDFs and original images retained in this workspace exceed the 200 MiB safety limit. Remove some pages/files or use smaller images.', errorPages: 'At most {n} pages can be added.', dismiss: 'Dismiss message',
     enterSplitRanges: 'Enter page ranges to split (for example, 1-3, 4-6).', enterSplitSize: 'Enter how many pages to put in each PDF.',
     invalidRange: 'Check the page ranges or pages per file (maximum 50 output PDFs).', estimate: '{files} PDF file(s) will be generated.',
   },
@@ -107,7 +107,7 @@ export const workspaceCopy = {
     watermarkNeedsText: '请填写水印内容；不需要时可关闭水印开关。',
     app: 'PDF 页面工作台', local: '文件仅在本机处理', organize: '整理页面', split: '拆分文件', add: '添加文件', export: '导出 PDF', working: '正在处理…',
     dropTitle: '将 PDF 或图片拖入此处', dropSub: '也可以从您的设备中选择文件', choose: '选择 PDF 或图片', opening: '正在读取…',
-    limits: 'PDF、JPG、PNG、WebP · 最多 20 个文件 · 单文件 100 MB · 共 600 页', private: '文件始终留在您的设备上。', reset: '清空工作台，重新开始',
+    limits: 'PDF、JPG、PNG、WebP、BMP、静态 AVIF · 最多 20 个文件 · 单文件 100 MB · 共 600 页', private: '文件始终留在您的设备上。', reset: '清空工作台，重新开始',
     page: '页', pages: '页', file: '个文件', files: '个文件', from: '来自', selected: '页已选中', undo: '撤销', redo: '重做', clear: '清空', clearConfirmTitle: '确定清空 PDF 工作台？', clearConfirmDescription: '这会永久清除所有已加载文件、页面编辑及撤销历史。是否继续？', cancelClear: '继续编辑', confirmClear: '确认全部清空',
     all: '全选', none: '取消选择', rotateLeft: '向左旋转', rotateRight: '向右旋转', extract: '提取页面', del: '删除页面', duplicateSelected: '复制选中页', duplicated: '已在原位置后复制 {pages} 页。', insertBlank: '插入空白页', blankInserted: '已按相邻页面尺寸插入空白页。', blankHint: '选择一页时插入在其后；未选中时追加到末尾。插入前最多选中一页。',
     dragHint: '拖拽缩略图可调整顺序。先多选再拖动选中页面，可成组移动；按住 Shift 点击可选择连续页面。触屏或键盘操作可用每页下方的左右按钮。',
@@ -120,7 +120,7 @@ export const workspaceCopy = {
     noFile: '请先添加 PDF 或图片。', selectionNeeded: '请先选择需要提取的页面。',
     loaded: '已添加 {files} 个文件，共 {pages} 页。', exported: '导出成功，原始文件没有被修改。',
     extracted: '已提取 {pages} 页。', zipped: '已将 {files} 个 PDF 打包为 ZIP。', cleared: '工作台已清空。',
-    errorGeneric: '操作失败，请检查文件后重试。', errorFiles: '一次最多处理 {n} 个文件。', errorTypes: '请选择 PDF、JPG、PNG 或 WebP 文件。', errorCombined: '当前工作台保留的 PDF 数据和原始图片超过 200 MiB 安全上限。请减少图片或文件，或使用更小的图片。', errorPages: '一次最多支持 {n} 页，请减少文件。', dismiss: '关闭提示',
+    errorGeneric: '操作失败，请检查文件后重试。', errorFiles: '一次最多处理 {n} 个文件。', errorTypes: '请选择 PDF、JPG、PNG、WebP、BMP 或静态 AVIF 文件，不支持动态图像。', errorCombined: '当前工作台保留的 PDF 数据和原始图片超过 200 MiB 安全上限。请减少图片或文件，或使用更小的图片。', errorPages: '一次最多支持 {n} 页，请减少文件。', dismiss: '关闭提示',
     enterSplitRanges: '请填写要拆分的页码范围，例如 1-3, 4-6。', enterSplitSize: '请填写每份 PDF 包含多少页。',
     invalidRange: '请检查拆分页码或每份页数（最多生成 50 个 PDF）。', estimate: '预计生成 {files} 个 PDF 文件。',
   },
@@ -133,6 +133,8 @@ export function interpolate(template, params = {}) {
 export function translateProcessingError(message, locale = 'en') {
   if (locale !== 'zh') return message;
   const error = String(message);
+  if (/Animated (AVIF|WebP) is not supported/i.test(error)) return '不支持动态 AVIF 或 WebP。请使用静态图片，避免只导出动画的第一帧。';
+  if (/This AVIF could not be decoded/i.test(error)) return '当前浏览器无法解码此 AVIF 图片。请确认文件有效，或先转换为 PNG、WebP 后重试。';
   if (/JPEG metadata could not be safely removed/i.test(error)) return 'JPEG 元数据结构异常，无法安全移除隐藏信息。请换一张图片或先导出为不含元数据的新图片。';
   if (/Split cancelled/i.test(error)) return '已取消拆分，没有下载未完成的 ZIP。';
   if (/PDF export cancelled/i.test(error)) return '已取消 PDF 导出，没有下载未完成的文件。';
