@@ -1073,7 +1073,8 @@ test('one split range downloads a real PDF directly, not a ZIP', async ({ page }
 test('Chinese single-result split by pages per PDF is a direct full PDF export', async ({ page }) => {
   await page.goto('/zh/split-pdf/');
   await page.getByTestId('file-input').setInputFiles({ name: 'three.pdf', mimeType: 'application/pdf', buffer: await makePdf([301, 302, 303]) });
-  await expect(page.getByTestId('page-tile')).toHaveCount(3);
+  // /split-pdf/ starts on the Split tab; thumbnails only exist on Organize.
+  await expect(page.locator('.file-count')).toContainText('3 页');
   await page.getByRole('tab', { name: '拆分文件' }).click();
   await page.getByRole('radio', { name: '每 N 页拆分一次' }).check();
   await page.getByRole('spinbutton', { name: '每个 PDF 的页数' }).fill('3');
