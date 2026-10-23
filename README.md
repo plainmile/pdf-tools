@@ -48,6 +48,10 @@ docker image inspect ghcr.io/plainmile/pdf-tools:latest \
 # Expected: https://pdf.plainmile.com/
 ```
 
+## Report a problem or suggest a workflow
+
+Use the visible **Report an issue / 反馈问题** link in the website footer, or open [GitHub Issues](https://github.com/plainmile/pdf-tools/issues/new/choose). Include the page URL, exact non-sensitive steps, expected versus actual result, browser, and approximate file type/size/page count. **Do not upload or paste original documents, extracted text, file names, account details, or other personal information.** Reproduce with a synthetic document whenever possible. The tool runs locally; issue reports are public and are not part of document processing.
+
 ## Features
 
 - Merge PDFs at the page level, including interleaving pages from different files.
