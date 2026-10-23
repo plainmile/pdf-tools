@@ -4,7 +4,7 @@ import {
 } from 'pdf-lib';
 import { renderWatermarkPng, watermarkTextFromOptions, WATERMARK_OPACITY } from './watermark.mjs';
 import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement, stripJpegPrivateMetadata } from './jpegExif.mjs';
-import { imagePdfPageLayout } from './imagePdfLayout.mjs';
+import { imagePdfPageLayout, IMAGE_PDF_LAYOUT_DEFAULT } from './imagePdfLayout.mjs';
 
 /**
  * Generate temporary IDs without depending on crypto.randomUUID(), which is
@@ -149,6 +149,7 @@ export async function readSourceFile(file, options = {}) {
   const pageCount = doc.getPageCount();
   if (!pageCount) throw new Error(`${file.name}: this document has no pages.`);
   return { id: temporaryWorkspaceId(), name: file.name, bytes, pageCount, isImage, inputSize: file.size,
+    imageLayout: isImage ? { ...IMAGE_PDF_LAYOUT_DEFAULT, ...options.imageLayout } : null,
     // Retain only in browser RAM, so the user can change paper settings without
     // re-uploading a photo or losing the existing page order/undo history.
     originalImageBytes: isImage ? originalBytes : null,
@@ -168,7 +169,7 @@ export async function reflowImageSources(sources, layout, report = () => {}) {
       }
       const bytes = await imageToPdfBytes({ name: source.name },
         source.originalImageBytes, source.originalImageType, layout);
-      updated.push({ ...source, bytes });
+      updated.push({ ...source, bytes, imageLayout: { ...IMAGE_PDF_LAYOUT_DEFAULT, ...layout } });
     }
     report(index + 1, sources.length);
     // Allow React updates and UI progress during bulk photo reflow.
