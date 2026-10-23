@@ -127,6 +127,43 @@ test('keyboard-accessible move buttons change the actual exported page order', a
   expect(output.getPages().map((p) => p.getWidth())).toEqual([310, 300, 320]);
 });
 
+test('select pages by output ranges then extract real nonconsecutive pages', async ({ page }) => {
+  await page.goto('/extract-pages/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'numbers.pdf', mimeType: 'application/pdf', buffer: await makePdf([301, 302, 303, 304, 305, 306]),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(6);
+  await page.getByTestId('selection-range-panel').locator('summary').click();
+  await page.getByTestId('selection-ranges').fill('2-3, 5, 5');
+  await page.getByTestId('selection-range-apply').click();
+  await expect(page.locator('.selection-info strong')).toHaveText('3 pages selected');
+  const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Extract selected pages' }).click());
+  expect(output.getPages().map(p => p.getWidth())).toEqual([302, 303, 305]);
+});
+
+test('Chinese touch-width range selection uses export order and rejects reversed ranges atomically', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/delete-pages/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'document.pdf', mimeType: 'application/pdf', buffer: await makePdf([301, 302, 303, 304, 305]),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(5);
+  await page.getByTestId('workspace-view-grouped').click();
+  await page.getByTestId('selection-range-panel').locator('summary').click();
+  await page.getByTestId('selection-ranges').fill('1-2, 4');
+  await page.getByTestId('selection-range-apply').click();
+  await expect(page.locator('.selection-info strong')).toContainText('3 页已选中');
+  await page.getByTestId('selection-ranges').fill('5-1');
+  await page.getByTestId('selection-range-apply').click();
+  await expect(page.getByRole('alert')).toContainText('选择页码无效');
+  await expect(page.locator('.selection-info strong')).toContainText('3 页已选中');
+  await page.getByRole('button', { name: '删除页面' }).click();
+  const saved = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
+  expect(saved.getPages().map(p => p.getWidth())).toEqual([303, 305]);
+  const width = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth }));
+  expect(width.scroll).toBeLessThanOrEqual(width.viewport + 2);
+});
+
 test('rotate, delete, undo and extract selected pages', async ({ page }) => {
   await loadInput(page);
   await page.getByRole('checkbox', { name: 'Select page 2' }).check();
