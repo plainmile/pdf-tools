@@ -155,6 +155,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const activeSourceCount = useMemo(() => countActiveSources(pages.filter(page => !sourceLookup.get(page.sourceId)?.isGeneratedBlank)), [pages, sourceLookup]);
   const onlyImages = pages.length > 1 && pages.every(page => sourceLookup.get(page.sourceId)?.isImage);
   const hasOriginalPdf = pages.some(page => { const src = sourceLookup.get(page.sourceId); return src && !src.isImage && !src.isGeneratedBlank; });
+  const activeFormSourceCount = countActiveSources(pages.filter(page => sourceLookup.get(page.sourceId)?.hasInteractiveForms));
   // Only a full Export PDF marks these particular edits as safely downloaded.
   // A later rotation/reorder/paper/watermark change immediately re-enables the
   // navigation guard; no document bytes ever leave browser RAM or enter storage.
@@ -674,6 +675,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         {error && <div className="notice notice-error" role="alert">{error}<button type="button" aria-label={t.dismiss} onClick={() => setError('')}>×</button></div>}
         {notice && <div className="notice notice-success" role="status">{notice}<button type="button" aria-label={t.dismiss} onClick={() => setNotice('')}>×</button></div>}
         {hasOriginalPdf && <p className="utility-note" data-testid="workspace-document-caution">{t.documentCaution}</p>}
+        {activeFormSourceCount > 0 && <p className="utility-note workspace-form-risk"
+          data-testid="workspace-form-risk" role="alert">
+          {interpolate(t.formRisk, { files: activeFormSourceCount })}
+        </p>}
         {largeWorkspace && <p className="utility-note" data-testid="workspace-large-warning">{t.bigDocWarning}</p>}
         {!pages.length ? (
           <div className="dropzone" data-testid="dropzone" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); void addFiles(event.dataTransfer.files); }}>
