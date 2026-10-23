@@ -348,7 +348,8 @@ test('image conversion exposes cancel and a ZIP packaging stage', async ({ page 
   const download = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
   expect(download.name).toMatch(/\.zip$/);
   await expect(page.getByTestId('utility-progress')).toContainText('Packaging ZIP');
-  await expect(page.getByTestId('utility-next-step')).toContainText('Continue with another PDF tool');
+  await expect(page.getByTestId('utility-next-step')).toContainText('files do not transfer automatically');
+  await expect(page.getByTestId('utility-next-step').getByRole('link')).toHaveAttribute('href', '/#all-tools');
 });
 
 test('page number tool warns that overlay can overlap content', async ({ page }) => {
