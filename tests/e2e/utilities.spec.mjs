@@ -602,10 +602,19 @@ test('text conversion retains old PDF for download after edits and only replaces
   await expect(page.getByTestId('text-result-stale')).toContainText('previous text');
   const previous = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
   expect((await PDFDocument.load(previous.bytes)).getPageCount()).toBe(1);
+  // The old download does not save the newly edited draft. Native navigation
+  // must still warn before this unsaved text is discarded.
+  const nativeGuard = () => page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  await expect.poll(nativeGuard).toBe(true);
 
   await page.getByTestId('utility-run').click();
   await expect(page.getByTestId('text-result-stale')).toHaveCount(0);
   const updated = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
+  await expect.poll(nativeGuard).toBe(false);
   expect(updated.name).toBe('plainmile-text-plain.pdf');
   expect((await PDFDocument.load(updated.bytes)).getPageCount()).toBe(1);
   expect(Buffer.compare(previous.bytes, updated.bytes)).not.toBe(0);
