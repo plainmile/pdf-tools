@@ -25,7 +25,7 @@ export const toolHelp = {
       ['Does rotating reduce image resolution?', 'Page rotation changes the PDF page orientation without intentionally converting its content to images. Always check important exports.'],
     ],
     'extract-pages': [
-      ['Can I take selected pages out of a long document?', 'Yes. Select the desired pages in the workspace and download a separate PDF containing only that selection.'],
+      ['Can I take selected pages out of a long document?', 'Yes. Tick thumbnails or enter output-page ranges such as 2-3, 5, 8 to select pages in one step, then export only that selection.'],
       ['Do extracted pages keep their order?', 'Yes. They follow the order shown in the current workspace. You can reorder pages before extracting them.'],
     ],
     'delete-pages': [
@@ -95,7 +95,7 @@ export const toolHelp = {
       ['旋转会降低清晰度吗？', '旋转修改的是 PDF 页面的方向，并不会刻意将页面图片化。重要文档仍建议检查导出结果。'],
     ],
     'extract-pages': [
-      ['如何从一本长 PDF 中抽出指定页？', '在工作台中勾选需要的页面，再选择提取，下载仅包含所选页面的新 PDF。'],
+      ['如何从一本长 PDF 中抽出指定页？', '可勾选页面，也可按当前导出顺序输入 2-3, 5, 8 一次选中多页，再下载提取后的 PDF。'],
       ['提取出的页面顺序如何确定？', '按照工作台当前显示的顺序导出。您也可以先拖动页面，再进行提取。'],
     ],
     'delete-pages': [
