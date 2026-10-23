@@ -9,7 +9,7 @@ import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges,
-  getRangePages, reversePages, sortPagesByFilename, groupPagesBySource, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
+  getRangePages, reversePages, sortPagesByFilename, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
 function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview, onOpen, outputPosition, busy }) {
@@ -521,6 +521,19 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     }
   };
 
+  const selectByQuickPattern = (pattern) => {
+    if (busy || busyRef.current || !pages.length) return;
+    const ids = pattern === 'invert'
+      ? invertPageIdSelection(pages, selected)
+      : pageIdsForParity(pages, pattern);
+    setSelected(ids);
+    setSelectionRanges(''); // Avoid a stale typed range appearing to be active.
+    lastSelectedIndex.current = null;
+    lastGroupedSelection.current = null;
+    setError('');
+    setNotice(interpolate(t.quickSelectionDone, { pages: ids.size }));
+  };
+
   const moveSelectedToPage = (event) => {
     event.preventDefault();
     if (busy || !pages.length || !selectedCount) return;
@@ -828,6 +841,19 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     <button className="button button-secondary button-small" type="submit"
                       data-testid="selection-range-apply" disabled={busy || !selectionRanges.trim()}>{t.rangeSelectApply}</button>
                     <p className="input-note">{t.rangeSelectHint}</p>
+                    <div className="selection-pattern-buttons" data-testid="selection-pattern-buttons"
+                      role="group" aria-label={t.quickSelectionLabel}>
+                      <button type="button" className="button button-secondary button-small"
+                        data-testid="select-odd-pages" disabled={busy}
+                        onClick={() => selectByQuickPattern('odd')}>{t.selectOdd}</button>
+                      <button type="button" className="button button-secondary button-small"
+                        data-testid="select-even-pages" disabled={busy}
+                        onClick={() => selectByQuickPattern('even')}>{t.selectEven}</button>
+                      <button type="button" className="button button-secondary button-small"
+                        data-testid="invert-page-selection" disabled={busy}
+                        onClick={() => selectByQuickPattern('invert')}>{t.invertSelection}</button>
+                    </div>
+                    <p className="input-note">{t.quickSelectionHint}</p>
                   </form>
                 </details>
                 {pages.length > 1 && <details className="move-position-panel" data-testid="move-position-panel">

@@ -4,7 +4,7 @@ import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, parsePageRanges,
   chunkPageRanges, getRangePages, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
-  reversePages, sortPagesByFilename, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges,
+  reversePages, sortPagesByFilename, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges, pageIdsForParity, invertPageIdSelection,
 } from '../../src/lib/pageOperations.mjs';
 
 const pages = Object.freeze([
@@ -65,6 +65,39 @@ test('numeric insertion rejects invalid and selected target atomically', () => {
   assert.throws(() => moveSelectedPagesToPosition(original, ['unknown'], 1), /Select/);
   assert.throws(() => moveSelectedPagesToPosition(original, ['a'], 2, 'inside'), /before or after/);
   assert.deepEqual(ids(original), ['a','b','c']);
+});
+
+test('odd and even page selection follows one-based current export order, not source page number', () => {
+  const original = Object.freeze([
+    { id: 'a', sourceId: 'one', pageIndex: 10 },
+    { id: 'b', sourceId: 'two', pageIndex: 0 },
+    { id: 'c', sourceId: 'one', pageIndex: 0 },
+    { id: 'd', sourceId: 'two', pageIndex: 3 },
+    { id: 'e', sourceId: 'one', pageIndex: 1 },
+  ].map(page => Object.freeze(page)));
+  assert.deepEqual([...pageIdsForParity(original, 'odd')], ['a', 'c', 'e']);
+  assert.deepEqual([...pageIdsForParity(original, 'even')], ['b', 'd']);
+  const reordered = movePage(original, 'e', 'a');
+  assert.deepEqual([...pageIdsForParity(reordered, 'odd')], ['e', 'b', 'd']);
+  assert.deepEqual([...pageIdsForParity(reordered, 'even')], ['a', 'c']);
+  assert.deepEqual([...invertPageIdSelection(original, ['a', 'd', 'stale-undo-id'])], ['b', 'c', 'e']);
+  assert.deepEqual([...invertPageIdSelection(original, [])], ['a', 'b', 'c', 'd', 'e']);
+  assert.deepEqual([...invertPageIdSelection(original, original.map(p => p.id))], []);
+  assert.throws(() => pageIdsForParity(original, 'third'), /odd or even/);
+  assert.deepEqual(original.map(p => p.id), ['a', 'b', 'c', 'd', 'e']);
+});
+
+test('odd/even shortcuts scale to maximum 600 workspace pages without range expansion', () => {
+  const book = Array.from({ length: 600 }, (_, index) => ({ id: String(index), sourceId: 'book', pageIndex: index }));
+  const odds = pageIdsForParity(book, 'odd');
+  const evens = pageIdsForParity(book, 'even');
+  assert.equal(odds.size, 300);
+  assert.equal(evens.size, 300);
+  assert.deepEqual([...invertPageIdSelection(book, odds)], [...evens]);
+  assert.deepEqual([...pageIdsForParity(book.slice(0, 1), 'even')], []);
+  assert.deepEqual([...pageIdsForParity([], 'odd')], []);
+  assert.equal(pageIdsForParity(book, 'odd').has('0'), true);
+  assert.equal(pageIdsForParity(book, 'odd').has('1'), false);
 });
 
 test('rotate only selected pages, normalize degrees', () => {
