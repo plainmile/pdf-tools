@@ -11,6 +11,18 @@ export function sameImagePdfLayout(a, b) {
     .every(key => a[key] === b[key]);
 }
 
+
+/** Reflow only visible photo sources whose layout actually changed.
+ * Deleted photos retained solely for Undo keep their old applied layout.
+ * When Undo restores them, the workspace's dirty-layout guard requires an
+ * explicit Apply before export; history never silently rewrites old sources.
+ */
+export function shouldReflowImageSource(source, layout, activeIds = null) {
+  return Boolean(source?.isImage) &&
+    (activeIds === null || activeIds.has(source.id)) &&
+    !sameImagePdfLayout(source.imageLayout, layout);
+}
+
 const PAPER_SIZES = Object.freeze({
   a4: [595.28, 841.89],
   letter: [612, 792],
