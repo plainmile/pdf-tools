@@ -558,3 +558,41 @@ test('large page numbering can be cancelled from the browser without a partial d
   await expect(page.getByTestId('utility-run')).toBeEnabled();
   expect(downloads).toHaveLength(0);
 });
+
+
+test('invalid replacement keeps previously generated undownloaded text PDF', async ({ page }) => {
+  await page.goto('/txt-to-pdf/');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'kept.txt', mimeType: 'text/plain', buffer: Buffer.from('Original saved draft'),
+  });
+  await expect(page.getByTestId('text-file-summary')).toContainText('kept.txt');
+  const downloads = [];
+  page.on('download', item => downloads.push(item.suggestedFilename()));
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible();
+  expect(downloads).toHaveLength(0);
+
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'bad.png', mimeType: 'image/png', buffer: Buffer.from('not text'),
+  });
+  await expect(page.getByRole('alert')).toContainText('Previous file remains: kept.txt');
+  await expect(page.getByTestId('text-file-summary')).toContainText('kept.txt');
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible();
+  await expect(page.getByTestId('utility-pdf-download')).toBeEnabled();
+  expect(downloads).toHaveLength(0);
+  const result = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
+  const pdf = await PDFDocument.load(result.bytes);
+  expect(pdf.getPageCount()).toBe(1);
+  expect(result.name).toBe('kept-plain.pdf');
+
+  // An invalid replacement also must not erase an already-extracted preview.
+  await page.goto('/pdf-to-txt/');
+  await upload(page, await fixturePdf('Retained extracted text', 1));
+  await getDownload(page, () => page.getByTestId('utility-run').click());
+  await expect(page.getByTestId('utility-preview')).toContainText('Retained extracted text');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'broken.pdf', mimeType: 'application/pdf', buffer: Buffer.from('corrupt pdf'),
+  });
+  await expect(page.getByRole('alert')).toContainText('Previous file remains: fixture.pdf');
+  await expect(page.getByTestId('utility-preview')).toContainText('Retained extracted text');
+});
