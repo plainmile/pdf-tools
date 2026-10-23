@@ -457,6 +457,21 @@ test('English Markdown quotes, rules and numbered steps produce searchable PDF t
   expect(text).toContain('2. Second step');
 });
 
+test('Markdown technical comparisons survive an actual PDF download and TXT round-trip', async ({ page }) => {
+  await page.goto('/markdown-to-pdf/');
+  await page.getByTestId('utility-text').fill('Logic: a < 3 && b > 2\nBounds: x <= 40 && y >= 8\n**Safe** <strong>HTML</strong> text');
+  const generated = await generateTextPdfAndDownload(page);
+  expect((await PDFDocument.load(generated.bytes)).getPageCount()).toBe(1);
+
+  await page.goto('/pdf-to-txt/');
+  await upload(page, generated.bytes);
+  const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
+  const text = extracted.bytes.toString('utf8');
+  expect(text).toContain('a < 3 && b > 2');
+  expect(text).toContain('x <= 40 && y >= 8');
+  expect(text).toContain('Safe HTML text');
+});
+
 test('page numbering on rotated cropped PDFs preserves page rotations and searchable digits', async ({ page }) => {
   const { degrees } = await import('pdf-lib');
   const input = await PDFDocument.create();
