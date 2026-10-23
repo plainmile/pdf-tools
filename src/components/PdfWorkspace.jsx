@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import JSZip from 'jszip';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
-import { LIMITS, composePdf, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId } from '../lib/pdfEngine.mjs';
+import { LIMITS, composePdf, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId, createBlankPageSource } from '../lib/pdfEngine.mjs';
 import { sanitizeFilename } from '../lib/utilityCore.mjs';
 import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLayout.mjs';
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
-  movePage, movePageGroup, shiftPage, rotatePages, deletePages, parsePageRanges, chunkPageRanges,
+  movePage, movePageGroup, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, chunkPageRanges,
   getRangePages, reversePages, sortPagesByFilename, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources,
 } from '../lib/pageOperations.mjs';
 
@@ -133,14 +133,14 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     .some(id => !sameImagePdfLayout(sourceLookup.get(id)?.imageLayout, imageLayout));
   const activeNames = useMemo(() => {
     const ids = new Set(pages.map(page => page.sourceId));
-    return sources.filter(source => ids.has(source.id)).map(source => source.name);
+    return sources.filter(source => ids.has(source.id) && !source.isGeneratedBlank).map(source => source.name);
   }, [pages, sources]);
   const fileBase = activeNames.length === 1 ? sanitizeFilename(activeNames[0]) :
-    `plainmile-${activeNames.length}-files`;
+    activeNames.length ? `plainmile-${activeNames.length}-files` : 'plainmile-pages';
   const filename = `${fileBase}-${mode === 'image-to-pdf' ? 'images' : 'organized'}.pdf`;
-  const activeSourceCount = useMemo(() => countActiveSources(pages), [pages]);
+  const activeSourceCount = useMemo(() => countActiveSources(pages.filter(page => !sourceLookup.get(page.sourceId)?.isGeneratedBlank)), [pages, sourceLookup]);
   const onlyImages = pages.length > 1 && pages.every(page => sourceLookup.get(page.sourceId)?.isImage);
-  const hasOriginalPdf = pages.some(page => !sourceLookup.get(page.sourceId)?.isImage);
+  const hasOriginalPdf = pages.some(page => { const src = sourceLookup.get(page.sourceId); return src && !src.isImage && !src.isGeneratedBlank; });
   // Only a full Export PDF marks these particular edits as safely downloaded.
   // A later rotation/reorder/paper/watermark change immediately re-enables the
   // navigation guard; no document bytes ever leave browser RAM or enter storage.
@@ -254,6 +254,34 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     catch (reason) { setError(translateProcessingError(reason instanceof Error ? reason.message : t.errorGeneric, locale)); }
     finally { setBusy(false); }
   };
+
+  const duplicateSelected = () => {
+    try {
+      const copies = duplicatePages(pages, selected, temporaryWorkspaceId, LIMITS.maxPages);
+      if (copies === pages) return;
+      commit(() => copies);
+      setNotice(interpolate(t.duplicated, { pages: selectedCount }));
+    } catch (reason) {
+      setError(translateProcessingError(reason instanceof Error ? reason.message : t.errorGeneric, locale));
+    }
+  };
+
+  const insertBlank = () => withBusy(async () => {
+    if (!pages.length || selectedCount > 1) return;
+    if (pages.length + 1 > LIMITS.maxPages) throw new Error(interpolate(t.errorPages, { n: LIMITS.maxPages }));
+    const afterIndex = selectedCount === 1
+      ? pages.findIndex(page => selected.has(page.id)) : pages.length - 1;
+    const reference = pages[afterIndex];
+    const source = sourceLookup.get(reference.sourceId);
+    const blank = await createBlankPageSource(source, reference,
+      locale === 'zh' ? '空白页.pdf' : 'Blank page.pdf');
+    if (bytesInMemory + blank.inputSize > LIMITS.maxCombinedBytes) throw new Error(t.errorCombined);
+    const newRef = { id: temporaryWorkspaceId(), sourceId: blank.id, pageIndex: 0, rotation: 0 };
+    setSources(previous => [...previous, blank]);
+    setHistory(previous => commitHistory(previous, insertPageAfter(previous.present, afterIndex, newRef)));
+    resetSelection();
+    setNotice(t.blankInserted);
+  });
 
   const applyImageLayout = () => withBusy(async () => {
     const updated = await reflowImageSources(sources, imageLayout);
@@ -512,9 +540,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     <button type="button" disabled={!selectedCount || busy} onClick={() => commit((previous) => rotatePages(previous, selected, -90), true)} aria-label={t.rotateLeft}>↶ {t.rotateLeft}</button>
                     <button type="button" disabled={!selectedCount || busy} onClick={() => commit((previous) => rotatePages(previous, selected, 90), true)} aria-label={locale === 'en' ? 'Rotate clockwise' : t.rotateRight}>↷ {t.rotateRight}</button>
                     <button type="button" disabled={!selectedCount || busy || imageLayoutDirty} onClick={exportSelected} aria-label={locale === 'en' ? 'Extract selected pages' : t.extract}>↗ {t.extract}</button>
+                    <button type="button" data-testid="duplicate-pages" disabled={!selectedCount || busy} onClick={duplicateSelected} aria-label={t.duplicateSelected}>⧉ {t.duplicateSelected}</button>
+                    <button type="button" data-testid="insert-blank-page" disabled={busy || selectedCount > 1} onClick={insertBlank} title={t.blankHint} aria-label={t.insertBlank}>＋ {t.insertBlank}</button>
                     <button type="button" disabled={!selectedCount || busy} className="muted-danger" onClick={() => commit((previous) => deletePages(previous, selected))} aria-label={locale === 'en' ? 'Delete selected pages' : t.del}>× {t.del}</button>
                   </div>
                 </div>
+                <p className="input-note" data-testid="blank-position-hint">{t.blankHint}</p>
                 {onlyImages && <div className="page-action-buttons" data-testid="image-batch-actions"><button type="button" disabled={busy} onClick={() => commit(previous => sortPagesByFilename(previous, sources, locale))}>{t.sortFilename}</button><button type="button" disabled={busy} onClick={() => commit(reversePages)}>{t.reverseOrder}</button></div>}
                 <div className="page-grid" data-testid="page-grid">
                   {pages.map((pageRef, index) => {

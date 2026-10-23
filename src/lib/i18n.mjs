@@ -55,10 +55,10 @@ export const siteCopy = {
 };
 
 export const chineseTools = {
-  workspace: { title: 'PDF 工作台', short: '一个地方，整理全部页面', headline: '自由整理每一页 PDF。', description: '把多个 PDF 或图片组合起来，拖拽排序、旋转、删除、提取并导出。所有操作在浏览器本地完成。', details: '添加文件后即可看到全部页面缩略图。按您指定的顺序编辑，再导出新的 PDF。', steps: ['添加 PDF 或图片', '按需调整页面顺序', '导出 PDF'] },
+  workspace: { title: 'PDF 工作台', short: '一个地方，整理全部页面', headline: '自由整理每一页 PDF。', description: '在浏览器本地整理 PDF：拖拽排序、旋转、复制页面、插入空白页、删除或提取，不上传原始文件。', details: '添加 PDF 或图片后预览全部页面；可复制选中页，或按相邻纸张大小插入空白页，再下载新的 PDF。', steps: ['添加 PDF 或图片', '按需调整页面顺序', '导出 PDF'] },
   'merge-pdf': { title: '合并 PDF', short: '多个文件，合并成一个', headline: '按您指定的顺序合并 PDF。', description: '合并多个 PDF，导出前可预览、逐页调整顺序。不必上传文件到服务器。', details: '不仅能调整文件顺序，还能混排不同文件中的页面，旋转扫描件并删除不需要的页面。', steps: ['添加多个 PDF', '调整页面顺序', '导出合并后的 PDF'] },
   'split-pdf': { title: '拆分 PDF', short: '按范围或固定页数拆分', headline: '将 PDF 拆分成需要的部分。', description: '按页码范围或每 N 页拆分 PDF，将结果打包成 ZIP 下载。文件在本地处理。', details: '输入 1-3, 4-6 等范围，每个范围独立输出；也可以按固定页数自动拆分。', steps: ['添加 PDF', '输入拆分范围或每份页数', '下载 ZIP'] },
-  'organize-pdf': { title: '整理 PDF 页面', short: '缩略图拖拽排序', headline: '让每一页出现在正确位置。', description: '通过缩略图和移动按钮调整 PDF 页面顺序，支持撤销和重做。', details: '跨文件调整页面顺序，旋转、删除页面。也可通过键盘可操作的按钮移动页面。', steps: ['添加文件', '预览并排序', '导出 PDF'] },
+  'organize-pdf': { title: '整理 PDF 页面', short: '缩略图拖拽排序', headline: '让每一页出现在正确位置。', description: '可视化排序、复制 PDF 页面、插入空白页，还能旋转与删除。支持撤销、重做和本地导出。', details: '跨文件调整页面顺序，复制选中页或插入与相邻页面等尺寸的空白页。支持键盘操作，不上传文档。', steps: ['添加文件', '预览并排序', '导出 PDF'] },
   'rotate-pdf': { title: '旋转 PDF 页面', short: '修正方向不对的扫描页', headline: '轻松调整歪倒的页面。', description: '选中一页或多页，以 90° 为单位旋转，再导出新的 PDF。', details: '选中方向不正确的页面，向左或向右旋转。原始文件不会被修改。', steps: ['添加 PDF', '选择并旋转页面', '导出 PDF'] },
   'extract-pages': { title: '提取 PDF 页面', short: '只保留需要的页面', headline: '把选中的页面单独保存。', description: '从一个或多个 PDF 中勾选页面，按照工作台当前顺序提取成新 PDF。', details: '适合从报告、合同和附件中快速提取需要的几页。', steps: ['添加 PDF', '选择需要的页面', '导出所选页面'] },
   'delete-pages': { title: '删除 PDF 页面', short: '去除不需要的页面', headline: '去掉不需要的 PDF 页面。', description: '预览并批量删除页面，支持撤销操作。不会修改原始 PDF。', details: '勾选一个或多个页面、删除、核对结果，再下载整理好的文档。', steps: ['添加 PDF', '选择并删除页面', '导出 PDF'] },
@@ -84,7 +84,7 @@ export const workspaceCopy = {
     dropTitle: 'Drop PDF files or images here', dropSub: 'Or choose files from your device', choose: 'Choose PDF or images', opening: 'Opening files…',
     limits: 'PDF, JPG, PNG, WebP · Up to 20 files · 100 MB each · 600 pages total', private: 'Your files stay on this device.', reset: 'Clear workspace and start over',
     page: 'page', pages: 'pages', file: 'file', files: 'files', from: 'from', selected: 'selected', undo: 'Undo', redo: 'Redo', clear: 'Clear', clearConfirmTitle: 'Clear the PDF workspace?', clearConfirmDescription: 'This permanently removes all loaded files, page edits and undo history. Continue?', cancelClear: 'Keep editing', confirmClear: 'Clear everything',
-    all: 'Select all', none: 'Deselect', rotateLeft: 'Rotate left', rotateRight: 'Rotate right', extract: 'Extract', del: 'Delete',
+    all: 'Select all', none: 'Deselect', rotateLeft: 'Rotate left', rotateRight: 'Rotate right', extract: 'Extract', del: 'Delete', duplicateSelected: 'Duplicate selected', duplicated: 'Duplicated {pages} selected page(s) after the originals.', insertBlank: 'Insert blank page', blankInserted: 'Added a blank page using the neighboring page size.', blankHint: 'One page selected: insert after it. None: append at the end. Select at most one page.',
     dragHint: 'Drag thumbnails to reorder. To move several pages, select them first and drag one of the selected pages. Shift-click selects a range. On touch screens or with a keyboard, use the move buttons.',
     addMore: 'Add more files', pageName: 'Page', document: 'Document', previewFail: 'Preview unavailable', selectPage: 'Select page', moveLeft: 'Move page {n} left', moveRight: 'Move page {n} right', dragTitle: 'Drag to reorder',
     splitTitle: 'Choose how to split', splitHint: 'Specify the pages you want in each result; we will not choose a split point for you. Pages follow the current workspace order. Up to 50 output PDFs.',
@@ -109,7 +109,7 @@ export const workspaceCopy = {
     dropTitle: '将 PDF 或图片拖入此处', dropSub: '也可以从您的设备中选择文件', choose: '选择 PDF 或图片', opening: '正在读取…',
     limits: 'PDF、JPG、PNG、WebP · 最多 20 个文件 · 单文件 100 MB · 共 600 页', private: '文件始终留在您的设备上。', reset: '清空工作台，重新开始',
     page: '页', pages: '页', file: '个文件', files: '个文件', from: '来自', selected: '页已选中', undo: '撤销', redo: '重做', clear: '清空', clearConfirmTitle: '确定清空 PDF 工作台？', clearConfirmDescription: '这会永久清除所有已加载文件、页面编辑及撤销历史。是否继续？', cancelClear: '继续编辑', confirmClear: '确认全部清空',
-    all: '全选', none: '取消选择', rotateLeft: '向左旋转', rotateRight: '向右旋转', extract: '提取页面', del: '删除页面',
+    all: '全选', none: '取消选择', rotateLeft: '向左旋转', rotateRight: '向右旋转', extract: '提取页面', del: '删除页面', duplicateSelected: '复制选中页', duplicated: '已在原位置后复制 {pages} 页。', insertBlank: '插入空白页', blankInserted: '已按相邻页面尺寸插入空白页。', blankHint: '选择一页时插入在其后；未选中时追加到末尾。插入前最多选中一页。',
     dragHint: '拖拽缩略图可调整顺序。先多选再拖动选中页面，可成组移动；按住 Shift 点击可选择连续页面。触屏或键盘操作可用每页下方的左右按钮。',
     addMore: '继续添加文件', pageName: '第', document: '文档', previewFail: '无法预览', selectPage: '选择第', moveLeft: '向左移动第 {n} 页', moveRight: '向右移动第 {n} 页', dragTitle: '拖动可调整顺序',
     splitTitle: '选择拆分方式', splitHint: '请自己指定拆分范围或每份页数；我们不会替您选择拆分点。页码按当前工作台顺序计算，每个 ZIP 最多包含 50 个 PDF。',

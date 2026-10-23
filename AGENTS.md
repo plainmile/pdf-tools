@@ -7,7 +7,8 @@
 - Deploy via a Docker-built static site served by Nginx. No host-installed Node/npm. Keep the shared `edge` Docker network and preserve existing website routing.
 - The PDF.js Worker has an unversioned public path; keep it revalidated (`Cache-Control: no-cache`) on every deployment, while preserving asset caching for hashed JS chunks. CI must check MIME type and cache headers to prevent client/Worker version mismatch.
 - Use feature branches + PRs + CI. Never bypass main protection or merge while unit/build/E2E tests are failing.
-- Verify actual exported PDF pages using pdf-lib in E2E after drag, rotation, deletion, selection and splitting. UI-only success indicators are insufficient.
+- Verify actual exported PDF pages using pdf-lib in E2E after drag, rotation, deletion, selection and splitting.
+- Duplicate selected pages adjacent to their originals, with distinct new page IDs and preserved rotation/source references. Blank insertions must match a chosen page's visible dimensions and honor the 600-page/200MiB limits. Generated blanks must not consume the 20 actual imported-file slots. Both actions must be Undo/Redo safe and E2E must inspect real PDF output and ordering. UI-only success indicators are insufficient.
 - All indexable public pages must have unique localized titles/descriptions, canonical URLs, reciprocal hreflang `en`/`zh-CN`, meaningful prerendered content, internal links and inclusion in sitemap. The 404 page must return status 404 and be excluded from indexing.
 - Keep limits on document count, file size, total pages and image pixel count. Passworded, malformed PDFs and browser resource exhaustion must fail safely with user-friendly messages.
 - Never claim a document is securely redacted or digitally signed if it is only visually overlaid.

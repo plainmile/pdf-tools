@@ -921,3 +921,71 @@ test('mobile Chinese clear confirmation preserves document when cancelled', asyn
   const pdf = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
   expect(pdf.getPage(0).getWidth()).toBe(301);
 });
+
+test('duplicate nonadjacent selected pages and preserve exact exported order and Undo/Redo', async ({ page }) => {
+  await loadInput(page);
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  await page.getByRole('checkbox', { name: 'Select page 3' }).check();
+  await page.getByTestId('duplicate-pages').click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(5);
+  const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(output.getPages().map(p => p.getWidth())).toEqual([300, 300, 310, 320, 320]);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Redo' }).click();
+  const redone = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(redone.getPages().map(p => p.getWidth())).toEqual([300, 300, 310, 320, 320]);
+});
+
+test('insert blank after a rotated page matching its visible dimensions, without copying content', async ({ page }) => {
+  await loadInput(page);
+  await page.getByRole('checkbox', { name: 'Select page 2' }).check();
+  await page.getByRole('button', { name: 'Rotate clockwise' }).click();
+  await page.getByTestId('insert-blank-page').click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(4);
+  await expect(page.locator('.file-count')).toContainText('2 files');
+  const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(output.getPages().map(p => p.getWidth())).toEqual([300, 310, 420, 320]);
+  expect(output.getPages().map(p => p.getRotation().angle)).toEqual([0, 90, 0, 0]);
+  expect(output.getPage(2).getHeight()).toBe(310);
+  expect(output.getPage(2).getRotation().angle).toBe(0);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(4);
+});
+
+test('no selection appends blank page; Chinese mobile disables ambiguous multi-selection insert', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'sample.pdf', mimeType: 'application/pdf', buffer: await makePdf([300, 320]),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await page.getByTestId('insert-blank-page').click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(3);
+  const pdf = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
+  expect(pdf.getPages().map(p => p.getWidth())).toEqual([300, 320, 320]);
+  await page.getByRole('checkbox', { name: '选择第 1 页' }).check();
+  await page.getByRole('checkbox', { name: '选择第 2 页' }).check();
+  await expect(page.getByTestId('insert-blank-page')).toBeDisabled();
+  await expect(page.getByTestId('duplicate-pages')).toBeEnabled();
+  await expect(page.getByTestId('blank-position-hint')).toContainText('最多选中一页');
+});
+
+test('duplicating at the 600-page workspace boundary fails safely and preserves document', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'synthetic-600-pages.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf(Array.from({ length: 600 }, () => 300)),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(600, { timeout: 20000 });
+  await page.getByRole('checkbox', { name: 'Select page 1', exact: true }).check();
+  await page.getByTestId('duplicate-pages').click();
+  await expect(page.getByRole('alert')).toContainText('600 pages');
+  await expect(page.getByTestId('page-tile')).toHaveCount(600);
+  await page.getByTestId('insert-blank-page').click();
+  await expect(page.getByRole('alert')).toContainText('600 pages');
+  await expect(page.getByTestId('page-tile')).toHaveCount(600);
+});

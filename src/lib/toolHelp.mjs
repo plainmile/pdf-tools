@@ -5,6 +5,7 @@ export const toolHelp = {
     workspace: [
       ['Can I open a book with hundreds of pages?', 'Yes. The visual workspace accepts up to 600 pages and 200 MiB across files. Thumbnails load as you scroll. Large documents still need substantial device memory.'],
       ['Does the workspace change my original files?', 'No. Rotate, delete and reorder your copies in the browser, then download a new PDF. Your source documents stay untouched.'],
+      ['Can I duplicate pages or add a blank separator?', 'Yes. Select pages and choose Duplicate selected to copy each right after its original. Insert blank page after one selected page, or at the end when none is selected. Each blank matches the adjacent page size.'],
     ],
     'merge-pdf': [
       ['Can I interleave pages from different PDFs?', 'Yes. Add your PDFs, then drag individual pages between documents before exporting a single PDF.'],
@@ -17,6 +18,7 @@ export const toolHelp = {
     'organize-pdf': [
       ['How do I move several pages together?', 'Select pages using their checkboxes, then drag the selection to its new position. Keyboard-accessible move controls are also provided.'],
       ['Can I undo an accidental move?', 'Yes. Undo and redo are available before export. Reloading the page clears the current editing session.'],
+      ['Where will duplicate or blank pages go?', 'Selected pages are duplicated immediately after each original. A blank page is inserted after one selected page; with nothing selected, it is appended at the end. The 600-page workspace limit still applies.'],
     ],
     'rotate-pdf': [
       ['Can I rotate only the pages scanned sideways?', 'Yes. Select the affected pages, rotate them by 90 degrees, and export a corrected PDF. Other pages retain their original orientation.'],
@@ -73,6 +75,7 @@ export const toolHelp = {
     workspace: [
       ['能处理几百页的书吗？', '可以。可视化工作台最多支持 600 页、文件总计 200 MiB。缩略图随滚动按需加载，但大文档仍会占用较多设备内存。'],
       ['会修改原始 PDF 吗？', '不会。旋转、删除和调整顺序只影响浏览器中的工作副本；导出时会生成新的 PDF。'],
+      ['能复制选中的页面或插入空白分隔页吗？', '可以。复制的页面紧跟原页面，插入空白页时，选择一页则插在其后，不选择则追加到末尾；空白页使用相邻页的尺寸。'],
     ],
     'merge-pdf': [
       ['可以将不同 PDF 中的页面交叉合并吗？', '可以。先添加多个 PDF，再拖动每一页到需要的位置，最后导出一个 PDF。'],
@@ -85,6 +88,7 @@ export const toolHelp = {
     'organize-pdf': [
       ['如何一次移动多页？', '通过复选框选择多页，再拖动整组页面。也支持使用移动按钮调整顺序。'],
       ['移动错了可以撤销吗？', '可以。导出前可以撤销和重做。刷新页面则会清空当前编辑会话。'],
+      ['复制页和空白页会放在哪里？', '复制的每一页紧跟在其原页面之后。空白页插在唯一选中页面之后；若没有选中页，则放在文档最后。复制或插入后仍不能超过 600 页。'],
     ],
     'rotate-pdf': [
       ['可以只旋转部分倒置的扫描页吗？', '可以。选择需要修正的页面，以 90° 为单位旋转，其他页面不变。'],

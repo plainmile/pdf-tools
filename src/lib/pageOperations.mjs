@@ -63,6 +63,32 @@ export function sortPagesByFilename(pages, sources, locale = 'en') {
     .map(({ page }) => page);
 }
 
+/** Duplicate selected pages immediately AFTER their originals in current order.
+ * Copies receive fresh page IDs but point to the same underlying source page;
+ * the source bytes and rotation stay unchanged, and Undo restores original order.
+ */
+export function duplicatePages(pages, ids, createId, maxPages = 600) {
+  const selected = new Set(ids);
+  const count = pages.reduce((n, page) => n + (selected.has(page.id) ? 1 : 0), 0);
+  if (!count) return pages;
+  if (!Number.isSafeInteger(maxPages) || maxPages < 1 || pages.length + count > maxPages) {
+    throw new Error(`At most ${maxPages} pages can be added.`);
+  }
+  if (typeof createId !== 'function') throw new Error('A page ID generator is required.');
+  return pages.flatMap(page => selected.has(page.id)
+    ? [page, { ...page, id: createId() }] : [page]);
+}
+
+/** Put a new page after one existing page (or after the last page).
+ * The caller owns construction of the source PDF and the fresh page ID.
+ */
+export function insertPageAfter(pages, afterIndex, page) {
+  if (!Number.isSafeInteger(afterIndex) || afterIndex < -1 || afterIndex >= pages.length || !page?.id) {
+    throw new Error('Invalid blank page insertion position.');
+  }
+  return [...pages.slice(0, afterIndex + 1), page, ...pages.slice(afterIndex + 1)];
+}
+
 export function rotatePages(pages, ids, degrees) {
   const selected = new Set(ids);
   return pages.map((page) => selected.has(page.id)

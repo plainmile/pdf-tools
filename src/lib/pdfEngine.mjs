@@ -157,6 +157,39 @@ export async function readSourceFile(file, options = {}) {
   };
 }
 
+/**
+ * Create a truly blank, browser-local PDF page sized to match the visible
+ * selected page (including its current rotation). Never modify the source PDF.
+ * Generated blank pages are not user input files and do not count against the
+ * 20 imported-file limit; they still count toward the 600-page/memory budgets.
+ */
+export async function createBlankPageSource(source, pageRef, name = 'blank-page.pdf') {
+  if (!source?.bytes || !pageRef || !Number.isSafeInteger(pageRef.pageIndex)) {
+    throw new Error('Choose a valid page before inserting a blank page.');
+  }
+  const original = await PDFDocument.load(source.bytes, { updateMetadata: false });
+  if (pageRef.pageIndex < 0 || pageRef.pageIndex >= original.getPageCount()) {
+    throw new Error('The chosen page no longer exists.');
+  }
+  const reference = original.getPage(pageRef.pageIndex);
+  const crop = reference.getCropBox();
+  let { width, height } = crop;
+  const angle = (((reference.getRotation().angle + (pageRef.rotation || 0)) % 360) + 360) % 360;
+  if (angle === 90 || angle === 270) [width, height] = [height, width];
+  if (![width, height].every(value => Number.isFinite(value) && value > 0 && value <= 14_400)) {
+    throw new Error('The selected page size cannot be used for a blank page.');
+  }
+
+  const blank = await PDFDocument.create({ updateMetadata: false });
+  blank.addPage([width, height]);
+  const bytes = new Uint8Array(await blank.save({ useObjectStreams: true }));
+  return {
+    id: temporaryWorkspaceId(), name, bytes, pageCount: 1,
+    inputSize: bytes.length, isImage: false, isGeneratedBlank: true,
+    imageLayout: null, originalImageBytes: null, originalImageType: null,
+  };
+}
+
 export async function reflowImageSources(sources, layout, report = () => {}) {
   const updated = [];
   for (let index = 0; index < sources.length; index++) {

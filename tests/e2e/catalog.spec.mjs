@@ -145,3 +145,21 @@ test('375px mobile tool pages retain visible, keyboard-usable top navigation', a
   await nav.getByRole('link', { name: '拆分 PDF' }).click();
   await expect(page).toHaveURL(/\/zh\/split-pdf\/$/);
 });
+
+test('organize PDF page copy/blank help remains indexable in both languages without JavaScript', async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  try {
+    await page.goto('/organize-pdf/');
+    await expect(page.locator('main')).toContainText('duplicate');
+    await expect(page.locator('main')).toContainText('blank PDF pages');
+    await expect(page.locator('.tool-faq')).toContainText('600-page workspace limit');
+
+    await page.goto('/zh/organize-pdf/');
+    await expect(page.locator('main')).toContainText('复制 PDF 页面');
+    await expect(page.locator('main')).toContainText('插入空白页');
+    await expect(page.locator('.tool-faq')).toContainText('600 页');
+  } finally {
+    await context.close();
+  }
+});
