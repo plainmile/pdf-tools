@@ -163,9 +163,24 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   }
   function requestFile(file) {
     if (!file || operationRef.current || pendingReplacementRef.current) return;
+    // An obviously unsupported/empty/oversized input must be rejected right
+    // away, WITHOUT asking the user to abandon a valuable unsaved result.
+    // PDF content corruption is checked by the existing parser after consent.
+    const validType = isTextInput ? /\.(?:txt|md|markdown)$/i.test(file.name)
+      : /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
+    const maximum = isTextInput ? UTILITY_LIMITS.maxTextBytes : UTILITY_LIMITS.maxPdfBytes;
+    if (!validType || !file.size || file.size > maximum) {
+      const message = !validType
+        ? isTextInput ? t.invalidFile : locale === 'zh' ? '请选择 PDF 文件。' : 'Choose a PDF file.'
+        : isTextInput ? t.invalidFile : locale === 'zh'
+          ? 'PDF 文件大小须在 1 字节至 100 MB 之间。' : 'PDF must be between 1 byte and 100 MB.';
+      const existing = pdf?.name || textFileName;
+      setError(message + (existing ? ' ' + t.replacedFailed.replace('{name}', existing) : ''));
+      return;
+    }
     if (hasUnsavedUtilityWork) {
       pendingReplacementRef.current = file;
-      setPendingReplacementName(file.name);
+      setPendingReplacementName(file.name || t.file);
       setDragging(false);
       setClearConfirm(false);
       return;
