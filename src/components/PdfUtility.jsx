@@ -7,7 +7,7 @@ import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 const COPY = {
   en: {
     label: 'Browser-local processing', file: 'Choose a PDF', textFile: 'Import TXT / Markdown', uploaded: 'Loaded', pages: 'pages', choose: 'Choose file', start: 'Process file', run: 'Convert and download', busy: 'Working on your device…',
-    privacy: 'No files are uploaded. Processing may use significant device memory on large documents.', clear: 'Clear',
+    privacy: 'No files are uploaded. Processing may use significant device memory on large documents.', clear: 'Clear', clearConfirmTitle: 'Discard unsaved conversion?', clearConfirmHint: 'The generated PDF preview or edited text has not been safely saved. Clearing now will remove it from this browser.', clearKeep: 'Keep my work', clearConfirm: 'Discard and clear',
     pageRange: 'Pages (blank selects all if ≤60)', rangeHint: 'Example: 301-360. Long PDFs start with pages 1-60; use Next pages for later batches.', imageType: 'Image format', quality: 'Render resolution',
     low: 'Smaller (72 DPI)', medium: 'Balanced (108 DPI)', high: 'Sharper (144 DPI)',
     download: 'Download result', compressionMethod: 'Compression level', compressionLow: 'Smaller size (lossier)', compressionMid: 'Balanced', compressionHigh: 'Clearer (larger)',
@@ -30,7 +30,7 @@ const COPY = {
   },
   zh: {
     label: '仅在浏览器本地处理', file: '选择 PDF 文件', textFile: '导入 TXT / Markdown', uploaded: '已读取', pages: '页', choose: '选择文件', start: '开始处理', run: '转换并下载', busy: '正在本机处理…',
-    privacy: '文件不上传服务器。大文件可能消耗较多设备内存。', clear: '清空',
+    privacy: '文件不上传服务器。大文件可能消耗较多设备内存。', clear: '清空', clearConfirmTitle: '确定丢弃未保存的转换结果？', clearConfirmHint: '当前生成的 PDF 预览或编辑后的文字尚未妥善保存。清空将从浏览器删除这些内容。', clearKeep: '继续编辑', clearConfirm: '丢弃并清空',
     pageRange: '选择页码（总页数不超过 60 时可留空）', rangeHint: '例如 301-360。长 PDF 默认选前 60 页，可用“下一批”继续。', imageType: '图片格式', quality: '渲染清晰度',
     low: '更小（72 DPI）', medium: '平衡（108 DPI）', high: '高清（144 DPI）',
     download: '下载结果', compressionMethod: '压缩强度', compressionLow: '更小体积（画质较低）', compressionMid: '平衡', compressionHigh: '画质较清晰（体积较大）',
@@ -137,9 +137,25 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const [dragging, setDragging] = useState(false);
   const [textFileName, setTextFileName] = useState('');
   const [batchIndex, setBatchIndex] = useState(0);
+  const [clearConfirm, setClearConfirm] = useState(false);
+  // A preview awaiting download, or text edited/typed only in this tab, must
+  // not be discarded via an unconfirmed Clear click.
+  const hasUnsavedUtilityWork = Boolean((output?.bytes && notDownloaded) ||
+    (isTextInput && sourceText.trim() && (!textFileName || textEdited)));
 
-  function clearOutput() { setOutput(null); setNotice(''); setError(''); setPreview(''); setExtractionWarning(''); setProgress(null); setShowCompressionPreview(false); setNotDownloaded(true); }
-  function reset() { if (operationRef.current) return; setPdf(null); setSourceText(''); setPages(''); setTextFileName(''); setTextEdited(false); setBatchIndex(0); clearOutput(); setNotDownloaded(false); }
+
+  function clearOutput() { setClearConfirm(false); setOutput(null); setNotice(''); setError(''); setPreview(''); setExtractionWarning(''); setProgress(null); setShowCompressionPreview(false); setNotDownloaded(true); }
+  function clearSession() {
+    if (operationRef.current) return;
+    setPdf(null); setSourceText(''); setPages(''); setTextFileName('');
+    setTextEdited(false); setBatchIndex(0);
+    clearOutput(); setNotDownloaded(false);
+  }
+  function reset() {
+    if (operationRef.current) return;
+    if (hasUnsavedUtilityWork) { setClearConfirm(true); return; }
+    clearSession();
+  }
   async function acceptFile(file) {
     if (!file || operationRef.current) return;
     // Reserve synchronously before awaiting PDF parsing or File.text().
@@ -302,8 +318,21 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         </div>
         {isTextInput && textFileName && <div className="utility-file-summary" data-testid="text-file-summary"><strong>{t.imported}: {textFileName}{textEdited ? ` · ${t.modified}` : ''}</strong><button type="button" disabled={busy} onClick={reset}>{t.clear}</button></div>}
         {pdf && <div className="utility-file-summary" data-testid="utility-file-summary"><strong>{pdf.name}</strong><span>{formatBytes(pdf.size)} · {pdf.count} {t.pages}</span><button type="button" onClick={reset} disabled={busy}>{t.clear}</button></div>}
+        {clearConfirm && !busy && <div className="workspace-clear-confirm" role="group"
+          aria-label={t.clearConfirmTitle} data-testid="utility-clear-confirm">
+          <p>{t.clearConfirmHint}</p>
+          <div className="workspace-clear-buttons">
+            <button type="button" className="button button-secondary button-small"
+              data-testid="utility-clear-keep" onClick={() => setClearConfirm(false)}>{t.clearKeep}</button>
+            <button type="button" className="button button-secondary button-small muted-danger"
+              data-testid="utility-clear-confirm-button" onClick={clearSession}>{t.clearConfirm}</button>
+          </div>
+        </div>}
         {pdf && (pdf.count >= 250 || pdf.size >= 75 * 1024 * 1024) && <p className="utility-note" data-testid="large-document-note">{t.heavyWarning}</p>}
         {isTextInput && <label className="utility-text-input"><span className="utility-field-label">{t.textLabel}</span><textarea data-testid="utility-text" rows={10} maxLength={UTILITY_LIMITS.maxTextBytes} placeholder={t.textPlaceholder} value={sourceText} onChange={e => { setSourceText(e.target.value); setTextEdited(Boolean(textFileName)); clearOutput(); }} disabled={busy} /></label>}
+        {isTextInput && !textFileName && sourceText.trim() && <button type="button"
+          className="button button-secondary button-small" data-testid="utility-text-clear"
+          disabled={busy} onClick={reset}>{t.clear}</button>}
         {mode === 'pdf-to-images' && <div className="utility-options">
           <label><span>{t.imageType}</span><select aria-label={t.imageType} value={format} disabled={busy} onChange={e => { setFormat(e.target.value); clearOutput(); }}><option value="jpg">JPG</option><option value="png">PNG</option></select></label>
           <label><span>{t.quality}</span><select aria-label={t.quality} value={scale} disabled={busy} onChange={e => { setScale(e.target.value); clearOutput(); }}><option value="1">{t.low}</option><option value="1.5">{t.medium}</option><option value="2">{t.high}</option></select></label>
