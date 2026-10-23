@@ -1378,7 +1378,7 @@ test('real chapter-bookmark PDF warns that exports lose the original outline nav
 
   // Warning is tied to the active source pages, not stale Undo-only data.
   await page.getByRole('button', { name: 'Select all' }).click();
-  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete selected pages' }).click();
   await expect(page.getByTestId('workspace-bookmark-risk')).toHaveCount(0);
   await page.getByTestId('undo-all-deleted').click();
   await expect(page.getByTestId('workspace-bookmark-risk')).toContainText('Document bookmarks');
