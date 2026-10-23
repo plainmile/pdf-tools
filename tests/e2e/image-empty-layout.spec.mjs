@@ -50,6 +50,10 @@ test('empty image workspace can switch paper and reimport without stale undo blo
   await page.getByTestId('file-input').setInputFiles({
     name: 'new.png', mimeType: 'image/png', buffer: await picture(page, 160, 90),
   });
+  // A VALID replacement is no longer allowed to destroy Undo implicitly.
+  await expect(page.getByTestId('reimport-confirmation')).toContainText('permanently discard');
+  await expect(page.getByTestId('undo-all-deleted')).toBeDisabled();
+  await page.getByTestId('confirm-reimport').click();
   await expect(page.getByTestId('page-tile')).toHaveCount(1);
   await expect(page.getByTestId('image-layout-dirty')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
