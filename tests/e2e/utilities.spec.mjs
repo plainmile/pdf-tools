@@ -586,7 +586,7 @@ test('Chinese compression honestly calls larger raster PDFs an increase, never a
 });
 
 
-test('text conversion previews PDF before download, clears stale preview on edits', async ({ page }) => {
+test('text conversion retains old PDF for download after edits and only replaces it on successful regeneration', async ({ page }) => {
   await page.goto('/txt-to-pdf/');
   const downloads = [];
   page.on('download', d => downloads.push(d.suggestedFilename()));
@@ -596,12 +596,32 @@ test('text conversion previews PDF before download, clears stale preview on edit
   await expect.poll(() => page.getByTestId('utility-pdf-preview').locator('canvas')
     .evaluate(canvas => canvas.width)).toBeGreaterThan(0);
   expect(downloads).toEqual([]);
-  await page.getByTestId('utility-text').fill('Second version');
-  await expect(page.getByTestId('text-pdf-result')).toHaveCount(0);
-  const updated = await generateTextPdfAndDownload(page);
+
+  await page.getByTestId('utility-text').fill('Second version with new edits');
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible();
+  await expect(page.getByTestId('text-result-stale')).toContainText('previous text');
+  const previous = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
+  expect((await PDFDocument.load(previous.bytes)).getPageCount()).toBe(1);
+
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('text-result-stale')).toHaveCount(0);
+  const updated = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
   expect(updated.name).toBe('plainmile-text-plain.pdf');
-  const generated = await PDFDocument.load(updated.bytes);
-  expect(generated.getPageCount()).toBe(1);
+  expect((await PDFDocument.load(updated.bytes)).getPageCount()).toBe(1);
+  expect(Buffer.compare(previous.bytes, updated.bytes)).not.toBe(0);
+
+  // Verify the actual saved bytes rather than only checking a browser label.
+  for (const [pdfBytes, expected, excluded] of [
+    [previous.bytes, 'First version for preview', 'Second version'],
+    [updated.bytes, 'Second version with new edits', 'First version'],
+  ]) {
+    await page.goto('/pdf-to-txt/');
+    await upload(page, pdfBytes);
+    const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
+    const body = extracted.bytes.toString('utf8');
+    expect(body).toContain(expected);
+    expect(body).not.toContain(excluded);
+  }
 });
 
 test('imported TXT filenames are retained; Chinese text PDF offers preview and explicit download', async ({ page }) => {
@@ -614,18 +634,46 @@ test('imported TXT filenames are retained; Chinese text PDF offers preview and e
   await expect(page.getByTestId('utility-pdf-preview')).toContainText('第 1 页预览');
 });
 
-test('changing Markdown after rendering invalidates the old PDF and download', async ({ page }) => {
+test('Markdown edits keep the previous PDF, and regenerated PDF contains only the updated text', async ({ page }) => {
   await page.goto('/markdown-to-pdf/');
   await page.getByTestId('utility-text').fill('# Original document');
   await page.getByTestId('utility-run').click();
   await expect(page.getByTestId('utility-pdf-download')).toBeVisible();
   await page.getByTestId('utility-text').fill('# Changed document');
-  await expect(page.getByTestId('utility-pdf-download')).toHaveCount(0);
-  const result = await generateTextPdfAndDownload(page);
+  await expect(page.getByTestId('text-result-stale')).toContainText('previous text');
+  const old = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
+  expect((await PDFDocument.load(old.bytes)).getPageCount()).toBe(1);
+
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('text-result-stale')).toHaveCount(0);
+  const result = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
   await page.goto('/pdf-to-txt/');
   await upload(page, result.bytes);
   const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
   expect(extracted.bytes.toString('utf8')).toContain('Changed document');
+  expect(extracted.bytes.toString('utf8')).not.toContain('Original document');
+});
+
+test('Chinese mobile text editing warns about stale generated PDF without losing its download', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/txt-to-pdf/');
+  await page.getByTestId('utility-text').fill('Chinese-route original PDF');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible();
+  await page.getByTestId('utility-text').fill('Chinese-route newer draft');
+  await expect(page.getByTestId('text-result-stale')).toContainText('修改前的文字');
+  const old = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
+  expect((await PDFDocument.load(old.bytes)).getPageCount()).toBe(1);
+  const size = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    client: document.documentElement.clientWidth,
+  }));
+  expect(size.scroll).toBeLessThanOrEqual(size.client + 2);
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('text-result-stale')).toHaveCount(0);
+  const newer = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
+  expect((await PDFDocument.load(newer.bytes)).getPageCount()).toBe(1);
+  expect(Buffer.compare(old.bytes, newer.bytes)).not.toBe(0);
 });
 
 test('follow-up link is honest about file handoff and leads to the full tool catalog', async ({ page }) => {
