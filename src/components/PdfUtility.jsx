@@ -247,9 +247,10 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   }
   function save(outputFile) {
     saveDownload(outputFile.bytes, outputFile.name, outputFile.mime || 'application/pdf');
-    // Downloading an earlier PDF does not save the current text draft.
-    // Keep navigation and replacement protections until the current text is generated and downloaded.
-    setNotDownloaded(Boolean(isTextInput && outputFile.textRevision !== textRevision));
+    // Downloading an earlier PDF does not save new nonempty text edits.
+    // When the textarea is empty and the only retained PDF is downloaded,
+    // neither a new text draft nor undownloaded result remains to protect.
+    setNotDownloaded(Boolean(isTextInput && outputFile.textRevision !== textRevision && sourceText.trim()));
   }
   async function processFile() {
     if (operationRef.current || pendingReplacementRef.current) return;
@@ -343,7 +344,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const description = isCompress ? t.compressionWarning : isTextOutput ? `${t.textWarning} ${mode === 'pdf-to-markdown' ? t.markdownWarning : ''}` : isTextInput ? mode === 'markdown-to-pdf' ? t.markdownInputHint : t.textInputHint : mode === 'add-page-numbers' ? t.numbersHint : t.privacy;
   return (
     <section className="pdf-workspace pdf-utility" data-testid="pdf-utility">
-      <UnsavedNavigationGuard active={Boolean(notDownloaded && (pdf || textFileName || sourceText.trim()))} locale={locale} />
+      <UnsavedNavigationGuard active={Boolean(notDownloaded && (pdf || textFileName || sourceText.trim() || output?.bytes))} locale={locale} />
       <div className="workspace-bar"><div className="workspace-heading"><span className="workspace-app-icon" aria-hidden="true">▤</span><div><strong>{t.label}</strong><span>{t.privacy}</span></div></div></div>
       <div className="utility-main">
         <div className={`utility-dropzone${dragging ? ' is-dragging-over' : ''}`} data-testid="utility-dropzone"
