@@ -1149,6 +1149,8 @@ test('Chinese single-result split by pages per PDF is a direct full PDF export',
 
 test('two same-tick PDF drop batches cannot bypass 20-file workspace safety limit', async ({ page }) => {
   await page.goto('/workspace/');
+  // Astro hydrates the React island asynchronously after the HTML navigation.
+  await expect(page.getByTestId('dropzone')).toBeVisible();
   const pdfData = (await makePdf([307])).toString('base64');
   await page.evaluate(base64 => {
     const bytes = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
