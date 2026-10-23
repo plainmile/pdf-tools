@@ -265,8 +265,10 @@ main { flex: 1; }
 @media (max-width: 770px) {
   .site-container { width: min(100% - 32px, 620px); }
   .site-header, .nav-layout { min-height: 64px; }
-  .nav-layout { gap: 12px; }
-  .brand { font-size: 16px; } .primary-nav { display: none; } .nav-settings { margin-left: auto; gap: 8px; }
+  .nav-layout { gap: 8px 12px; flex-wrap: wrap; padding-block: 10px; }
+  .brand { font-size: 16px; } .primary-nav { display: flex; order: 3; flex: 0 0 100%; min-width: 0; margin-left: 0; gap: 21px; overflow-x: auto; overflow-y: hidden; padding: 5px 0 9px; scrollbar-width: thin; }
+  .primary-nav a { padding: 5px 0; }
+  .nav-settings { margin-left: auto; gap: 8px; }
   .hero { grid-template-columns: 1fr; padding: 53px 0 60px; gap: 33px; }
   .hero h1 { font-size: clamp(37px, 8vw, 52px); }
   .hero-lead { font-size: 14px; }
@@ -284,6 +286,11 @@ main { flex: 1; }
   .workspace-status { display: none; }
   .workspace-foot { flex-wrap: wrap; }
   .split-panel { padding: 19px; }
+}
+@media (max-width: 390px) {
+  .brand { font-size: 14px; }
+  .nav-settings { gap: 5px; }
+  .theme-switch select { max-width: 92px; }
 }
 @media (max-width: 440px) {
   .illustration-pages { gap: 5px; padding: 14px 8px 19px; }
