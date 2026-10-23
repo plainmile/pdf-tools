@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import JSZip from 'jszip';
-import { LIMITS, composePdf, isSupportedFile, readSourceFile, reflowImageSources, saveDownload } from '../lib/pdfEngine.mjs';
+import { LIMITS, composePdf, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId } from '../lib/pdfEngine.mjs';
 import { sanitizeFilename } from '../lib/utilityCore.mjs';
 import { IMAGE_PDF_LAYOUT_DEFAULT } from '../lib/imagePdfLayout.mjs';
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
@@ -207,7 +207,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         if (pages.length + nextPages.length + source.pageCount > LIMITS.maxPages) throw new Error(interpolate(t.errorPages, { n: LIMITS.maxPages }));
         nextSources.push(source);
         for (let pageIndex = 0; pageIndex < source.pageCount; pageIndex++) {
-          nextPages.push({ id: crypto.randomUUID(), sourceId: source.id, pageIndex, rotation: 0 });
+          nextPages.push({ id: temporaryWorkspaceId(), sourceId: source.id, pageIndex, rotation: 0 });
         }
       }
       if (!pages.length) {
