@@ -7,7 +7,7 @@ import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLay
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
-  movePage, movePageGroup, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, chunkPageRanges,
+  movePage, movePageGroup, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges,
   getRangePages, reversePages, sortPagesByFilename, groupPagesBySource, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
@@ -102,6 +102,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [sources, setSources] = useState([]);
   const [history, setHistory] = useState(() => makeHistoryState());
   const [selected, setSelected] = useState(() => new Set());
+  const [selectionRanges, setSelectionRanges] = useState('');
   const [busy, setBusy] = useState(false);
   const [clearConfirm, setClearConfirm] = useState(false);
   const [splitProgress, setSplitProgress] = useState(null);
@@ -268,6 +269,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         setHistory((previous) => commitHistory(previous, [...previous.present, ...nextPages]));
       }
       resetSelection();
+      setSelectionRanges('');
       setNotice(locale === 'en'
         ? `Added ${nextSources.length} ${nextSources.length === 1 ? 'file' : 'files'} and ${nextPages.length} ${nextPages.length === 1 ? 'page' : 'pages'}.`
         : interpolate(t.loaded, { files: nextSources.length, pages: nextPages.length }));
@@ -438,6 +440,24 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     }
   };
 
+  const applyPageRangeSelection = (event) => {
+    event.preventDefault();
+    if (busy || !pages.length) return;
+    try {
+      // Validate and compute the complete selection before replacing anything.
+      // This is the actual current export order, even in grouped source view.
+      const ids = pageIdsForRanges(pages, selectionRanges);
+      setSelected(ids);
+      lastSelectedIndex.current = null;
+      lastGroupedSelection.current = null;
+      setError('');
+      setNotice(interpolate(t.rangeSelected, { pages: ids.size }));
+    } catch (_reason) {
+      setNotice('');
+      setError(t.rangeSelectInvalid);
+    }
+  };
+
   const clearAll = () => {
     setClearConfirm(false);
     setWatermarkEnabled(false); setWatermarkText(''); setExportSettingsOpen(mode === 'watermark-pdf');
@@ -445,6 +465,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setPageView('order'); setCollapsedSources(new Set());
     setLastDownloadedRevision(null);
     setRanges(''); setChunkSize(''); setSplitMode('ranges');
+    setSelectionRanges('');
     // A fresh image-to-PDF workspace must not inherit a previous crop choice.
     setImageLayout({ ...IMAGE_PDF_LAYOUT_DEFAULT });
     releasePreviewDocuments();
@@ -631,6 +652,19 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     <button type="button" disabled={!selectedCount || busy} className="muted-danger" onClick={() => commit((previous) => deletePages(previous, selected))} aria-label={locale === 'en' ? 'Delete selected pages' : t.del}>× {t.del}</button>
                   </div>
                 </div>
+                <details className="selection-range-panel" data-testid="selection-range-panel">
+                  <summary>{t.rangeSelectToggle}</summary>
+                  <form className="selection-range-form" onSubmit={applyPageRangeSelection}>
+                    <label htmlFor="selection-ranges">{t.rangeSelectLabel}
+                      <input id="selection-ranges" data-testid="selection-ranges" type="text"
+                        placeholder="1-3, 5, 8-12" value={selectionRanges} disabled={busy}
+                        onChange={event => setSelectionRanges(event.target.value)} />
+                    </label>
+                    <button className="button button-secondary button-small" type="submit"
+                      data-testid="selection-range-apply" disabled={busy || !selectionRanges.trim()}>{t.rangeSelectApply}</button>
+                    <p className="input-note">{t.rangeSelectHint}</p>
+                  </form>
+                </details>
                 <p className="input-note" data-testid="blank-position-hint">{t.blankHint}</p>
                 <div className="workspace-view-switch" role="group" aria-label={t.viewBySource} data-testid="workspace-view-switch">
                   <button type="button" data-testid="workspace-view-order"
