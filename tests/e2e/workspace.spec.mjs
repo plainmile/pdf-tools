@@ -236,6 +236,72 @@ test('Chinese touch-width range selection uses export order and rejects reversed
   expect(width.scroll).toBeLessThanOrEqual(width.viewport + 2);
 });
 
+test('rotate tool highlights rotation first and preserves secondary extraction', async ({ page }) => {
+  await page.goto('/rotate-pdf/');
+  await page.getByTestId('file-input').setInputFiles({ name: 'angles.pdf', mimeType: 'application/pdf', buffer: await makePdf([301,302,303]) });
+  await expect(page.getByTestId('page-tile')).toHaveCount(3);
+  await expect(page.getByTestId('focused-page-hint')).toContainText('rotate left or right');
+  await expect(page.getByTestId('page-actions').getByRole('button', { name: 'Rotate clockwise' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete selected pages' })).toHaveCount(0);
+  await page.getByRole('checkbox', { name: 'Select page 2' }).check();
+  await page.getByRole('button', { name: 'Rotate clockwise' }).click();
+  const rotated = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(rotated.getPages().map(p => p.getRotation().angle)).toEqual([0,90,0]);
+  await page.getByTestId('page-more-actions').locator('summary').click();
+  const extracted = await downloadPdf(page, () => page.getByRole('button', { name: 'Extract selected pages' }).click());
+  expect(extracted.getPages().map(p => p.getWidth())).toEqual([302]);
+});
+
+test('delete entry defaults to Delete and retains alternate operations and Undo', async ({ page }) => {
+  await page.goto('/delete-pages/');
+  await page.getByTestId('file-input').setInputFiles({ name: 'delete.pdf', mimeType: 'application/pdf', buffer: await makePdf([301,302,303]) });
+  await expect(page.getByTestId('page-tile')).toHaveCount(3);
+  await expect(page.getByTestId('focused-page-hint')).toContainText('Undo can restore');
+  await expect(page.getByRole('button', { name: 'Delete selected pages' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Rotate clockwise' })).toHaveCount(0);
+  await page.getByRole('checkbox', { name: 'Select page 2' }).check();
+  await page.getByRole('button', { name: 'Delete selected pages' }).click();
+  let exported = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(exported.getPages().map(p => p.getWidth())).toEqual([301,303]);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(3);
+  await page.getByTestId('page-more-actions').locator('summary').click();
+  await expect(page.getByRole('button', { name: 'Rotate clockwise' })).toBeVisible();
+});
+
+test('extract entry favors selected pages and clearly distinguishes full export', async ({ page }) => {
+  await page.goto('/extract-pages/');
+  await page.getByTestId('file-input').setInputFiles({ name: 'extract.pdf', mimeType: 'application/pdf', buffer: await makePdf([301,302,303]) });
+  await expect(page.getByTestId('page-tile')).toHaveCount(3);
+  await expect(page.getByTestId('focused-page-hint')).toContainText('separate PDF');
+  await expect(page.getByRole('button', { name: 'Export all pages' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Extract selected pages' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete selected pages' })).toHaveCount(0);
+  await page.getByRole('checkbox', { name: 'Select page 2' }).check();
+  await page.getByRole('checkbox', { name: 'Select page 3' }).check();
+  const extracted = await downloadPdf(page, () => page.getByRole('button', { name: 'Extract selected pages' }).click());
+  expect(extracted.getPages().map(p => p.getWidth())).toEqual([302,303]);
+  const full = await downloadPdf(page, () => page.getByRole('button', { name: 'Export all pages' }).click());
+  expect(full.getPages().map(p => p.getWidth())).toEqual([301,302,303]);
+});
+
+test('Chinese focused Delete stays accessible on narrow mobile without sideways scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/delete-pages/');
+  await page.getByTestId('file-input').setInputFiles({ name: 'delete.pdf', mimeType: 'application/pdf', buffer: await makePdf([301,302]) });
+  await expect(page.getByRole('button', { name: '删除页面' })).toBeVisible();
+  await expect(page.getByTestId('page-more-actions').locator('summary')).toContainText('更多页面操作');
+  await page.getByRole('checkbox', { name: '选择第 1 页' }).check();
+  await page.getByRole('button', { name: '删除页面' }).click();
+  const exported = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
+  expect(exported.getPages().map(p => p.getWidth())).toEqual([302]);
+  const measure = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(measure.scrollWidth).toBeLessThanOrEqual(measure.clientWidth + 2);
+});
+
 test('rotate, delete, undo and extract selected pages', async ({ page }) => {
   await loadInput(page);
   await page.getByRole('checkbox', { name: 'Select page 2' }).check();
