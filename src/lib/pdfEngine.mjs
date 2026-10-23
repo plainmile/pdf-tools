@@ -32,7 +32,7 @@ export const LIMITS = Object.freeze({
   maxImagePixels: 36_000_000,
 });
 
-const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/avif']);
 
 /**
  * Count document buffers actually retained by the workspace, not only the
@@ -62,10 +62,13 @@ export function retainedSourcesBytes(sources) {
 // bytes in the parsers rather than rejecting otherwise valid .jpg/.png/.webp files.
 export function imageTypeFor(file) {
   const type = (file.type || '').toLowerCase();
+  if (['image/x-ms-bmp', 'image/x-bmp'].includes(type)) return 'image/bmp';
   if (IMAGE_TYPES.has(type)) return type;
   if (/\.jpe?g$/i.test(file.name || '')) return 'image/jpeg';
   if (/\.png$/i.test(file.name || '')) return 'image/png';
   if (/\.webp$/i.test(file.name || '')) return 'image/webp';
+  if (/\.bmp$/i.test(file.name || '')) return 'image/bmp';
+  if (/\.avif$/i.test(file.name || '')) return 'image/avif';
   return null;
 }
 
@@ -107,6 +110,77 @@ export function compressedImageDimensions(type, bytes) {
     }
     throw new Error('Invalid image header.');
   }
+  if (type === 'image/bmp') {
+    // Only Windows BITMAPINFOHEADER-style BMP with a sane pixel offset;
+    // reject OS/2 core headers and embedded compressed/JPEG/PNG variants.
+    if (bytes.length < 54 || bytes[0] !== 0x42 || bytes[1] !== 0x4d) throw new Error('Invalid image header.');
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const imageOffset = view.getUint32(10, true);
+    const dibSize = view.getUint32(14, true);
+    if (dibSize < 40 || imageOffset < 14 + dibSize || imageOffset >= bytes.length) {
+      throw new Error('Invalid image header.');
+    }
+    const width = view.getInt32(18, true);
+    const height = Math.abs(view.getInt32(22, true));
+    const bitDepth = view.getUint16(28, true);
+    const compression = view.getUint32(30, true);
+    if (width <= 0 || !height || ![1, 4, 8, 16, 24, 32].includes(bitDepth) ||
+        ![0, 3].includes(compression)) throw new Error('Invalid image header.');
+    return { width, height };
+  }
+  if (type === 'image/avif') {
+    // AVIF is an ISO BMFF container. Validate ftyp and inspect ispe
+    // BEFORE decoding images on canvas. Reject animation instead of
+    // silently outputting only the first frame.
+    const invalid = () => { throw new Error('Invalid image header.'); };
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (bytes.length < 32 || String.fromCharCode(...bytes.subarray(4, 8)) !== 'ftyp') invalid();
+    const boxLen = view.getUint32(0);
+    if (boxLen < 16 || boxLen > bytes.length || (boxLen - 16) % 4 !== 0) invalid();
+    const fourcc = (offset) => String.fromCharCode(...bytes.subarray(offset, offset + 4));
+    const brands = [fourcc(8)];
+    for (let offset = 16; offset + 4 <= boxLen; offset += 4) brands.push(fourcc(offset));
+    if (brands.includes('avis') || brands.includes('msf1')) {
+      throw new Error('Animated AVIF is not supported.');
+    }
+    if (!brands.includes('avif')) invalid();
+    let dimensions = null;
+    let inspected = 0;
+    const walk = (from, end, container = '') => {
+      let offset = from;
+      while (offset + 8 <= end) {
+        if (++inspected > 4096) invalid();
+        const size = view.getUint32(offset);
+        const typeName = fourcc(offset + 4);
+        // Exclude extended and zero-sized boxes; fail closed for unusually
+        // complex containers instead of guessing pre-decode dimensions.
+        if (size < 8 || size > end - offset) invalid();
+        const dataOffset = offset + 8;
+        const dataEnd = offset + size;
+        if (typeName === 'ispe' && container === 'ipco') {
+          if (size < 20) invalid();
+          const width = view.getUint32(dataOffset + 4);
+          const height = view.getUint32(dataOffset + 8);
+          if (!width || !height) invalid();
+          // Check all item properties; actual decoded bitmap is checked again.
+          if (width * height > LIMITS.maxImagePixels) throw new Error('Image dimensions are too large.');
+          dimensions = { width, height };
+        } else if (typeName === 'meta') {
+          if (size < 12) invalid();
+          walk(dataOffset + 4, dataEnd, 'meta');
+        } else if (typeName === 'iprp' && container === 'meta') {
+          walk(dataOffset, dataEnd, 'iprp');
+        } else if (typeName === 'ipco' && container === 'iprp') {
+          walk(dataOffset, dataEnd, 'ipco');
+        }
+        offset = dataEnd;
+      }
+      if (offset !== end) invalid();
+    };
+    walk(0, bytes.length);
+    if (!dimensions) invalid();
+    return dimensions;
+  }
   if (type === 'image/webp') {
     // RFC 9649: RIFF WEBP chunks are little-endian, padded to even lengths.
     // VP8X stores canvas size as LE24 + 1, VP8L as two packed 14-bit fields,
@@ -125,6 +199,7 @@ export function compressedImageDimensions(type, bytes) {
       if (size > riffLength - start) bad();
       if (tag === 'VP8X') {
         if (size < 10) bad();
+        if (bytes[start] & 0x02) throw new Error('Animated WebP is not supported.');
         const width = 1 + bytes[start + 4] + (bytes[start + 5] << 8) + (bytes[start + 6] << 16);
         const height = 1 + bytes[start + 7] + (bytes[start + 8] << 8) + (bytes[start + 9] << 16);
         return { width, height };
@@ -152,7 +227,7 @@ export function compressedImageDimensions(type, bytes) {
 }
 
 export async function readSourceFile(file, options = {}) {
-  if (!isSupportedFile(file)) throw new Error(`${file.name}: choose PDF, JPG, PNG or WebP files.`);
+  if (!isSupportedFile(file)) throw new Error(`${file.name}: choose PDF, JPG, PNG, WebP, BMP or static AVIF files.`);
   if (!file.size || file.size > LIMITS.maxFileBytes) {
     throw new Error(`${file.name}: files must be between 1 byte and 100 MB.`);
   }
@@ -261,7 +336,7 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}) {
       const context = canvas.getContext('2d');
       if (!context) throw new Error('Image canvas is unavailable.');
       context.drawImage(bitmap, 0, 0);
-      const blob = await new Promise((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Could not convert WebP image.')), 'image/png'));
+      const blob = await new Promise((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Could not convert image to PNG.')), 'image/png'));
       embedded = await doc.embedPng(await blob.arrayBuffer());
       canvas.width = 1;
       canvas.height = 1;
@@ -289,7 +364,8 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}) {
     return new Uint8Array(await doc.save({ useObjectStreams: true }));
   } catch (error) {
     if (error?.message === 'Image dimensions are too large.' ||
-        error?.message === 'JPEG metadata could not be safely removed.') throw error;
+        error?.message === 'JPEG metadata could not be safely removed.' ||
+        /^Animated (AVIF|WebP) is not supported\.$/.test(error?.message)) throw error;
     throw new Error(`${file.name}: image could not be converted to PDF.`);
   } finally {
     bitmap?.close();
