@@ -69,6 +69,17 @@ test('image conversion selects any 60 pages from a 500-page book, not only first
   assert.throws(() => enforceImageBatchLimit(requestedPages('1-61', 500).length), /60 pages/);
 });
 
+test('PDF image ZIP filename labels preserve localized and nonconsecutive output-page identities', () => {
+  assert.equal(imagePageSelectionLabel('３０１－３０６', 500), '301-306');
+  assert.equal(imagePageSelectionLabel('２－３，５、７', 10), '2-3_5_7');
+  assert.equal(imagePageSelectionLabel('3,1', 20), '3_1');
+  assert.equal(imagePageSelectionLabel('', 10), '');
+  const longList = Array.from({ length: 60 }, (_, n) => n * 2 + 1).join(',');
+  const label = imagePageSelectionLabel(longList, 125);
+  assert.match(label, /^selection-first1-last119-60pages$/);
+  assert.throws(() => imagePageSelectionLabel('4-1', 5), /reversed/);
+});
+
 test('image batch suggestions cover the entire book without overlapping or exceeding 60 pages', () => {
   assert.deepEqual(imagePageBatch(2), { start: 1, end: 2, total: 1, range: '1-2' });
   assert.deepEqual(imagePageBatch(60), { start: 1, end: 60, total: 1, range: '1-60' });
