@@ -267,29 +267,37 @@ export function* wrapTextLines(text, maxWidth, measureChar, { preserveWords = tr
     const blank = char === ' ' || char === '\t';
     if (row && rowWidth + charWidth > maxWidth) {
       if (!blank && preserveWords && lastWordBreak > 0) {
-        // The final word fits on the next line; never split it just because
-        // character-by-character layout used up the remaining space.
+        // Prefer a word boundary, but a long wide-glyph token may STILL
+        // overflow after the prefix is removed. Fall back to a hard wrap
+        // instead of painting characters beyond the PDF's right margin.
         yield row.slice(0, lastWordBreak).trimEnd();
         row = row.slice(lastWordBreak).trimStart();
         rowWidth = 0;
         for (const retained of row) rowWidth += measureChar(retained);
+        if (row && rowWidth + charWidth > maxWidth) {
+          yield row.trimEnd();
+          row = '';
+          rowWidth = 0;
+        }
       } else {
-        yield row.trimEnd();
+        // Markdown fenced code is literal text: trailing and leading spaces
+        // at a visual line break must not be silently discarded.
+        yield preserveWords ? row.trimEnd() : row;
         row = '';
         rowWidth = 0;
       }
       lastWordBreak = -1;
       wrapped = true;
-      if (blank) continue; // A word boundary is not a new line's content.
+      if (blank && preserveWords) continue; // Prose collapses wrap-boundary whitespace.
     }
-    if (wrapped && !row && blank) continue;
+    if (wrapped && !row && blank && preserveWords) continue;
     if (preserveWords && blank && row && row.at(-1) !== ' ' && row.at(-1) !== '\t') {
       lastWordBreak = row.length;
     }
     row += char;
     rowWidth += charWidth;
   }
-  if (row) yield row.trimEnd();
+  if (row) yield preserveWords ? row.trimEnd() : row;
 }
 
 export function parseTextBlocks(source, markdown = false) {
