@@ -171,6 +171,20 @@ export function requestedPages(input, count) {
   }
   return output;
 }
+/** Stable natural/lexicographic page filenames for extracted images.
+ * All filenames in one PDF use the SAME width, including page 1 when a
+ * 1,000-page source crosses the three-digit boundary.
+ */
+export function imagePageFilename(pageNumber, pageCount, format = 'jpg') {
+  if (![pageNumber, pageCount].every(Number.isSafeInteger) ||
+      pageCount < 1 || pageCount > UTILITY_LIMITS.maxPages ||
+      pageNumber < 1 || pageNumber > pageCount || !['jpg', 'png'].includes(format)) {
+    throw new Error('Invalid PDF image page or format.');
+  }
+  const digits = Math.max(3, String(pageCount).length);
+  return `page-${String(pageNumber).padStart(digits, '0')}.${format}`;
+}
+
 /** A deterministic ASCII download label for user-chosen page ranges, even
  * when the accepted input used Chinese punctuation or fullwidth digits.
  * Long noncontiguous lists get a truthful compact selection label.

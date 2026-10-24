@@ -404,6 +404,25 @@ test('long PDF image exporter accepts late page range and blocks 61 images per b
   await expect(page.getByRole('alert')).toContainText('up to 60 pages');
 });
 
+test('1000-page PDF image ZIP keeps correct numeric filename order at the last page', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/pdf-to-images/');
+  await upload(page, await fixturePdf('Thousand-page image naming', 1000));
+  await expect(page.getByTestId('utility-file-summary')).toContainText('1000');
+  await page.getByTestId('utility-page-ranges').fill('999-1000');
+  const output = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+  const zip = await JSZip.loadAsync(output.bytes);
+  expect(Object.keys(zip.files).sort()).toEqual(['page-0999.jpg', 'page-1000.jpg']);
+  for (const image of Object.values(zip.files)) {
+    const bytes = await image.async('uint8array');
+    expect(Array.from(bytes.slice(0, 3))).toEqual([0xff, 0xd8, 0xff]);
+  }
+  await page.getByTestId('utility-page-ranges').fill('1-2');
+  const firstBatch = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+  const firstZip = await JSZip.loadAsync(firstBatch.bytes);
+  expect(Object.keys(firstZip.files).sort()).toEqual(['page-0001.jpg', 'page-0002.jpg']);
+});
+
 test('text import accepts more than 1 MB, rejects files larger than 5 MiB', async ({ page }) => {
   await page.goto('/txt-to-pdf/');
   const text = Buffer.alloc(1024 * 1024 + 1024, 65);
