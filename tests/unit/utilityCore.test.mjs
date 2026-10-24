@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline,
+  formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline, wrapTextLines,
   textContentToLines, linesToReadableText, summarizeTextCoverage, sanitizeFilename, workspaceFilenameStem,
   UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
@@ -35,6 +35,20 @@ test('image page selection handles ranges and no duplicate pages', () => {
   assert.throws(() => requestedPages('4-2', 4), /reversed/);
   assert.throws(() => requestedPages('100', 4), /outside/);
 });
+test('TXT and Markdown line wrapping keeps whole words when they fit and splits only oversized tokens', () => {
+  const wrap = (text, width, options = {}) => [...wrapTextLines(text, width, () => 1, options)];
+  assert.deepEqual(wrap('foo bar baz', 7), ['foo bar', 'baz']);
+  assert.deepEqual(wrap('hello brave world', 9), ['hello', 'brave', 'world']);
+  assert.deepEqual(wrap('abcdefghij', 4), ['abcd', 'efgh', 'ij']);
+  assert.deepEqual(wrap('ABC verylongtoken', 7), ['ABC', 'verylon', 'gtoken']);
+  assert.deepEqual(wrap('one     two   three', 8), ['one', 'two', 'three']);
+  assert.deepEqual(wrap('中文测试没有空格', 3), ['中文测', '试没有', '空格']);
+  // Code remains monospaced and may wrap at any character, never silently
+  // losing the initial indentation or replacing symbols with Markdown syntax.
+  assert.deepEqual(wrap('      let x = 1;', 7, { preserveWords: false }),
+    ['      l', 'et x =', '1;']);
+});
+
 test('basic Markdown headings and list semantics without inserting remote HTML', () => {
   const blocks = parseTextBlocks('# Hello **PlainMile**\r\n- Item with [link](https://example.com)\n```js\nconst x = 1\n```', true);
   assert.equal(blocks[0].text, 'Hello PlainMile');
