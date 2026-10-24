@@ -1153,6 +1153,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                       <ol>{splitPlan.parts.map((part, index) =>
                         <li key={index}>{interpolate(t.splitPreviewPart, {
                           index: index + 1, start: part.start, end: part.end, count: part.end - part.start + 1,
+                          unit: part.end === part.start ? 'page' : 'pages',
                         })}</li>)}</ol>
                     </details>
                   </div>}
