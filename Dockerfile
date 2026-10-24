@@ -5,7 +5,7 @@ RUN set -eu; if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else
 COPY . .
 RUN npm run test:unit && npm run build
 
-FROM nginx:1.27-alpine
+FROM nginx:1.30.6-alpine
 # OCI metadata is shown on the GHCR package page and with docker image inspect.
 LABEL org.opencontainers.image.title="PlainMile PDF Tools" \
       org.opencontainers.image.description="Free, private, browser-local PDF tools for merging, splitting, organizing and converting PDFs" \
