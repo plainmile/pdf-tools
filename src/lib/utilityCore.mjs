@@ -252,9 +252,24 @@ export function decodeImportedText(bytes, locale = 'en') {
 export function normalizeText(source) {
   return source.replace(/\r\n?/g, '\n').replace(/\0/g, '').replace(/\t/g, '    ');
 }
+/** Unicode grapheme clusters are the smallest units safe to wrap: a Latin
+ * letter plus its combining accent, a flag pair, or a ZWJ emoji must never
+ * be split onto different PDF lines. Keep plain ASCII on the lightweight
+ * iterator so long English books don't pay the Segmenter cost.
+ */
+const textGraphemeSegmenter = typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'
+  ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
+function* textGraphemes(source) {
+  if (!textGraphemeSegmenter || /^[\\x00-\\x7f]*$/.test(source)) {
+    yield* source;
+    return;
+  }
+  for (const { segment } of textGraphemeSegmenter.segment(source)) yield segment;
+}
+
 /** Keep ordinary words together during TXT/Markdown PDF layout without
  * sacrificing bounded-width fallback for long URLs, code, or CJK text.
- * Measure one character at a time (linear work), and emit lines lazily so
+ * Measure one grapheme at a time (linear work), and emit lines lazily so
  * book-length files can still yield to Cancel in the renderer.
  */
 export function* wrapTextLines(text, maxWidth, measureChar, { preserveWords = true } = {}) {
@@ -262,7 +277,7 @@ export function* wrapTextLines(text, maxWidth, measureChar, { preserveWords = tr
   let rowWidth = 0;
   let lastWordBreak = -1;
   let wrapped = false;
-  for (const char of text) {
+  for (const char of textGraphemes(text)) {
     const charWidth = measureChar(char);
     const blank = char === ' ' || char === '\t';
     if (row && rowWidth + charWidth > maxWidth) {
@@ -273,7 +288,7 @@ export function* wrapTextLines(text, maxWidth, measureChar, { preserveWords = tr
         yield row.slice(0, lastWordBreak).trimEnd();
         row = row.slice(lastWordBreak).trimStart();
         rowWidth = 0;
-        for (const retained of row) rowWidth += measureChar(retained);
+        for (const retained of textGraphemes(row)) rowWidth += measureChar(retained);
         if (row && rowWidth + charWidth > maxWidth) {
           yield row.trimEnd();
           row = '';
