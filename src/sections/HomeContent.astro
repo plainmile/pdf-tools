@@ -12,11 +12,11 @@ const zh = locale === 'zh';
 const labels = zh ? {
   frequent: '常用工具', search: '搜索工具', placeholder: '搜索：合并、压缩、水印、图片…',
   clear: '清除', noResults: '没有匹配的工具，请换一个关键词。',
-  categories: '工具分类', open: '打开工具', count: '个工具',
+  categories: '工具分类', open: '打开工具', count: '个工具', countSingular: '个工具',
 } : {
   frequent: 'Popular tools', search: 'Find a PDF tool', placeholder: 'Search merge, compress, watermark, image…',
   clear: 'Clear', noResults: 'No tools match that search. Try a different term.',
-  categories: 'Tool categories', open: 'Open tool', count: 'tools',
+  categories: 'Tool categories', open: 'Open tool', count: 'tools', countSingular: 'tool',
 };
 const title = zh ? '免费 PDF 合并、拆分、转换及页面整理工具 - PlainMile' : 'Free PDF Merge, Split, Convert and Page Organizer - PlainMile';
 const desc = zh
@@ -62,15 +62,15 @@ const desc = zh
       </div>
       <p class="tool-empty" data-tool-empty role="status" hidden>{labels.noResults}</p>
     </div>
-    <nav class="category-jump" aria-label={labels.categories}>
-      {toolGroups.map((group) => <a href={'#group-' + group.id}>{zh ? group.zh : group.en}</a>)}
+    <nav class="category-jump" data-category-jump aria-label={labels.categories}>
+      {toolGroups.map((group) => <a data-category-link href={'#group-' + group.id}>{zh ? group.zh : group.en}</a>)}
     </nav>
     <div class="catalog-groups" data-tool-catalog>
       {toolGroups.map((group) => (
         <section class="tool-group" id={'group-' + group.id} data-tool-group aria-labelledby={'heading-' + group.id}>
           <div class="catalog-group-heading">
             <h3 id={'heading-' + group.id}>{zh ? group.zh : group.en}</h3>
-            <span>{group.slugs.length} {labels.count}</span>
+            <span data-tool-group-count data-count-unit={labels.count} data-count-singular={labels.countSingular}>{group.slugs.length} {labels.count}</span>
           </div>
           <div class="tool-cards">
             {group.slugs.map((slug) => {
@@ -101,6 +101,9 @@ const desc = zh
       if (!search || !catalog || !clear || !empty) return;
       const cards = [...catalog.querySelectorAll('[data-tool-card]')];
       const groups = [...catalog.querySelectorAll('[data-tool-group]')];
+      const categoryNav = document.querySelector('[data-category-jump]');
+      const categoryLinks = new Map([...(categoryNav?.querySelectorAll('[data-category-link]') || [])]
+        .map(link => [link.getAttribute('href')?.slice(1), link]));
       const update = () => {
         const query = search.value.trim().toLocaleLowerCase();
         let matches = 0;
@@ -109,7 +112,17 @@ const desc = zh
           card.hidden = !visible;
           if (visible) matches++;
         }
-        for (const group of groups) group.hidden = ![...group.querySelectorAll('[data-tool-card]')].some(card => !card.hidden);
+        let visibleGroups = 0;
+        for (const group of groups) {
+          const count = [...group.querySelectorAll('[data-tool-card]')].filter(card => !card.hidden).length;
+          group.hidden = count === 0;
+          if (count) visibleGroups++;
+          const label = group.querySelector('[data-tool-group-count]');
+          if (label) label.textContent = `${count} ${count === 1 ? label.dataset.countSingular : label.dataset.countUnit}`;
+          const link = categoryLinks.get(group.id);
+          if (link) link.hidden = count === 0;
+        }
+        if (categoryNav) categoryNav.hidden = visibleGroups === 0;
         empty.hidden = matches !== 0;
         clear.disabled = !query;
       };
