@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFDict, PDFName } from 'pdf-lib';
 import { readFile } from 'node:fs/promises';
 
 async function pdfFixture(widths = [300, 320]) {
@@ -79,14 +79,17 @@ test('browser-local Unicode text creates a downloadable PDF, not a blank output'
   await page.getByTestId('utility-text').fill('中文测试：春天来了。\n第二行，保存完整内容。');
   await page.getByTestId('utility-run').click();
   await expect(page.getByTestId('text-pdf-result')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole('status')).toContainText('图片', { timeout: 30_000 });
+  await expect(page.locator('.notice-success')).toContainText('图片', { timeout: 30_000 });
   const exported = await downloadBytes(page, () => page.getByTestId('utility-pdf-download').click());
   const doc = await PDFDocument.load(exported.bytes);
   expect(doc.getPageCount()).toBe(1);
   // Unicode text in the built-in-font fallback must create a raster image
   // rather than an empty page or a silent missing-glyph PDF.
-  const content = String(doc.getPage(0).node.Contents() ?? '');
-  expect(content.length).toBeGreaterThan(0);
+  const resources = doc.context.lookup(doc.getPage(0).node.Resources(), PDFDict);
+  const xObjectRef = resources.get(PDFName.of('XObject'));
+  expect(xObjectRef).toBeTruthy();
+  const xObjects = doc.context.lookup(xObjectRef, PDFDict);
+  expect(xObjects.keys().length).toBeGreaterThan(0);
 });
 
 test('converter opens unchanged source freely, while unsaved workspace edits ask to stay', async ({ page }) => {
