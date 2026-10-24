@@ -186,6 +186,21 @@ export function imagePageFilename(pageNumber, pageCount, format = 'jpg') {
   return `page-${String(pageNumber).padStart(digits, '0')}.${format}`;
 }
 
+/** Preserve explicitly requested non-ascending image order when users
+ * extract ZIP entries in Explorer/Finder, which sort filenames by default.
+ * Normal ascending exports keep their established page-001 naming contract.
+ */
+export function imageExportFilenames(selected, pageCount, format = 'jpg') {
+  if (!Array.isArray(selected) || selected.length < 1 ||
+      selected.length > UTILITY_LIMITS.maxImagePagesPerRun || new Set(selected).size !== selected.length) {
+    throw new Error('Invalid PDF image page selection.');
+  }
+  const filenames = selected.map(page => imagePageFilename(page, pageCount, format));
+  const outOfOrder = selected.some((page, index) => index > 0 && page < selected[index - 1]);
+  if (!outOfOrder) return filenames;
+  return filenames.map((name, index) => `order-${String(index + 1).padStart(3, '0')}-${name}`);
+}
+
 /** A deterministic ASCII download label for user-chosen page ranges, even
  * when the accepted input used Chinese punctuation or fullwidth digits.
  * Long noncontiguous lists get a truthful compact selection label.
