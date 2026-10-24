@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { loadPdf, convertPdfToImages, compressPdfRaster, extractPdfText, textToPdf, addPageNumbers } from '../lib/pdfUtilities.mjs';
-import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, translateUtilityError, decodeImportedText, IMAGE_PRINT_SCALE } from '../lib/utilityCore.mjs';
+import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, translateUtilityError, decodeImportedText, textFitsUtf8Budget, IMAGE_PRINT_SCALE } from '../lib/utilityCore.mjs';
 import { saveDownload } from '../lib/pdfEngine.mjs';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 
@@ -464,7 +464,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           </div>
         </div>}
         {pdf && (pdf.count >= 250 || pdf.size >= 75 * 1024 * 1024) && <p className="utility-note" data-testid="large-document-note">{t.heavyWarning}</p>}
-        {isTextInput && <label className="utility-text-input"><span className="utility-field-label">{t.textLabel}</span><textarea data-testid="utility-text" rows={10} spellCheck={false} autoComplete="off" autoCorrect="off" autoCapitalize="off" maxLength={UTILITY_LIMITS.maxTextBytes} placeholder={t.textPlaceholder} value={sourceText} onChange={e => { setSourceText(e.target.value); setTextRevision(previous => previous + 1); setTextEdited(Boolean(textFileName)); setNotDownloaded(true); setClearConfirm(false); setNotice(''); setError(''); setProgress(null); }} disabled={inputLocked} /></label>}
+        {isTextInput && <label className="utility-text-input"><span className="utility-field-label">{t.textLabel}</span><textarea data-testid="utility-text" rows={10} spellCheck={false} autoComplete="off" autoCorrect="off" autoCapitalize="off" placeholder={t.textPlaceholder} value={sourceText} onChange={e => { if (!textFitsUtf8Budget(e.target.value)) { setError(t.tooMuchText); setNotice(''); return; } setSourceText(e.target.value); setTextRevision(previous => previous + 1); setTextEdited(Boolean(textFileName)); setNotDownloaded(true); setClearConfirm(false); setNotice(''); setError(''); setProgress(null); }} disabled={inputLocked} /></label>}
         {isTextInput && !textFileName && sourceText.trim() && <button type="button"
           className="button button-secondary button-small" data-testid="utility-text-clear"
           disabled={inputLocked} onClick={reset}>{t.clear}</button>}
