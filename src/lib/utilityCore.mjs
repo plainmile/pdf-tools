@@ -470,6 +470,26 @@ function stripPairedMarkdownMarkers(source) {
   }).join('\n');
 }
 
+/** Remove only complete HTML comments using forward-only searches.
+ * A global lazy HTML-comment regex rescans the same suffix for every unclosed
+ * opener, making a few KB of malformed Markdown quadratic. Preserve the
+ * exact original text of unclosed comments rather than swallowing it.
+ */
+function stripClosedMarkdownComments(source) {
+  const chunks = [];
+  let cursor = 0;
+  while (cursor < source.length) {
+    const start = source.indexOf('<!--', cursor);
+    if (start < 0) break;
+    const end = source.indexOf('-->', start + 4);
+    if (end < 0) break;
+    chunks.push(source.slice(cursor, start));
+    cursor = end + 3;
+  }
+  chunks.push(source.slice(cursor));
+  return chunks.join('');
+}
+
 // Intentionally a minimal CommonMark subset: never execute HTML, remote images or scripts.
 export function stripMarkdownInline(source) {
   // Shield single-backtick inline code before stripping links, HTML or emphasis.
@@ -480,12 +500,11 @@ export function stripMarkdownInline(source) {
   const outsideCode = source.replace(/`([^`\n]+)`/g, (_token, literal) => {
     return `${marker}${inlineCode.push(literal) - 1}${marker}`;
   });
-  const plain = readableMarkdownReferences(outsideCode)
+  const plain = stripClosedMarkdownComments(readableMarkdownReferences(outsideCode))
     // Strip only recognizable HTML tags with syntactically valid attributes.
     // Preserve "List<T>", "<username>", and "a<b && c>d" verbatim.
-    .replace(/<!--[\s\S]*?-->|<\/?([A-Za-z][\w:-]*)(?:\s+[A-Za-z_:][\w:.-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*\s*\/?>/g,
-      (token, tag) => tag && !PLAIN_MARKDOWN_HTML_TAGS.has(tag.toLowerCase()) ? token : '')
-    ;
+    .replace(/<\/?([A-Za-z][\w:-]*)(?:\s+[A-Za-z_:][\w:.-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*\s*\/?>/g,
+      (token, tag) => tag && !PLAIN_MARKDOWN_HTML_TAGS.has(tag.toLowerCase()) ? token : '');
   return stripPairedMarkdownMarkers(plain)
     .replace(new RegExp(`${marker}(\\d+)${marker}`, 'g'),
       (_token, index) => inlineCode[Number(index)]);
