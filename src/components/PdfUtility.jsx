@@ -21,12 +21,12 @@ const COPY = {
     partialTextReady: 'Some PDF pages were not extracted. Review the warning before choosing to download this incomplete text file.',
     markdownWarning: 'Markdown conversion is approximate; headings are inferred from font size. Complex PDF layout cannot be faithfully recovered.',
     textLabel: 'Text to convert', textPlaceholder: 'Paste text here or import a .txt / .md file…',
-    textInputHint: 'Import UTF-8 or BOM-marked UTF-16 text. Built-in-font text stays selectable; Chinese and unsupported characters use local browser fonts as non-searchable image pages.',
-    markdownInputHint: 'Import UTF-8 or BOM-marked UTF-16 text. Supports simple headings, lists, quotes and code blocks, not external images, HTML, full tables or complex Markdown. Link addresses are shown as text, not clickable PDF links. Non-Latin scripts become image pages.',
+    textInputHint: 'Import UTF-8 or BOM-marked UTF-16 text. Pages containing characters unsupported by built-in PDF fonts use local browser fonts as images; other pages keep selectable text.',
+    markdownInputHint: 'Import UTF-8 or BOM-marked UTF-16 text. Supports basic headings, lists, quotes and code blocks, not external images, HTML or complex tables. Link addresses appear as text, not clickable links. Pages requiring unsupported glyphs become images; other pages remain searchable.',
     pageStart: 'First printed number', firstPage: 'Start numbering on PDF page', firstPageReset: 'The new PDF is shorter than the previous starting page. Numbering has been reset to PDF page 1.', firstPageHint: 'Pages before this page (such as a cover or contents) stay unnumbered. The first numbered page displays the number above.', pagePosition: 'Position', pageSize: 'Font size', bottomCenter: 'Bottom center', bottomRight: 'Bottom right', topRight: 'Top right',
     numbersHint: 'Adds selectable page numbers starting at the chosen PDF page, leaving earlier pages unnumbered. Preserves page size. Review annotations and digital signatures before using this modified file.',
     ready: 'Ready to download', noPdf: 'Select a PDF first.', noText: 'Enter text to convert.', sizeLimit: 'PDF up to 100 MB / 1,000 pages; TXT / Markdown up to 5 MB.', limitText: 'TXT / Markdown up to 5 MB; PDF output: up to 1,000 pages (300 image-based pages for CJK).', limitImages: 'PDF up to 100 MB / 1,000 pages; up to 60 selected image pages per batch.', limitCompression: 'PDF up to 100 MB / 120 pages; JPEG output safety budget 96 MB.', limitGeneral: 'PDF up to 100 MB / 1,000 pages.', heavyWarning: 'Large document: processing hundreds of pages may take time and require substantial device memory. Close other heavy tabs if necessary.', progressLabel: 'Processed {done} of {total} pages', tooMuchText: 'Text exceeds 5 MB.',
-    noteUnicode: 'This PDF uses rasterized pages for non-Latin characters. Text in the result cannot be selected.', noteSearch: 'Output text is selectable.',
+    noteUnicode: 'This PDF uses rasterized pages for non-Latin characters. Text in the result cannot be selected.', noteMixed: '{raster} of {pages} pages contain unsupported characters and are image-based; text on the other {searchable} pages remains selectable.', noteSearch: 'Output text is selectable.',
     textResultStale: 'This PDF was generated from the previous text. You can still download this version; generate again to include your latest edits.',
     invalidFile: 'Please select a supported file and retry.', resultPreview: 'Extracted text preview', dropHint: 'Or drag a file here. Nothing is uploaded.', imported: 'Imported', multipleFiles: 'This converter accepts one file at a time. No file was replaced; choose a single file.', batchLabel: 'Image batch {current} of {total}', batchPrev: 'Previous pages', batchNext: 'Next pages', batchCustom: 'Custom page selection', batchCustomHint: 'Previous/Next work with standard 60-page batches. Return to batches to continue near your custom range.', batchResume: 'Return to page batches', cancel: 'Cancel', cancelling: 'Cancelling…', cancelled: 'Cancelled', packaging: 'Packaging ZIP: {percent}%', replacedFailed: 'Import failed. Previous file remains: {name}.', modified: 'Edited after import', nextStep: 'Browse other tools (files do not transfer automatically)', overlap: 'Page numbers are drawn over existing content. Check footers, stamps and existing numbers before using the result.',
   },
@@ -46,12 +46,12 @@ const COPY = {
     partialTextReady: '有些 PDF 页面未能提取文字。请先查看缺页提示，再决定是否下载这份不完整的文字文件。',
     markdownWarning: 'Markdown 为近似转换：根据字号推测标题，复杂 PDF 的版式无法完整还原。',
     textLabel: '需要转换的文本', textPlaceholder: '粘贴文字，或选择 .txt / .md 文件……',
-    textInputHint: '支持 UTF-8 或带 BOM 的 UTF-16 文本。拉丁文字尽量保留可选中内容；中文等文字使用本地字体输出为不可搜索的图片页。',
-    markdownInputHint: '导入支持 UTF-8 或带 BOM 的 UTF-16。支持基础标题、列表、引用和代码块；不支持远程图片、HTML、完整表格或复杂 Markdown。链接地址将作为文字显示，不会成为可点击的 PDF 链接。中文会输出为图片页。',
+    textInputHint: '支持 UTF-8 或带 BOM 的 UTF-16 文本。含内置 PDF 字体不支持字符的页面将使用本地字体图片化，其他页面保留可选中、可搜索的文字。',
+    markdownInputHint: '导入支持 UTF-8 或带 BOM 的 UTF-16。支持基础标题、列表、引用和代码块；不支持远程图片、HTML、完整表格或复杂 Markdown。链接地址显示为普通文字，不成为可点击的链接。需要特殊字体的页面会图片化，其他页面仍可搜索。',
     pageStart: '显示的起始数字', firstPage: '从 PDF 第几页开始编号', firstPageReset: '新 PDF 的页数不足以使用之前的起始编号位置，已重置为从 PDF 第 1 页开始。', firstPageHint: '前面的封面、目录等页面不会添加页码；开始编号的那一页使用上方指定的起始数字。', pagePosition: '页码位置', pageSize: '字号', bottomCenter: '底部居中', bottomRight: '右下角', topRight: '右上角',
     numbersHint: '从指定 PDF 页开始添加可选择的页码，前面的页面不添加页码；保持原有纸张尺寸。重要文件请检查注释和数字签名。',
     ready: '文件已经生成', noPdf: '请先选择 PDF 文件。', noText: '请输入待转换的文字。', sizeLimit: 'PDF 最多 100 MB / 1000 页；TXT / Markdown 最多 5 MB。', limitText: 'TXT / Markdown 最多 5 MB；输出最多 1000 页（中文等图片化内容最多 300 页）。', limitImages: 'PDF 最多 100 MB / 1000 页；每批最多导出选定的 60 页图片。', limitCompression: 'PDF 最多 100 MB / 120 页；JPEG 数据累计上限 96 MB。', limitGeneral: 'PDF 最多 100 MB / 1000 页。', heavyWarning: '大文档提示：处理数百页时可能占用较多设备内存，并需要更长时间。建议关闭其他高负载标签页。', progressLabel: '已处理 {done} / {total} 页', tooMuchText: '文本内容超过 5 MB。',
-    noteUnicode: '由于含有非拉丁文字，此 PDF 输出为图片页，无法选择和搜索文字。', noteSearch: '输出文字可选择和搜索。',
+    noteUnicode: '由于含有非拉丁文字，此 PDF 输出为图片页，无法选择和搜索文字。', noteMixed: '共 {pages} 页，其中 {raster} 页含有内置字体不支持的字符，已图片化；其余 {searchable} 页仍可选择和搜索文字。', noteSearch: '输出文字可选择和搜索。',
     textResultStale: '此 PDF 由修改前的文字生成，尚未包含最新编辑。可以下载这个旧版本，或重新生成 PDF。',
     invalidFile: '请选择受支持的文件后重试。', resultPreview: '提取文字预览', dropHint: '也可以将文件拖到这里，不会上传至服务器。', imported: '已导入', multipleFiles: '此转换工具每次只接受一个文件。当前文件未改变，请只选择一个文件。', batchLabel: '图片批次 {current} / {total}', batchPrev: '上一批', batchNext: '下一批', batchCustom: '自定义页码范围', batchCustomHint: '“上一批 / 下一批”按每 60 页导航。先返回批次模式，才能从自定义页码附近继续。', batchResume: '返回分批浏览', cancel: '取消处理', cancelling: '正在取消…', cancelled: '已取消', packaging: '正在打包 ZIP：{percent}%', replacedFailed: '导入失败，当前仍是旧文件：{name}。', modified: '导入后已修改', nextStep: '查看其他工具（文件不会自动带入）', overlap: '页码会直接叠加在原页面上，可能遮挡页脚、印章或已有页码，使用前请核对。',
   },
@@ -375,7 +375,12 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           name: `${baseName}-${mode === 'markdown-to-pdf' ? 'markdown' : 'plain'}.pdf` };
         setOutput({ ...result, textRevision });
         setNotDownloaded(true);
-        setNotice(`${t.ready}: ${created.pageCount} ${t.pages} · ${formatBytes(created.bytes.length)} · ${created.searchable ? t.noteSearch : t.noteUnicode}`);
+        const searchNotice = created.rasterPages === 0 ? t.noteSearch
+          : created.rasterPages === created.pageCount ? t.noteUnicode
+            : t.noteMixed.replace('{raster}', String(created.rasterPages))
+              .replace('{pages}', String(created.pageCount))
+              .replace('{searchable}', String(created.pageCount - created.rasterPages));
+        setNotice(`${t.ready}: ${created.pageCount} ${t.pages} · ${formatBytes(created.bytes.length)} · ${searchNotice}`);
       } else if (mode === 'add-page-numbers') {
         result = { bytes: await addPageNumbers(pdf, { start: Number(start), firstPage: Number(firstPage), position, fontSize: Number(fontSize), signal: controller.signal }, report), name: `${pdfName}-numbered.pdf` };
         ensureNotCancelled();
