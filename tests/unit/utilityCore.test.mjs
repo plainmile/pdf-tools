@@ -132,7 +132,7 @@ test('generated download filename removes unsafe path characters and Windows dev
     assert.doesNotMatch(sanitizeFilename(safe), /^plainmile-/i, safe);
   }
   assert.equal(sanitizeFilename('...'), 'document');
-};
+});
 
 test('book-length text extraction and page numbering accept 500 pages up to 100 MiB', () => {
   const info = { size: 80 * 1024 ** 2, count: 500 };
