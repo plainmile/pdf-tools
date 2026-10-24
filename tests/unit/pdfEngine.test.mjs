@@ -252,14 +252,14 @@ test('bulk reflow refuses an oversized retained workspace before committing any 
   // A progress label that says "Updating photo X of Y" must not count PDF
   // sources or photos whose layout is already current.
   const layout = { paper: 'a4', orientation: 'portrait', margin: 30, imageSizing: 'contain' };
-  const unchanged = [
+  const noOpSources = [
     { id: 'pdf', isImage: false, bytes: new Uint8Array([1]) },
     { id: 'photo', isImage: true, bytes: new Uint8Array([2]),
       originalImageBytes: new Uint8Array([3]), imageLayout: layout },
   ];
   const progress = [];
-  assert.deepEqual(await reflowImageSources(unchanged, layout,
-    (done, total) => progress.push([done, total])), unchanged);
+  assert.deepEqual(await reflowImageSources(noOpSources, layout,
+    (done, total) => progress.push([done, total])), noOpSources);
   assert.deepEqual(progress, []);
 });
 
