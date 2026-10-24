@@ -154,6 +154,12 @@ test('malformed HTML comments parse near-linearly, without losing literal source
     'Before <!-- unfinished keep');
   assert.equal(stripMarkdownInline('alpha <!-- one --> beta <!-- two --> gamma'),
     'alpha  beta  gamma');
+  // Unknown HTML-like tags can contain comment-looking quoted attributes.
+  // Preserve them exactly instead of stripping the attribute's contents.
+  assert.equal(stripMarkdownInline('<Widget title="<!-- keep -->">hello</Widget>'),
+    '<Widget title="<!-- keep -->">hello</Widget>');
+  assert.equal(stripMarkdownInline('<strong title="<!-- irrelevant -->">bold</strong>'),
+    'bold');
 });
 
 test('Markdown code fences preserve trailing spaces and whitespace-only lines before PDF wrapping', () => {
