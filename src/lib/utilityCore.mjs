@@ -26,13 +26,23 @@ export const UTILITY_LIMITS = Object.freeze({
   // Conservative cross-browser maximum; a long narrow poster can be below
   // 12 MP but still exceed the canvas width/height supported by Safari.
   maxCanvasSide: 16_384,
+  // iPhone/iPad canvas dimensions can be as low as 4,096 px per axis.
+  maxIOSCanvasSide: 4_096,
 });
 
-export function enforceRasterViewport({ width, height }) {
+export function rasterCanvasSideLimit(userAgent = '', maxTouchPoints = 0) {
+  // iPadOS can advertise a desktop Macintosh UA, but remains touch-based.
+  const ios = /\b(?:iPhone|iPad|iPod)\b/i.test(userAgent) ||
+    (/\bMacintosh\b/.test(userAgent) && Number(maxTouchPoints) > 1);
+  return ios ? UTILITY_LIMITS.maxIOSCanvasSide : UTILITY_LIMITS.maxCanvasSide;
+}
+
+export function enforceRasterViewport({ width, height }, maxSide = UTILITY_LIMITS.maxCanvasSide) {
+  const pixelsWide = Math.round(width);
+  const pixelsHigh = Math.round(height);
   if (![width, height].every(value => Number.isFinite(value) && value > 0) ||
-      Math.round(width) > UTILITY_LIMITS.maxCanvasSide ||
-      Math.round(height) > UTILITY_LIMITS.maxCanvasSide ||
-      width * height > UTILITY_LIMITS.maxPixelCount) {
+      pixelsWide > maxSide || pixelsHigh > maxSide ||
+      pixelsWide * pixelsHigh > UTILITY_LIMITS.maxPixelCount) {
     throw new Error('This page is too large to rasterize safely.');
   }
   return true;
