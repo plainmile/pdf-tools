@@ -392,17 +392,17 @@ test('split preview exposes omissions and overlaps without blocking intentional 
   await page.getByRole('tab', { name: 'Split' }).click();
   const ranges = page.getByRole('textbox', { name: 'Page ranges', exact: true });
   await ranges.fill('1,3');
-  await expect(page.getByTestId('split-coverage-omitted')).toContainText('2 of 3');
-  await expect(page.getByTestId('split-coverage-omitted')).toContainText('excluded page(s): 2');
+  await expect(page.getByTestId('split-coverage-omitted')).toContainText('2 included');
+  await expect(page.getByTestId('split-coverage-omitted')).toContainText('Pages excluded from the split: 2');
   await expect(page.getByRole('button', { name: 'Download split PDFs (ZIP)' })).toBeEnabled();
   await ranges.fill('1-2,2-3');
   await expect(page.getByTestId('split-coverage-omitted')).toHaveCount(0);
-  await expect(page.getByTestId('split-coverage-repeated')).toContainText('page(s) occur in more than one file: 2');
+  await expect(page.getByTestId('split-coverage-repeated')).toContainText('Pages repeated across output files: 2');
   await ranges.fill('3,1-2');
-  await expect(page.getByTestId('split-coverage-complete')).toContainText('All 3 current output pages');
+  await expect(page.getByTestId('split-coverage-complete')).toContainText('Every current output page is included exactly once');
   await page.getByTestId('split-output-preview').locator('summary').click();
   await expect(page.getByTestId('split-output-preview').locator('li')).toHaveCount(2);
-  await expect(page.getByTestId('split-output-preview').locator('li').first()).toContainText('pages 3–3 (1 pages)');
+  await expect(page.getByTestId('split-output-preview').locator('li').first()).toContainText('pages 3–3 (1 page)');
   await expect(page.getByTestId('split-output-preview').locator('li').last()).toContainText('pages 1–2 (2 pages)');
 });
 
