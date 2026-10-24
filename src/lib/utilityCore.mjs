@@ -405,6 +405,71 @@ function readableMarkdownReferences(source) {
   return result + source.slice(cursor);
 }
 
+// Pre-index valid emphasis closers once per line. A lazy regex searching the
+// suffix from every unclosed '*' or '_' causes quadratic browser work.
+const INLINE_MARKS = ['**', '__', '~~', String.fromCharCode(96), '*', '_'];
+const INLINE_MARK_CHARS = '*_~' + String.fromCharCode(96);
+const INLINE_BOUNDARY = /[\p{L}\p{N}_*~]/u;
+const INLINE_SPACE = /\s/u;
+function inlinePreviousCharacter(line, at) {
+  const last = line.charCodeAt(at - 1);
+  // Match Unicode code points (including astral letters) at boundaries.
+  return at >= 2 && last >= 0xdc00 && last <= 0xdfff &&
+    line.charCodeAt(at - 2) >= 0xd800 && line.charCodeAt(at - 2) <= 0xdbff
+    ? line.slice(at - 2, at) : line[at - 1];
+}
+function inlineNextCharacter(line, at) {
+  const point = line.codePointAt(at);
+  return point === undefined ? '' : String.fromCodePoint(point);
+}
+function stripPairedMarkdownMarkers(source) {
+  return source.split('\n').map(line => {
+    const closers = new Map(INLINE_MARKS.map(mark => [mark, []]));
+    for (let at = 1; at < line.length; at++) {
+      const char = line[at];
+      if (!INLINE_MARK_CHARS.includes(char) ||
+          INLINE_SPACE.test(inlinePreviousCharacter(line, at))) continue;
+      for (const mark of INLINE_MARKS) {
+        if (mark[0] !== char || !line.startsWith(mark, at) ||
+            INLINE_BOUNDARY.test(inlineNextCharacter(line, at + mark.length))) continue;
+        closers.get(mark).push(at);
+      }
+    }
+    let output = '', cursor = 0;
+    for (let at = 0; at < line.length;) {
+      const char = line[at];
+      if (!INLINE_MARK_CHARS.includes(char) ||
+          (at > 0 && INLINE_BOUNDARY.test(inlinePreviousCharacter(line, at)))) {
+        at++;
+        continue;
+      }
+      let matched = false;
+      for (const mark of INLINE_MARKS) {
+        if (mark[0] !== char || !line.startsWith(mark, at)) continue;
+        const next = inlineNextCharacter(line, at + mark.length);
+        if (!next || INLINE_SPACE.test(next)) continue;
+        const candidates = closers.get(mark);
+        const minEnd = at + mark.length + 1;
+        let low = 0, high = candidates.length;
+        while (low < high) {
+          const middle = (low + high) >>> 1;
+          if (candidates[middle] < minEnd) low = middle + 1;
+          else high = middle;
+        }
+        if (low === candidates.length) continue;
+        const end = candidates[low];
+        output += line.slice(cursor, at) + line.slice(at + mark.length, end);
+        cursor = end + mark.length;
+        at = cursor;
+        matched = true;
+        break;
+      }
+      if (!matched) at++;
+    }
+    return output + line.slice(cursor);
+  }).join('\n');
+}
+
 // Intentionally a minimal CommonMark subset: never execute HTML, remote images or scripts.
 export function stripMarkdownInline(source) {
   // Shield single-backtick inline code before stripping links, HTML or emphasis.
@@ -415,19 +480,13 @@ export function stripMarkdownInline(source) {
   const outsideCode = source.replace(/`([^`\n]+)`/g, (_token, literal) => {
     return `${marker}${inlineCode.push(literal) - 1}${marker}`;
   });
-  return readableMarkdownReferences(outsideCode)
+  const plain = readableMarkdownReferences(outsideCode)
     // Strip only recognizable HTML tags with syntactically valid attributes.
     // Preserve "List<T>", "<username>", and "a<b && c>d" verbatim.
     .replace(/<!--[\s\S]*?-->|<\/?([A-Za-z][\w:-]*)(?:\s+[A-Za-z_:][\w:.-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*\s*\/?>/g,
       (token, tag) => tag && !PLAIN_MARKDOWN_HTML_TAGS.has(tag.toLowerCase()) ? token : '')
-    // Strip only MATCHED Markdown formatting markers. Removing every '*' and
-    // '_' silently corrupts identifiers (user_id), multiplication (a*b) and
-    // exponent notation (x**2) in technical reports.
-    // Reject marker boundaries *inside* a doubled operator. Otherwise a
-    // sequence like "x**2 and y**2" matches the inner single stars and loses
-    // one multiplication symbol at each end even though no Markdown emphasis
-    // was intended. Preserve scientific notation and unspaced identifiers.
-    .replace(/(?<![\p{L}\p{N}_*~])(\*\*|__|~~|`|\*|_)(?=\S)([^\n]*?\S)\1(?![\p{L}\p{N}_*~])/gu, '$2')
+    ;
+  return stripPairedMarkdownMarkers(plain)
     .replace(new RegExp(`${marker}(\\d+)${marker}`, 'g'),
       (_token, index) => inlineCode[Number(index)]);
 }
