@@ -9,7 +9,7 @@ import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges,
-  getRangePages, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
+  getRangePages, splitCoversAllPagesExactlyOnce, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
 function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview, onOpen, outputPosition, busy }) {
@@ -485,6 +485,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     const pieces = splitMode === 'ranges'
       ? parsePageRanges(ranges, pages.length)
       : chunkPageRanges(pages.length, Number(chunkSize));
+    // Every current output page must be present once in the downloaded set.
+    const completeSplit = splitCoversAllPagesExactlyOnce(pieces, pages.length);
     const controller = new AbortController();
     splitAbortRef.current = controller;
     setSplitCancelling(false);
@@ -504,7 +506,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           saveDownload(contents, `${outputBase}-pages-${range.start}-${range.end}.pdf`);
           // A one-piece export covering the entire edited workspace is
           // equivalent to Export PDF; don't warn about work already saved.
-          if (range.start === 1 && range.end === pages.length) setLastDownloadedRevision(documentRevision);
+          if (completeSplit) setLastDownloadedRevision(documentRevision);
           setNotice(t.splitSingleSaved);
           return;
         }
@@ -525,6 +527,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       });
       if (controller.signal.aborted) throw new Error('Split cancelled.');
       saveDownload(archive, `${outputBase}-split.zip`, 'application/zip');
+      if (completeSplit) setLastDownloadedRevision(documentRevision);
       setNotice(interpolate(t.zipped, { files: pieces.length }));
     } finally {
       splitAbortRef.current = null;
