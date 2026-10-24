@@ -214,6 +214,23 @@ test('unsuccessful compression retry keeps an undownloaded earlier, genuinely sm
   expect((await PDFDocument.load(stillThere.bytes)).getPageCount()).toBe(1);
 });
 
+test('Windows-reserved source names produce safe TXT and Markdown downloads', async ({ page }) => {
+  const pdf = await fixturePdf('Filename compatibility', 1);
+  for (const [route, name, expected] of [
+    ['/pdf-to-txt/', 'CON.pdf', 'plainmile-CON.txt'],
+    ['/pdf-to-markdown/', 'nul.pdf', 'plainmile-nul.md'],
+  ]) {
+    await page.goto(route);
+    await page.getByTestId('utility-file-input').setInputFiles({
+      name, mimeType: 'application/pdf', buffer: pdf,
+    });
+    await expect(page.getByTestId('utility-file-summary')).toContainText(name);
+    const output = await getDownload(page, () => page.getByTestId('utility-run').click());
+    expect(output.name).toBe(expected);
+    expect(output.bytes.toString('utf8')).toContain('Filename compatibility');
+  }
+});
+
 test('PDF to TXT and Markdown extract actual text, reject empty scanned pages', async ({ page }) => {
   const pdf = await fixturePdf('Hello searchable PlainMile');
   for (const [path, extension] of [['/pdf-to-txt/', 'txt'], ['/pdf-to-markdown/', 'md']]) {
