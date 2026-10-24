@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { PDFDocument } from 'pdf-lib';
+import JSZip from 'jszip';
 import { readFile } from 'node:fs/promises';
 
 async function syntheticPdf() {
@@ -7,6 +8,59 @@ async function syntheticPdf() {
   doc.addPage([320, 420]);
   return Buffer.from(await doc.save());
 }
+
+test('complete two-part split ZIP releases unsaved warning; a later edit enables it again', async ({ page }) => {
+  const doc = await PDFDocument.create();
+  for (const width of [310, 320, 330, 340]) doc.addPage([width, 420]);
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'all-in-zip.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await doc.save()),
+  });
+  await page.locator('#ranges-input').fill('3-4,1-2');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download split PDFs (ZIP)' }).click();
+  const archive = await JSZip.loadAsync(await readFile(await (await download).path()));
+  const entries = Object.keys(archive.files).sort();
+  expect(entries).toEqual(['part-01-pages-3-4.pdf', 'part-02-pages-1-2.pdf']);
+  const first = await PDFDocument.load(await archive.files[entries[0]].async('uint8array'));
+  const second = await PDFDocument.load(await archive.files[entries[1]].async('uint8array'));
+  expect(first.getPages().map(page => page.getWidth())).toEqual([330, 340]);
+  expect(second.getPages().map(page => page.getWidth())).toEqual([310, 320]);
+
+  const nativeGuard = () => page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  await expect.poll(nativeGuard).toBe(false);
+
+  await page.getByRole('tab', { name: 'Organize' }).click();
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  await page.getByRole('button', { name: 'Rotate clockwise' }).click();
+  await expect.poll(nativeGuard).toBe(true);
+});
+
+test('partial two-part split ZIP never claims the omitted pages were saved', async ({ page }) => {
+  const doc = await PDFDocument.create();
+  for (const width of [310, 320, 330, 340]) doc.addPage([width, 420]);
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'partial-zip.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await doc.save()),
+  });
+  await page.locator('#ranges-input').fill('1-2,4');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download split PDFs (ZIP)' }).click();
+  const archive = await JSZip.loadAsync(await readFile(await (await download).path()));
+  const parts = Object.values(archive.files);
+  const widths = [];
+  for (const part of parts) {
+    const pdf = await PDFDocument.load(await part.async('uint8array'));
+    widths.push(...pdf.getPages().map(page => page.getWidth()));
+  }
+  expect(widths).toEqual([310, 320, 340]);
+  await page.locator('.language-link').click();
+  await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
+});
 
 test('empty PDF workspace navigates freely, but an imported unsaved PDF asks before switching language', async ({ page }) => {
   await page.goto('/workspace/');

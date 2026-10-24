@@ -263,6 +263,27 @@ export function chunkPageRanges(pageCount, chunkSize) {
   return result;
 }
 
+/** A split is a complete saved document only when every current output page
+ * appears in exactly one downloaded part. Keep the unsaved guard for gaps,
+ * overlaps, malformed ranges and partial extracts, regardless of part order.
+ */
+export function splitCoversAllPagesExactlyOnce(ranges, pageCount) {
+  if (!Array.isArray(ranges) || !ranges.length ||
+      !Number.isSafeInteger(pageCount) || pageCount < 1) return false;
+  const seen = new Uint8Array(pageCount);
+  let covered = 0;
+  for (const range of ranges) {
+    if (!Number.isSafeInteger(range?.start) || !Number.isSafeInteger(range?.end) ||
+        range.start < 1 || range.end < range.start || range.end > pageCount) return false;
+    for (let number = range.start; number <= range.end; number++) {
+      if (seen[number - 1]) return false;
+      seen[number - 1] = 1;
+      covered++;
+    }
+  }
+  return covered === pageCount;
+}
+
 export function getRangePages(pages, range) {
   return pages.slice(range.start - 1, range.end);
 }
