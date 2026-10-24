@@ -470,24 +470,51 @@ function stripPairedMarkdownMarkers(source) {
   }).join('\n');
 }
 
-/** Remove only complete HTML comments using forward-only searches.
- * A global lazy HTML-comment regex rescans the same suffix for every unclosed
- * opener, making a few KB of malformed Markdown quadratic. Preserve the
- * exact original text of unclosed comments rather than swallowing it.
+/** Scan HTML comments and HTML tags left-to-right without quadratic
+ * retries on malformed '<!--'. Preserve unknown tags exactly, including
+ * comment-looking text inside their quoted attribute values.
  */
-function stripClosedMarkdownComments(source) {
-  const chunks = [];
+// Match HTML tags only at the current '<' to preserve the original
+// leftmost-alternative behavior, including unknown tags whose attributes
+// contain comment-like text. Sticky matching never scans past this position.
+const MARKDOWN_HTML_TAG_AT = /<\/?([A-Za-z][\w:-]*)(?:\s+[A-Za-z_:][\w:.-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*\s*\/?>/y;
+
+function stripKnownMarkdownHtml(source) {
+  const parts = [];
   let cursor = 0;
-  while (cursor < source.length) {
-    const start = source.indexOf('<!--', cursor);
+  let searchFrom = 0;
+  let noCommentCloser = false;
+  while (searchFrom < source.length) {
+    const start = source.indexOf('<', searchFrom);
     if (start < 0) break;
-    const end = source.indexOf('-->', start + 4);
-    if (end < 0) break;
-    chunks.push(source.slice(cursor, start));
-    cursor = end + 3;
+    if (!noCommentCloser && source.startsWith('<!--', start)) {
+      const end = source.indexOf('-->', start + 4);
+      if (end >= 0) {
+        parts.push(source.slice(cursor, start));
+        cursor = end + 3;
+        searchFrom = cursor;
+        continue;
+      }
+      // There are no more comment closers anywhere in this suffix.
+      // Do not re-search the same tail from subsequent malformed openers.
+      noCommentCloser = true;
+    }
+    MARKDOWN_HTML_TAG_AT.lastIndex = start;
+    const match = MARKDOWN_HTML_TAG_AT.exec(source);
+    if (match) {
+      if (PLAIN_MARKDOWN_HTML_TAGS.has(match[1].toLowerCase())) {
+        parts.push(source.slice(cursor, start));
+        cursor = MARKDOWN_HTML_TAG_AT.lastIndex;
+      }
+      // Unknown HTML-like tags are literal technical text. Skip the whole
+      // token so a comment marker within a quoted attribute is not stripped.
+      searchFrom = MARKDOWN_HTML_TAG_AT.lastIndex;
+      continue;
+    }
+    searchFrom = start + 1;
   }
-  chunks.push(source.slice(cursor));
-  return chunks.join('');
+  parts.push(source.slice(cursor));
+  return parts.join('');
 }
 
 // Intentionally a minimal CommonMark subset: never execute HTML, remote images or scripts.
@@ -500,11 +527,7 @@ export function stripMarkdownInline(source) {
   const outsideCode = source.replace(/`([^`\n]+)`/g, (_token, literal) => {
     return `${marker}${inlineCode.push(literal) - 1}${marker}`;
   });
-  const plain = stripClosedMarkdownComments(readableMarkdownReferences(outsideCode))
-    // Strip only recognizable HTML tags with syntactically valid attributes.
-    // Preserve "List<T>", "<username>", and "a<b && c>d" verbatim.
-    .replace(/<\/?([A-Za-z][\w:-]*)(?:\s+[A-Za-z_:][\w:.-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*\s*\/?>/g,
-      (token, tag) => tag && !PLAIN_MARKDOWN_HTML_TAGS.has(tag.toLowerCase()) ? token : '');
+  const plain = stripKnownMarkdownHtml(readableMarkdownReferences(outsideCode));
   return stripPairedMarkdownMarkers(plain)
     .replace(new RegExp(`${marker}(\\d+)${marker}`, 'g'),
       (_token, index) => inlineCode[Number(index)]);
