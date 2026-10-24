@@ -111,6 +111,30 @@ test('Markdown links preserve targets with nested parentheses and optional title
     'Literal [docs](https://example.com) stays literal');
 });
 
+test('Markdown code fences preserve trailing spaces and whitespace-only lines before PDF wrapping', () => {
+  const input = [
+    '```js',
+    'const config = 1;   ',
+    '    ',
+    '',
+    '  return config;  ',
+    '```',
+    'Normal prose trailing spaces    ',
+  ].join('\n');
+  const blocks = parseTextBlocks(input, true);
+  assert.deepEqual(blocks.map(block => [block.kind, block.text]), [
+    ['code', 'const config = 1;   '],
+    ['code', '    '],
+    ['code', ''],
+    ['code', '  return config;  '],
+    ['paragraph', 'Normal prose trailing spaces'],
+  ]);
+  const first = [...wrapTextLines(blocks[0].text, 8, () => 1, { preserveWords: false })];
+  assert.equal(first.join(''), blocks[0].text);
+  const spaces = [...wrapTextLines(blocks[1].text, 8, () => 1, { preserveWords: false })];
+  assert.equal(spaces.join(''), '    ');
+});
+
 test('Markdown code fences respect marker type, opening length and closing-line syntax', () => {
   const blocks = parseTextBlocks([
     '````js',

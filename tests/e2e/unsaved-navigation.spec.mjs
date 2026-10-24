@@ -213,21 +213,55 @@ test('emptying text cannot silently discard an undownloaded earlier PDF; downloa
   await expect(page).toHaveURL(/\/zh\/txt-to-pdf\/$/);
 });
 
-test('plain PDF utility after import protects its source; explicit Clear releases navigation', async ({ page }) => {
+test('importing an unchanged PDF into a converter never reports unsaved work', async ({ page }) => {
+  const buffer = await syntheticPdf();
+  const nativeGuard = () => page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  for (const route of ['/pdf-to-txt/', '/pdf-to-images/', '/add-page-numbers/', '/compress-pdf/']) {
+    await page.goto(route);
+    await page.getByTestId('utility-file-input').setInputFiles({
+      name: 'unchanged.pdf', mimeType: 'application/pdf', buffer,
+    });
+    await expect(page.getByTestId('utility-file-summary')).toContainText('unchanged.pdf');
+    await expect.poll(nativeGuard).toBe(false);
+    if (route === '/pdf-to-images/') {
+      await page.getByRole('combobox', { name: 'Image format' }).selectOption('png');
+      await expect.poll(nativeGuard).toBe(false);
+    }
+    await page.locator('.primary-nav a[href="/merge-pdf/"]').click();
+    await expect(page).toHaveURL(/\/merge-pdf\/$/);
+    await expect(page.getByTestId('unsaved-navigation-dialog')).toHaveCount(0);
+  }
+});
+
+test('an incomplete PDF text extraction still blocks navigation until downloaded', async ({ page }) => {
+  const doc = await PDFDocument.create();
+  doc.addPage([320, 420]).drawText('Selectable text on page one');
+  doc.addPage([320, 420]); // Page two cannot be extracted without OCR.
   await page.goto('/pdf-to-txt/');
   await page.getByTestId('utility-file-input').setInputFiles({
-    name: 'minimal.pdf', mimeType: 'application/pdf', buffer: await syntheticPdf(),
+    name: 'mixed.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await doc.save()),
   });
-  // PDF.js loads and counts pages asynchronously; navigation protection
-  // should be tested only once the active file is actually loaded.
-  await expect(page.getByTestId('utility-file-summary')).toContainText('minimal.pdf');
+  await expect(page.getByTestId('utility-file-summary')).toContainText('mixed.pdf');
+  const nativeGuard = () => page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  await expect.poll(nativeGuard).toBe(false);
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('partial-text-download')).toBeVisible();
+  await expect.poll(nativeGuard).toBe(true);
   await page.locator('.primary-nav a[href="/merge-pdf/"]').click();
   await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
   await page.getByTestId('unsaved-keep').click();
-  await page.getByRole('button', { name: 'Clear' }).click();
-  await expect(page.getByTestId('unsaved-navigation-dialog')).toHaveCount(0);
-  await page.locator('.primary-nav a[href="/merge-pdf/"]').click();
-  await expect(page).toHaveURL(/\/merge-pdf\/$/);
+  const download = page.waitForEvent('download');
+  await page.getByTestId('partial-text-download').click();
+  await download;
+  await expect.poll(nativeGuard).toBe(false);
 });
 
 test('deleting all pages protects the recoverable Undo history on internal and native navigation', async ({ page }) => {

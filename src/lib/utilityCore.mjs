@@ -323,7 +323,10 @@ export function parseTextBlocks(source, markdown = false) {
   // must remain literal CODE rather than silently change later paragraphs.
   let fence = null;
   for (const raw of value.split('\n')) {
-    const line = raw.trimEnd();
+    // Prose may normalize trailing whitespace, but fenced code is literal.
+    // Keep trailing spaces and whitespace-only lines inside a code fence:
+    // trimming here destroys them before the PDF wrapping step can help.
+    const line = markdown && fence ? raw : raw.trimEnd();
     if (markdown) {
       if (fence) {
         const closing = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
@@ -339,7 +342,7 @@ export function parseTextBlocks(source, markdown = false) {
         }
       }
     }
-    if (markdown && fence && line.trim()) { blocks.push({ text: line, size: 10, kind: 'code' }); continue; }
+    if (markdown && fence) { blocks.push({ text: line, size: 10, kind: 'code' }); continue; }
     if (!line.trim()) { blocks.push({ text: '', size: 12, kind: 'gap' }); continue; }
     if (markdown && /^\s{0,3}#{1,3} /.test(line)) {
       const match = /^\s{0,3}(#{1,3})\s+(.*)$/.exec(line);
