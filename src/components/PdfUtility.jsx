@@ -215,6 +215,12 @@ export default function PdfUtility({ mode, locale = 'en' }) {
       if (isTextInput) {
         if (!/\.(?:txt|md|markdown)$/i.test(file.name) || !file.size || file.size > UTILITY_LIMITS.maxTextBytes) throw new Error(t.invalidFile);
         const content = decodeImportedText(new Uint8Array(await file.arrayBuffer()), locale);
+        // UTF-16 can be smaller on disk than the UTF-8 text we actually
+        // convert. Reject at import time, before discarding the previous
+        // draft or generated PDF, instead of failing only after Run.
+        if (new TextEncoder().encode(content).length > UTILITY_LIMITS.maxTextBytes) {
+          throw new Error(t.tooMuchText);
+        }
         clearOutput();
         setSourceText(content);
         setTextRevision(previous => previous + 1);
