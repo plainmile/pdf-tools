@@ -140,6 +140,7 @@ export function translateProcessingError(message, locale = 'en') {
   if (/JPEG metadata could not be safely removed/i.test(error)) return 'JPEG 元数据结构异常，无法安全移除隐藏信息。请换一张图片或先导出为不含元数据的新图片。';
   if (/Split cancelled/i.test(error)) return '已取消拆分，没有下载未完成的 ZIP。';
   if (/PDF export cancelled/i.test(error)) return '已取消 PDF 导出，没有下载未完成的文件。';
+  if (/Photo layout update cancelled/i.test(error)) return '已取消照片排版，原有页面保持不变。';
   if (/Split PDF outputs exceed the 128 MB/i.test(error)) return '拆分输出累计超过 128 MB 安全上限，请减少或调整拆分范围。';
   if (/enter watermark text|watermark text must|watermarks require|canvas is unavailable for watermark|could not create the watermark image|invalid PDF page dimensions for watermark/i.test(error)) return '请填写有效的水印文字，或关闭水印功能。';
   if (/50 output|50 ranges|maximum of 50/i.test(error)) return '一次最多生成 50 个 PDF 或使用 50 段页码范围，请减少输出文件数。';
