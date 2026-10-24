@@ -25,7 +25,7 @@ jobs:
       - name: Unit tests and static build inside Node container
         run: |
           docker run --rm -v "$PWD:/app" -w /app node:22-bookworm-slim \
-            sh -lc 'set -eu; if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi; npm run test:unit; npm run build'
+            sh -lc 'set -eu; npm ci --no-audit --no-fund; npm run test:unit; npm run build'
       - name: Verify canonical routes and PDF.js worker
         run: |
           set -euo pipefail
