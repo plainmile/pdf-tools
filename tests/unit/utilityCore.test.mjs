@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline,
   textContentToLines, linesToReadableText, summarizeTextCoverage, sanitizeFilename, workspaceFilenameStem,
-  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
+  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
 
 test('text importer decodes UTF-8 and BOM-marked Windows UTF-16 without data loss', () => {
@@ -146,6 +146,15 @@ test('220 DPI image export scale is exact and untrusted scales fall back safely'
   assert.equal(validatedImageScale(2), 2);
   assert.equal(validatedImageScale(500), 1.5);
   assert.equal(validatedImageScale(3), 1.5);
+});
+
+test('image rasterizer rejects extreme aspect ratios before allocating browser canvas', () => {
+  assert.equal(enforceRasterViewport({ width: 4000, height: 2000 }), true);
+  assert.equal(enforceRasterViewport({ width: 16384, height: 200 }), true);
+  assert.throws(() => enforceRasterViewport({ width: 17000, height: 300 }), /too large to rasterize/);
+  assert.throws(() => enforceRasterViewport({ width: 300, height: 17000 }), /too large to rasterize/);
+  assert.throws(() => enforceRasterViewport({ width: 4000, height: 4000 }), /too large to rasterize/);
+  assert.throws(() => enforceRasterViewport({ width: NaN, height: 10 }), /too large to rasterize/);
 });
 
 test('image conversion selects any 60 pages from a 500-page book, not only first 60', () => {
