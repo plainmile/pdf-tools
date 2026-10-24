@@ -134,6 +134,36 @@ export function sortPagesByFilename(pages, sources, locale = 'en', direction = '
     .map(({ page }) => page);
 }
 
+/** Explicitly recombine two simplex scans into duplex reading order.
+ * Source A contains front/odd pages; source B contains back/even pages,
+ * possibly scanned backwards after turning over the paper stack.
+ * Neither source document nor page rotation is modified; this only produces
+ * a new page-reference order, making the operation a single Undo step.
+ */
+export function interleaveDuplexPages(pages, reverseBacks = false) {
+  if (!Array.isArray(pages) || typeof reverseBacks !== 'boolean') {
+    throw new Error('Choose two source PDFs for duplex interleaving.');
+  }
+  // Source order is the order in which the FIRST ACTIVE page of each source
+  // occurs in the current export. This is the same order shown in source view.
+  const groups = groupPagesBySource(pages);
+  if (groups.length !== 2) throw new Error('Choose exactly two source PDFs for duplex interleaving.');
+  const fronts = groups[0].items.map(item => item.pageRef);
+  const backs = groups[1].items.map(item => item.pageRef);
+  // A last sheet can have an empty back side, but unmatched middle sheets
+  // cannot be inferred safely. Reject rather than silently discard pages.
+  if (fronts.length < backs.length || fronts.length > backs.length + 1) {
+    throw new Error('Front PDF must have the same number of pages as the back PDF, or one extra.');
+  }
+  const orderedBacks = reverseBacks ? [...backs].reverse() : backs;
+  const next = [];
+  for (let index = 0; index < fronts.length; index++) {
+    next.push(fronts[index]);
+    if (orderedBacks[index]) next.push(orderedBacks[index]);
+  }
+  return next.every((page, index) => page === pages[index]) ? pages : next;
+}
+
 /** Duplicate selected pages immediately AFTER their originals in current order.
  * Copies receive fresh page IDs but point to the same underlying source page;
  * the source bytes and rotation stay unchanged, and Undo restores original order.

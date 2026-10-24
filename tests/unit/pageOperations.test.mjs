@@ -4,7 +4,7 @@ import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, parsePageRanges,
   chunkPageRanges, getRangePages, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
-  reversePages, sortPagesByFilename, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges, pageIdsForParity, invertPageIdSelection,
+  reversePages, sortPagesByFilename, interleaveDuplexPages, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges, pageIdsForParity, invertPageIdSelection,
 } from '../../src/lib/pageOperations.mjs';
 
 const pages = Object.freeze([
@@ -231,6 +231,36 @@ test('identically named source PDFs sort as separate files using import order', 
     ['1-0', '1-1', '2-0', '2-1']);
   assert.deepEqual(ids(sortPagesByFilename(mixed, sources, 'en', 'desc')),
     ['1-0', '1-1', '2-0', '2-1']);
+});
+
+test('duplex scans interleave 1,3,5 with reversed 6,4,2 as 1,2,3,4,5,6', () => {
+  const fronts = [1, 3, 5].map(n => Object.freeze({ id: String(n), sourceId: 'fronts', pageIndex: n - 1, rotation: 90 }));
+  const backs = [6, 4, 2].map(n => Object.freeze({ id: String(n), sourceId: 'backs', pageIndex: n - 1, rotation: 0 }));
+  const imported = Object.freeze([...fronts, ...backs]);
+  const reversed = interleaveDuplexPages(imported, true);
+  assert.deepEqual(ids(reversed), ['1','2','3','4','5','6']);
+  assert.deepEqual(ids(interleaveDuplexPages(imported, false)), ['1','6','3','4','5','2']);
+  assert.equal(reversed[0].rotation, 90);
+  assert.equal(reversed[1].pageIndex, 1);
+  assert.deepEqual(ids(imported), ['1','3','5','6','4','2']);
+  const history = commitHistory(makeHistoryState(imported), reversed);
+  assert.deepEqual(ids(undoHistory(history).present), ids(imported));
+  assert.deepEqual(ids(redoHistory(undoHistory(history)).present), ids(reversed));
+  assert.strictEqual(interleaveDuplexPages(reversed, false), reversed);
+});
+
+test('duplex interleave allows one extra front, but rejects mismatched source counts safely', () => {
+  const make = (id, sourceId) => ({ id, sourceId, pageIndex: 0, rotation: 0 });
+  const frontLonger = [make('f1', 'a'), make('f2', 'a'), make('b1', 'b')];
+  assert.deepEqual(ids(interleaveDuplexPages(frontLonger)), ['f1', 'b1', 'f2']);
+  const bad = [make('f1','a'),make('f2','a'),make('f3','a'),make('b1','b')];
+  assert.throws(() => interleaveDuplexPages(bad), /same number of pages.*one extra/);
+  assert.deepEqual(ids(bad), ['f1', 'f2', 'f3', 'b1']);
+  assert.throws(() => interleaveDuplexPages([make('f1','a')]), /exactly two/);
+  assert.throws(() => interleaveDuplexPages([make('f1','a'),make('b1','b'),make('c1','c')]), /exactly two/);
+  assert.throws(() => interleaveDuplexPages([make('f1','a'),make('b1','b'),make('b2','b')]), /same number/);
+  assert.throws(() => interleaveDuplexPages([], true), /exactly two/);
+  assert.throws(() => interleaveDuplexPages(frontLonger, 'reverse'), /Choose two/);
 });
 
 test('duplicate selected pages immediately after originals using distinct IDs; Undo/Redo preserve all page data', () => {
