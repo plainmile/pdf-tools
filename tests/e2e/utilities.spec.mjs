@@ -1011,7 +1011,8 @@ test('mixed selectable text and genuine scanned-image page warns about omitted t
     expect(downloads).toEqual([]);
     const result = await getDownload(page, () => page.getByTestId('partial-text-download').click(), 30000);
     page.off('download', onDownload);
-    expect(result.name).toMatch(new RegExp('\\.' + ext + '
+    expect(result.name).toMatch(new RegExp('\\.' + ext + '$'));
+    const text = result.bytes.toString('utf8');
     expect(text).toContain('Searchable cover');
     expect(text).toContain('Searchable ending');
     expect(text).not.toContain('SCANNED IMAGE ONLY');
@@ -1021,7 +1022,7 @@ test('mixed selectable text and genuine scanned-image page warns about omitted t
   }
 });
 
-test('partial text export stays available after a cancelled retry and allows deliberate re-download', async ({ page }) => {
+test('incomplete text result allows repeat downloads without reprocessing', async ({ page }) => {
   const doc = await PDFDocument.create();
   doc.addPage([400, 600]).drawText('Partial source report', { x: 25, y: 500 });
   doc.addPage([400, 600]);
@@ -1034,154 +1035,6 @@ test('partial text export stays available after a cancelled retry and allows del
   await expect(page.getByTestId('partial-text-download')).toBeEnabled();
   const second = await getDownload(page, () => page.getByTestId('partial-text-download').click());
   expect(second.bytes.equals(first.bytes)).toBe(true);
-});
-
-test('fully searchable PDF text does not show an incomplete-extraction warning', async ({ page }) => {
-  await page.goto('/pdf-to-txt/');
-  await upload(page, await fixturePdf('Everything searchable', 3));
-  const output = await getDownload(page, () => page.getByTestId('utility-run').click());
-  expect(output.bytes.toString('utf8')).toContain('Everything searchable 3');
-  await expect(page.getByTestId('text-extraction-warning')).toHaveCount(0);
-});
-
-test('Clear protects an undownloaded generated TXT PDF but not an already downloaded output', async ({ page }) => {
-  await page.goto('/txt-to-pdf/');
-  await page.getByTestId('utility-file-input').setInputFiles({
-    name: 'draft.txt', mimeType: 'text/plain', buffer: Buffer.from('Original draft to keep'),
-  });
-  await expect(page.getByTestId('text-file-summary')).toContainText('draft.txt');
-  await page.getByTestId('utility-run').click();
-  await expect(page.getByTestId('text-pdf-result')).toBeVisible();
-  const clear = page.getByTestId('text-file-summary').getByRole('button', { name: 'Clear' });
-  await clear.click();
-  await expect(page.getByTestId('utility-clear-confirm')).toContainText('not been safely saved');
-  await page.getByTestId('utility-clear-keep').click();
-  await expect(page.getByTestId('utility-clear-confirm')).toHaveCount(0);
-  await expect(page.getByTestId('text-pdf-result')).toBeVisible();
-  await expect(page.getByTestId('utility-text')).toHaveValue('Original draft to keep');
-  const result = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
-  expect((await PDFDocument.load(result.bytes)).getPageCount()).toBe(1);
-  await clear.click();
-  await expect(page.getByTestId('utility-clear-confirm')).toHaveCount(0);
-  await expect(page.getByTestId('utility-text')).toHaveValue('');
-  await expect(page.getByTestId('utility-run')).toBeDisabled();
-});
-
-test('Chinese typed-only unsaved draft can be cleared only after explicit confirmation', async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto('/zh/markdown-to-pdf/');
-  await page.getByTestId('utility-text').fill('# 重要草稿\n待保存的内容');
-  await page.getByTestId('utility-text-clear').click();
-  await expect(page.getByTestId('utility-clear-confirm')).toContainText('尚未妥善保存');
-  await page.getByTestId('utility-clear-keep').click();
-  await expect(page.getByTestId('utility-text')).toHaveValue(/待保存的内容/);
-  await page.getByTestId('utility-text-clear').click();
-  await page.getByTestId('utility-clear-confirm-button').click();
-  await expect(page.getByTestId('utility-text')).toHaveValue('');
-  await expect(page.getByTestId('utility-run')).toBeDisabled();
-  const box = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth }));
-  expect(box.scroll).toBeLessThanOrEqual(box.viewport + 2);
-});
-
-
-test('Chinese text-to-PDF replacement protects edited text and an undownloaded real PDF preview', async ({ page }) => {
-  test.setTimeout(45000);
-  await page.goto('/zh/txt-to-pdf/');
-  await page.getByTestId('utility-file-input').setInputFiles({
-    name: 'original.txt', mimeType: 'text/plain', buffer: Buffer.from('Original editable report'),
-  });
-  await expect(page.getByTestId('text-file-summary')).toContainText('original.txt');
-  await page.getByTestId('utility-text').fill('Edited important report 2026');
-  await page.getByTestId('utility-run').click();
-  await expect(page.getByTestId('text-pdf-result')).toBeVisible({ timeout: 15000 });
-
-  const replacement = { name: 'replacement.txt', mimeType: 'text/plain', buffer: Buffer.from('Different replacement text') };
-  await page.getByTestId('utility-file-input').setInputFiles(replacement);
-  await expect(page.getByTestId('utility-replace-confirm')).toContainText('replacement.txt');
-  await expect(page.getByTestId('utility-replace-confirm')).toContainText('尚未下载');
-  await expect(page.getByTestId('text-file-summary')).toContainText('original.txt');
-  await expect(page.getByTestId('utility-text')).toHaveValue('Edited important report 2026');
-  await expect(page.getByTestId('text-pdf-result')).toBeVisible();
-  await expect(page.getByTestId('utility-file-input')).toBeDisabled();
-  await expect(page.getByTestId('utility-run')).toBeDisabled();
-
-  await page.getByTestId('utility-replace-keep').click();
-  await expect(page.getByTestId('utility-replace-confirm')).toHaveCount(0);
-  await expect(page.getByTestId('utility-text')).toHaveValue('Edited important report 2026');
-  const oldPdf = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
-  expect((await PDFDocument.load(oldPdf.bytes)).getPageCount()).toBe(1);
-
-  // The user still edited the imported text, even after downloading a PDF.
-  // A second replacement must not discard this draft without consent.
-  await page.getByTestId('utility-file-input').setInputFiles(replacement);
-  await expect(page.getByTestId('utility-replace-confirm')).toBeVisible();
-  await page.getByTestId('utility-replace-accept').click();
-  await expect(page.getByTestId('text-file-summary')).toContainText('replacement.txt');
-  await expect(page.getByTestId('utility-text')).toHaveValue('Different replacement text');
-  await expect(page.getByTestId('text-pdf-result')).toHaveCount(0);
-  await expect(page.getByTestId('utility-replace-confirm')).toHaveCount(0);
-  await expect(page.getByTestId('utility-run')).toBeEnabled();
-});
-
-test('unsaved compressed PDF survives accidental replacement drop, but a downloaded result does not add friction', async ({ page }) => {
-  test.setTimeout(65000);
-  await page.goto('/compress-pdf/');
-  const rawPng = await page.evaluate(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 620; canvas.height = 620;
-    const ctx = canvas.getContext('2d');
-    const image = ctx.createImageData(620, 620);
-    let n = 1234567;
-    for (let k = 0; k < image.data.length; k += 4) {
-      n ^= n << 13; n ^= n >>> 17; n ^= n << 5;
-      image.data[k] = n & 255; image.data[k + 1] = (n >>> 8) & 255;
-      image.data[k + 2] = (n >>> 16) & 255; image.data[k + 3] = 255;
-    }
-    ctx.putImageData(image, 0, 0);
-    return canvas.toDataURL('image/png').split(',')[1];
-  });
-  const source = await PDFDocument.create();
-  const image = await source.embedPng(Buffer.from(rawPng, 'base64'));
-  source.addPage([595, 842]).drawImage(image, { x: 0, y: 0, width: 595, height: 842 });
-  const input = Buffer.from(await source.save());
-  await upload(page, input);
-  await page.getByTestId('utility-run').click();
-  await expect(page.getByTestId('compression-download')).toBeEnabled({ timeout: 30000 });
-
-  const nextPdf = (await fixturePdf('Next PDF', 2)).toString('base64');
-  async function dropNewPdf() {
-    await page.evaluate(base64 => {
-      const data = Uint8Array.from(atob(base64), value => value.charCodeAt(0));
-      const transfer = new DataTransfer();
-      transfer.items.add(new File([data], 'replacement.pdf', { type: 'application/pdf' }));
-      document.querySelector('[data-testid="utility-dropzone"]').dispatchEvent(
-        new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
-    }, nextPdf);
-  }
-  await dropNewPdf();
-  await expect(page.getByTestId('utility-replace-confirm')).toContainText('replacement.pdf');
-  await expect(page.getByTestId('utility-file-summary')).toContainText('fixture.pdf');
-  await expect(page.getByTestId('compression-download')).toBeEnabled();
-  await page.getByTestId('utility-replace-keep').click();
-  const old = await getDownload(page, () => page.getByTestId('compression-download').click());
-  expect((await PDFDocument.load(old.bytes)).getPageCount()).toBe(1);
-  expect(old.bytes.length).toBeLessThan(input.length);
-
-  await dropNewPdf();
-  await expect(page.getByTestId('utility-replace-confirm')).toHaveCount(0);
-  await expect(page.getByTestId('utility-file-summary')).toContainText('replacement.pdf');
-  await expect(page.getByTestId('compression-result')).toHaveCount(0);
-  await expect(page.getByTestId('utility-run')).toBeEnabled();
-});
-));
-    const text = result.bytes.toString('utf8');
-    expect(text).toContain('Searchable cover');
-    expect(text).toContain('Searchable ending');
-    expect(text).not.toContain('SCANNED IMAGE ONLY');
-    const warning = page.getByTestId('text-extraction-warning');
-    await expect(warning).toContainText(hint);
-    await expect(warning).toContainText('2');
-  }
 });
 
 test('fully searchable PDF text does not show an incomplete-extraction warning', async ({ page }) => {
