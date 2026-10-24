@@ -473,6 +473,7 @@ export function textContentToReadingOrderLines(content, order = 'rows', viewport
   }
   const columns = [[], []];
   for (const item of content.items) {
+    if (typeof item.str !== 'string' || !item.str.trim()) continue;
     const x = Number(item.transform?.[4]);
     const y = Number(item.transform?.[5]);
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
