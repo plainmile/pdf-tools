@@ -304,6 +304,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       // helpful message, never throw during rendering or destroy the workspace.
       interleaveDuplexPages(pages, reverseBacks);
       commit(previous => interleaveDuplexPages(previous, reverseBacks));
+      // Source-group view intentionally keeps each file separate and would hide
+      // the new alternating order. Show the REAL export order for inspection.
+      setPageView('order');
       setNotice(t.duplexDone);
     } catch (_error) {
       setError(t.duplexInvalidCounts);
