@@ -843,6 +843,20 @@ test('wide-glyph words and code spacing create readable, bounded PDF pages', asy
   expect(words).toContain('tail');
 });
 
+test('combined Unicode graphemes generate a real, previewable local PDF without dropping text', async ({ page }) => {
+  await page.goto('/markdown-to-pdf/');
+  const phrase = 'Cafe\u0301 \u{1f469}\u{1f3fd}\u200d\u{1f4bb} \u{1f1fa}\u{1f1f3}';
+  await page.getByTestId('utility-text').fill('# Unicode page\n' + phrase + '\n' + phrase.repeat(20));
+  const result = await generateTextPdfAndDownload(page, 30000);
+  const doc = await PDFDocument.load(result.bytes);
+  expect(doc.getPageCount()).toBeGreaterThanOrEqual(1);
+  const first = doc.getPage(0);
+  const refs = first.node.Resources();
+  const resources = refs && doc.context.lookup(refs, PDFDict);
+  const images = resources?.get(PDFName.of('XObject'));
+  expect(images ? doc.context.lookup(images, PDFDict).keys().length : 0).toBeGreaterThan(0);
+});
+
 test('English Markdown quotes, rules and numbered steps produce searchable PDF text', async ({ page }) => {
   await page.goto('/markdown-to-pdf/');
   await page.getByTestId('utility-text').fill('# Weekly report\n\n> Important notice\n\n---\n\n1. First step\n2) Second step');
