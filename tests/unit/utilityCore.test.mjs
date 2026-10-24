@@ -162,8 +162,15 @@ test('partial PDF text extraction reports exactly the pages without selectable t
   });
 });
 
-test('generated download filename removes unsafe path characters', () => {
+test('generated download filename removes unsafe path characters and Windows device names', () => {
   assert.equal(sanitizeFilename('../secret\n local.pdf'), '..-secret-local');
+  for (const reserved of ['CON.pdf', 'prn.md', 'AUX.txt', 'NUL', 'COM1.PDF', 'lpt9.pdf', 'CON..pdf']) {
+    assert.match(sanitizeFilename(reserved), /^plainmile-/i, reserved);
+  }
+  for (const safe of ['CONTRACT.pdf', 'COM10.pdf', 'LPT0.pdf', 'NUL2.pdf', 'Personal.pdf']) {
+    assert.doesNotMatch(sanitizeFilename(safe), /^plainmile-/i, safe);
+  }
+  assert.equal(sanitizeFilename('...'), 'document');
 });
 
 test('book-length text extraction and page numbering accept 500 pages up to 100 MiB', () => {

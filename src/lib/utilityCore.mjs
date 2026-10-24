@@ -392,5 +392,12 @@ export function workspaceFilenameStem(input, fallback = '') {
     ? `plainmile-${stem}` : stem;
 }
 export function sanitizeFilename(filename) {
-  return (filename || 'document').replace(/\.[^.]+$/, '').replace(/[^\p{L}\p{N}._-]+/gu, '-').slice(0, 70) || 'document';
+  const stem = (filename || 'document').replace(/\.[^.]+$/, '')
+    .replace(/[^\p{L}\p{N}._-]+/gu, '-').slice(0, 70)
+    .replace(/\.+$/g, '') || 'document';
+  // Windows reserves device names even when followed by .pdf, .txt or .md.
+  // The workspace custom-name field already guards these; utility-generated
+  // converter filenames must follow the same rule.
+  return /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(stem)
+    ? `plainmile-${stem}` : stem;
 }
