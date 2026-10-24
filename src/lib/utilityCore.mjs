@@ -23,7 +23,20 @@ export const UTILITY_LIMITS = Object.freeze({
   // JPEG buffers and PDF serialization coexist in browser memory.
   maxCompressionImageBytes: 96 * MiB,
   maxPixelCount: 12_000_000,
+  // Conservative cross-browser maximum; a long narrow poster can be below
+  // 12 MP but still exceed the canvas width/height supported by Safari.
+  maxCanvasSide: 16_384,
 });
+
+export function enforceRasterViewport({ width, height }) {
+  if (![width, height].every(value => Number.isFinite(value) && value > 0) ||
+      Math.round(width) > UTILITY_LIMITS.maxCanvasSide ||
+      Math.round(height) > UTILITY_LIMITS.maxCanvasSide ||
+      width * height > UTILITY_LIMITS.maxPixelCount) {
+    throw new Error('This page is too large to rasterize safely.');
+  }
+  return true;
+}
 
 export function enforceUtilityPdfLimits({ size, count }, mode, locale = 'en') {
   const zh = locale === 'zh';
