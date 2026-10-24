@@ -983,6 +983,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                       const source = sourceLookup.get(group.sourceId);
                       const collapsed = collapsedSources.has(group.sourceId);
                       const label = source?.name ?? t.document;
+                      // A collapsed group can still own selected pages. Never hide
+                      // that fact before destructive or bulk operations.
+                      const selectedInGroup = group.items.reduce((total, item) => total + (selected.has(item.pageRef.id) ? 1 : 0), 0);
                       return (
                         <section className="source-group" data-testid="source-group" key={group.sourceId}
                           aria-label={label} data-source-id={group.sourceId}>
@@ -994,6 +997,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                               <span aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
                               <span className="source-group-name" title={label}>{label}</span>
                               <span className="source-group-count">{interpolate(t.groupPageCount, { pages: group.items.length })}</span>
+                              {selectedInGroup > 0 && <span className="source-group-selected-count" data-testid="source-group-selected-count">
+                                {interpolate(t.groupSelectedCount, { pages: selectedInGroup })}
+                              </span>}
                             </button>
                             <button type="button" className="source-group-select" disabled={busy}
                               data-testid="source-group-select" onClick={() => {
@@ -1001,6 +1007,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                                 lastSelectedIndex.current = null;
                                 lastGroupedSelection.current = null;
                               }}>{t.all}</button>
+                            {selectedInGroup > 0 && <button type="button" className="source-group-select" disabled={busy}
+                              data-testid="source-group-deselect" onClick={() => {
+                                const groupIds = new Set(group.items.map(item => item.pageRef.id));
+                                setSelected(previous => new Set([...previous].filter(id => !groupIds.has(id))));
+                                lastSelectedIndex.current = null;
+                                lastGroupedSelection.current = null;
+                              }}>{t.groupClearSelection}</button>}
                           </div>
                           {!collapsed && <div className="page-grid" id={`source-pages-${group.sourceId}`}
                             data-testid="source-group-pages">{groupedTiles(group)}</div>}
