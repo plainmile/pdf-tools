@@ -276,10 +276,11 @@ main { flex: 1; }
 .source-group-actions .input-note { flex: 1 1 230px; margin: 0; }
 .source-group-actions button, .source-group-select { background: transparent; color: var(--accent); border: 0; font-size: 12px; padding: 6px 8px; }
 .source-group { border: 1px solid var(--border); background: var(--panel); border-radius: 7px; padding: 12px; min-width: 0; }
-.source-group-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.source-group-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
 .source-group-heading > button:first-child { display: flex; align-items: center; gap: 11px; padding: 8px 6px; border: 0; background: transparent; color: var(--text); min-width: 0; flex: 1; text-align: left; font-weight: 650; }
 .source-group-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: min(58vw, 420px); }
 .source-group-count { color: var(--subtle); font-size: 11px; font-weight: 500; flex: 0 0 auto; }
+.source-group-selected-count { color: var(--accent); font-size: 11px; font-weight: 700; flex: 0 0 auto; }
 .source-group .page-grid { margin-top: 12px; }
 .page-tile-grouped { cursor: default; }
 .page-tile-grouped:active { cursor: default; }

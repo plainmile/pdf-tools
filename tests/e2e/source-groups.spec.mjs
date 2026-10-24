@@ -59,6 +59,28 @@ test('grouped file view reveals true positions but never changes interleaved PDF
   expect(restored.getPages().map(p => p.getWidth())).toEqual([300, 310, 320]);
 });
 
+test('collapsed source group reveals hidden selections and can clear that group alone', async ({ page }) => {
+  await importTwo(page);
+  await page.getByTestId('workspace-view-grouped').click();
+  const groups = page.getByTestId('source-group');
+  await groups.nth(0).getByTestId('source-group-select').click();
+  await groups.nth(1).getByTestId('source-group-select').click();
+  await expect(page.getByText('3 pages selected')).toBeVisible();
+
+  await groups.nth(0).getByTestId('source-group-toggle').click();
+  await expect(groups.nth(0).getByTestId('page-tile')).toHaveCount(0);
+  await expect(groups.nth(0).getByTestId('source-group-selected-count')).toHaveText('2 selected in this file');
+  await expect(groups.nth(1).getByTestId('source-group-selected-count')).toHaveText('1 selected in this file');
+  await groups.nth(0).getByTestId('source-group-deselect').click();
+  await expect(groups.nth(0).getByTestId('source-group-selected-count')).toHaveCount(0);
+  await expect(groups.nth(1).getByTestId('source-group-selected-count')).toHaveText('1 selected in this file');
+  await expect(page.getByText('1 page selected')).toBeVisible();
+
+  // The group controls affect only selection; export order and content stay intact.
+  const exported = await exportPdf(page);
+  expect(exported.getPages().map(p => p.getWidth())).toEqual([300, 310, 320]);
+});
+
 test('Chinese touch-width grouping is usable and keeps correct exported pages', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 780 });
   await page.goto('/zh/workspace/');
@@ -70,8 +92,13 @@ test('Chinese touch-width grouping is usable and keeps correct exported pages', 
   await page.getByTestId('workspace-view-grouped').click();
   await expect(page.getByTestId('source-group')).toHaveCount(2);
   await expect(page.getByTestId('group-view-hint')).toContainText('不会调整导出顺序');
+  await page.getByTestId('source-group').first().getByTestId('source-group-select').click();
   await page.getByTestId('source-groups-collapse-all').click();
   await expect(page.getByTestId('page-tile')).toHaveCount(0);
+  await expect(page.getByTestId('source-group').first().getByTestId('source-group-selected-count')).toHaveText('本文件已选 2 页');
+  await page.getByTestId('source-group').first().getByTestId('source-group-deselect').click();
+  await expect(page.getByTestId('source-group').first().getByTestId('source-group-selected-count')).toHaveCount(0);
+  await expect(page.getByText('0 页已选中')).toBeVisible();
   await page.getByTestId('source-groups-expand-all').click();
   await expect(page.getByTestId('page-tile')).toHaveCount(3);
   await expect(page.getByTestId('source-group').first().getByTestId('group-output-position')).toHaveText(['导出第 1 页', '导出第 2 页']);
