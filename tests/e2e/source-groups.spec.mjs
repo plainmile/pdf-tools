@@ -103,6 +103,46 @@ test('Chinese mobile PDF source sorting is explicit and stays usable at 375px', 
   expect(widths.scroll).toBeLessThanOrEqual(widths.viewport + 2);
 });
 
+test('duplex merge recombines odd fronts with backwards-scanned evens, with Undo', async ({ page }) => {
+  await page.goto('/merge-pdf/');
+  await page.getByTestId('file-input').setInputFiles([
+    { name: 'fronts.pdf', mimeType: 'application/pdf', buffer: await makePdf([301, 303, 305]) },
+    { name: 'backs.pdf', mimeType: 'application/pdf', buffer: await makePdf([306, 304, 302]) },
+  ]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(6);
+  await expect(page.getByTestId('duplex-interleave-panel')).toBeVisible();
+  await page.getByTestId('duplex-interleave-panel').locator('summary').click();
+  await expect(page.getByTestId('duplex-interleave-hint')).toContainText('fronts.pdf');
+  await expect(page.getByTestId('duplex-interleave-hint')).toContainText('backs.pdf');
+  await page.getByTestId('duplex-interleave-reverse').click();
+  const output = await exportPdf(page);
+  expect(output.getPages().map(p => p.getWidth())).toEqual([301, 302, 303, 304, 305, 306]);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  const undo = await exportPdf(page);
+  expect(undo.getPages().map(p => p.getWidth())).toEqual([301, 303, 305, 306, 304, 302]);
+  await page.getByTestId('duplex-interleave-forward').click();
+  const forward = await exportPdf(page);
+  expect(forward.getPages().map(p => p.getWidth())).toEqual([301, 306, 303, 304, 305, 302]);
+});
+
+test('duplex merge rejects unequal scans without changing PDF, on Chinese mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 780 });
+  await page.goto('/zh/merge-pdf/');
+  await page.getByTestId('file-input').setInputFiles([
+    { name: '正面.pdf', mimeType: 'application/pdf', buffer: await makePdf([301, 303, 305]) },
+    { name: '反面.pdf', mimeType: 'application/pdf', buffer: await makePdf([302]) },
+  ]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(4);
+  await page.getByTestId('duplex-interleave-panel').locator('summary').click();
+  await expect(page.getByTestId('duplex-interleave-hint')).toContainText('正面.pdf');
+  await page.getByTestId('duplex-interleave-reverse').click();
+  await expect(page.getByRole('alert')).toContainText('页面没有改变');
+  const original = await exportPdf(page, '导出 PDF');
+  expect(original.getPages().map(p => p.getWidth())).toEqual([301, 303, 305, 302]);
+  const width = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth }));
+  expect(width.scroll).toBeLessThanOrEqual(width.viewport + 2);
+});
+
 test('collapsed source group reveals hidden selections and can clear that group alone', async ({ page }) => {
   await importTwo(page);
   await page.getByTestId('workspace-view-grouped').click();
