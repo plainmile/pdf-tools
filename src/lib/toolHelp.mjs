@@ -53,8 +53,8 @@ export const toolHelp = {
       ['Can I convert a scanned textbook?', 'Only text already embedded in a PDF is extracted. Scanned pages without a text layer need OCR from a separate tool.'],
     ],
     'txt-to-pdf': [
-      ['Can I turn a book-length TXT file into PDF?', 'You can import up to 5 MiB of UTF-8 or BOM-marked UTF-16 text. Output is limited to 1,000 text pages, or 300 image-based pages for non-Latin scripts.'],
-      ['Will Chinese text be searchable in the output?', 'Currently, Chinese characters are rendered using your browser fonts as image-based PDF pages, so they are not searchable or selectable.'],
+      ['Can I turn a book-length TXT file into PDF?', 'You can import up to 5 MiB of UTF-8 or BOM-marked UTF-16 text. Output is limited to 1,000 total pages, including at most 300 image-based pages requiring unsupported glyphs.'],
+      ['Will Chinese text be searchable in the output?', 'Pages with Chinese or other unsupported characters are rendered as images, so those pages are not searchable. Pages containing only supported characters remain selectable, even in the same document.'],
     ],
     'markdown-to-pdf': [
       ['What Markdown is supported?', 'Basic headings, paragraphs, lists, block quotes and code blocks. Remote images, HTML and complex tables are not rendered.'],
@@ -124,7 +124,7 @@ export const toolHelp = {
       ['扫描版教材能转换吗？', '只能提取 PDF 中已有的文字层。没有文字层的扫描件需要先进行 OCR。'],
     ],
     'txt-to-pdf': [
-      ['可以将长篇 TXT 电子书转换成 PDF 吗？', '支持 UTF-8 或带 BOM 的 UTF-16 文本，文件最多 5 MiB。纯拉丁文字输出最多 1000 页，中文等图片化内容最多 300 页。'],
+      ['可以将长篇 TXT 电子书转换成 PDF 吗？', '支持 UTF-8 或带 BOM 的 UTF-16 文本，文件最多 5 MiB。输出总计最多 1000 页，其中需要特殊字体的图片化页面最多 300 页。'],
       ['中文转换后的 PDF 能搜索吗？', '目前中文文字通过浏览器字体绘制为图片页面，因此不能直接搜索或选择其中的文字。'],
     ],
     'markdown-to-pdf': [
