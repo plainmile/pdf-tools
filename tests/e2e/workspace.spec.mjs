@@ -387,6 +387,39 @@ test('split PDFs into ZIP ranges in the current workspace order', async ({ page 
   expect(partTwo.getPages().map((p) => p.getWidth())).toEqual([320]);
 });
 
+test('split preview exposes omissions and overlaps without blocking intentional partial output', async ({ page }) => {
+  await loadInput(page);
+  await page.getByRole('tab', { name: 'Split' }).click();
+  const ranges = page.getByRole('textbox', { name: 'Page ranges', exact: true });
+  await ranges.fill('1,3');
+  await expect(page.getByTestId('split-coverage-omitted')).toContainText('2 of 3');
+  await expect(page.getByTestId('split-coverage-omitted')).toContainText('excluded page(s): 2');
+  await expect(page.getByRole('button', { name: 'Download split PDFs (ZIP)' })).toBeEnabled();
+  await ranges.fill('1-2,2-3');
+  await expect(page.getByTestId('split-coverage-omitted')).toHaveCount(0);
+  await expect(page.getByTestId('split-coverage-repeated')).toContainText('page(s) occur in more than one file: 2');
+  await ranges.fill('3,1-2');
+  await expect(page.getByTestId('split-coverage-complete')).toContainText('All 3 current output pages');
+  await page.getByTestId('split-output-preview').locator('summary').click();
+  await expect(page.getByTestId('split-output-preview').locator('li')).toHaveCount(2);
+  await expect(page.getByTestId('split-output-preview').locator('li').first()).toContainText('pages 3–3 (1 pages)');
+  await expect(page.getByTestId('split-output-preview').locator('li').last()).toContainText('pages 1–2 (2 pages)');
+});
+
+test('Chinese mobile split preview lists actual output sections and does not overflow horizontally', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'split-zh.pdf', mimeType: 'application/pdf', buffer: await makePdf([301, 302, 303, 304]),
+  });
+  await page.locator('#ranges-input').fill('1-2,4');
+  await expect(page.getByTestId('split-coverage-omitted')).toContainText('遗漏 1 页：3');
+  await page.getByTestId('split-output-preview').locator('summary').click();
+  await expect(page.getByTestId('split-output-preview').locator('li')).toHaveCount(2);
+  const width = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth }));
+  expect(width.scroll).toBeLessThanOrEqual(width.viewport + 2);
+});
+
 test('invalid split ranges disable download until corrected', async ({ page }) => {
   await loadInput(page);
   await page.getByRole('tab', { name: 'Split' }).click();
