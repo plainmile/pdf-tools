@@ -1477,7 +1477,7 @@ test('Chinese custom download name affects split ZIP but does not change page id
   expect(second.getPages().map(p => p.getWidth())).toEqual([302,303]);
 });
 
-test('real chapter-bookmark PDF warns that exports lose the original outline navigation', async ({ page }) => {
+test('untouched PDF keeps bookmarks; edited PDF warns when chapter navigation is lost', async ({ page }) => {
   const source = await PDFDocument.create();
   const first = source.addPage([430, 600]);
   source.addPage([440, 600]);
@@ -1501,7 +1501,14 @@ test('real chapter-bookmark PDF warns that exports lose the original outline nav
   await expect(page.getByTestId('workspace-bookmark-risk')).toContainText('clickable table of contents');
   const exported = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
   expect(exported.getPageCount()).toBe(2);
-  expect(exported.catalog.get(PDFName.of('Outlines'))).toBeUndefined();
+  expect(exported.catalog.get(PDFName.of('Outlines'))).toBeDefined();
+
+  // Any page modification forces a newly composed PDF; outlines are document-level.
+  await page.getByRole('button', { name: 'Select all' }).click();
+  await page.getByRole('button', { name: 'Rotate left' }).click();
+  const rotated = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(rotated.getPageCount()).toBe(2);
+  expect(rotated.catalog.get(PDFName.of('Outlines'))).toBeUndefined();
 
   // Warning is tied to the active source pages, not stale Undo-only data.
   await page.getByRole('button', { name: 'Select all' }).click();
