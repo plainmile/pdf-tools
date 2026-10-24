@@ -67,6 +67,15 @@ test('Markdown inline formatting preserves identifiers, arithmetic and unmatched
   assert.equal(headings[1].text, 'Result: a*b + x**2 and c_d');
 });
 
+test('adjacent exponent operators never become an accidental Markdown emphasis pair', () => {
+  const literal = 'Powers: x**2 and y**3; fields: a__2 and b__5; multiply: 2*3*4';
+  assert.equal(stripMarkdownInline(literal), literal);
+  const mixed = 'Math x**2 and y**3, then **bold** and *italic* plus __strong__ and ~~old~~';
+  assert.equal(stripMarkdownInline(mixed),
+    'Math x**2 and y**3, then bold and italic plus strong and old');
+  assert.equal(parseTextBlocks('# x**2 and y**3\nValue: a__2 and b__5', true)[0].text, 'x**2 and y**3');
+});
+
 test('Markdown parser preserves generics, placeholders and comparisons without spaces', () => {
   const literal = 'Generics: List<T> and Map<string, number>; template <username>; x<y&&z>q; a<b && c>d';
   assert.equal(stripMarkdownInline(literal), literal);
