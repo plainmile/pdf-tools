@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { imageTypeFor, isSupportedFile, compressedImageDimensions, composePdf, temporaryWorkspaceId, createBlankPageSource, hasInteractivePdfForm, hasPdfBookmarks, LIMITS, retainedSourceBytes, retainedSourcesBytes, reflowImageSources } from '../../src/lib/pdfEngine.mjs';
+import { imageTypeFor, isSupportedFile, compressedImageDimensions, composePdf, pristinePdfBytes, temporaryWorkspaceId, createBlankPageSource, hasInteractivePdfForm, hasPdfBookmarks, LIMITS, retainedSourceBytes, retainedSourcesBytes, reflowImageSources } from '../../src/lib/pdfEngine.mjs';
 import { PDFDocument, PDFName, PDFHexString, degrees } from 'pdf-lib';
 
 test('recognize JPEG/PNG/WebP images even with missing or generic MIME types', () => {
@@ -130,6 +130,35 @@ test('long PDF export reports real pages and rejects cancellation without return
   });
   assert.equal((await PDFDocument.load(good)).getPageCount(), 12);
   assert.deepEqual(progress.at(-1), [12, 12]);
+});
+
+test('pristine PDF download preserves original bytes, but page changes require composition', async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([320, 450]);
+  const field = doc.getForm().createTextField('recipient');
+  field.setText('Alice');
+  field.addToPage(page);
+  const bytes = new Uint8Array(await doc.save());
+  const source = { id: 'original', bytes, pageCount: 1, isImage: false };
+  const pages = [{ id: 'one', sourceId: source.id, pageIndex: 0, rotation: 0 }];
+  assert.strictEqual(pristinePdfBytes([source], pages), bytes);
+  assert.equal(pristinePdfBytes([source], pages, { enabled: true, text: 'TEST' }), null);
+  assert.equal(pristinePdfBytes([source], [{ ...pages[0], rotation: 90 }]), null);
+  assert.equal(pristinePdfBytes([source], [...pages, pages[0]]), null);
+  assert.equal(pristinePdfBytes([{ ...source, isImage: true }], pages), null);
+});
+
+test('reused parsed source documents keep separate output PDFs independent', async () => {
+  const original = await PDFDocument.create();
+  original.addPage([310, 400]); original.addPage([320, 400]);
+  const source = { id: 'pdf', bytes: new Uint8Array(await original.save()) };
+  const sourceDocuments = new Map();
+  const first = await composePdf([source], [{ sourceId: 'pdf', pageIndex: 0, rotation: 0 }], { sourceDocuments });
+  const cached = sourceDocuments.get('pdf');
+  const second = await composePdf([source], [{ sourceId: 'pdf', pageIndex: 1, rotation: 0 }], { sourceDocuments });
+  assert.strictEqual(sourceDocuments.get('pdf'), cached);
+  assert.equal((await PDFDocument.load(first)).getPage(0).getWidth(), 310);
+  assert.equal((await PDFDocument.load(second)).getPage(0).getWidth(), 320);
 });
 
 test('temporary workspace IDs work on HTTP LAN origins without crypto.randomUUID', () => {

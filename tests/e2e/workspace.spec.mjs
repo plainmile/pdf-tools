@@ -59,6 +59,37 @@ test('exports without any watermark by default and only marks pages after opt-in
   expect(watermarkImageCounts(plainAgain)).toEqual([0, 0, 0]);
 });
 
+test('pristine single PDF export preserves original form fields and source bytes', async ({ page }) => {
+  const original = await PDFDocument.create();
+  original.setTitle('Original editable form');
+  const sheet = original.addPage([420, 595]);
+  const field = original.getForm().createTextField('recipient');
+  field.setText('Alice');
+  field.addToPage(sheet);
+  const bytes = Buffer.from(await original.save());
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles({ name: 'form.pdf', mimeType: 'application/pdf', buffer: bytes });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export PDF' }).click();
+  const saved = await readFile(await (await downloadPromise).path());
+  expect(Buffer.from(saved).equals(bytes)).toBe(true);
+});
+
+test('organize/split tabs support arrow keys and expose the active panel', async ({ page }) => {
+  await loadInput(page);
+  const organize = page.getByRole('tab', { name: 'Organize' });
+  const split = page.getByRole('tab', { name: 'Split' });
+  await organize.focus();
+  await organize.press('ArrowRight');
+  await expect(split).toBeFocused();
+  await expect(split).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tabpanel', { name: 'Split' })).toBeVisible();
+  await split.press('Home');
+  await expect(organize).toBeFocused();
+  await expect(page.getByRole('tabpanel', { name: 'Organize' })).toBeVisible();
+});
+
 test('watermark requires custom text, never inserts a default brand watermark', async ({ page }) => {
   await loadInput(page);
   await page.getByTestId('export-options-button').click();
@@ -1446,7 +1477,7 @@ test('Chinese custom download name affects split ZIP but does not change page id
   expect(second.getPages().map(p => p.getWidth())).toEqual([302,303]);
 });
 
-test('real chapter-bookmark PDF warns that exports lose the original outline navigation', async ({ page }) => {
+test('untouched PDF keeps bookmarks; edited PDF warns when chapter navigation is lost', async ({ page }) => {
   const source = await PDFDocument.create();
   const first = source.addPage([430, 600]);
   source.addPage([440, 600]);
@@ -1470,7 +1501,14 @@ test('real chapter-bookmark PDF warns that exports lose the original outline nav
   await expect(page.getByTestId('workspace-bookmark-risk')).toContainText('clickable table of contents');
   const exported = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
   expect(exported.getPageCount()).toBe(2);
-  expect(exported.catalog.get(PDFName.of('Outlines'))).toBeUndefined();
+  expect(exported.catalog.get(PDFName.of('Outlines'))).toBeDefined();
+
+  // Any page modification forces a newly composed PDF; outlines are document-level.
+  await page.getByRole('button', { name: 'Select all' }).click();
+  await page.getByRole('button', { name: 'Rotate left' }).click();
+  const rotated = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(rotated.getPageCount()).toBe(2);
+  expect(rotated.catalog.get(PDFName.of('Outlines'))).toBeUndefined();
 
   // Warning is tied to the active source pages, not stale Undo-only data.
   await page.getByRole('button', { name: 'Select all' }).click();
