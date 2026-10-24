@@ -222,6 +222,46 @@ export function decodeImportedText(bytes, locale = 'en') {
 export function normalizeText(source) {
   return source.replace(/\r\n?/g, '\n').replace(/\0/g, '').replace(/\t/g, '    ');
 }
+/** Keep ordinary words together during TXT/Markdown PDF layout without
+ * sacrificing bounded-width fallback for long URLs, code, or CJK text.
+ * Measure one character at a time (linear work), and emit lines lazily so
+ * book-length files can still yield to Cancel in the renderer.
+ */
+export function* wrapTextLines(text, maxWidth, measureChar, { preserveWords = true } = {}) {
+  let row = '';
+  let rowWidth = 0;
+  let lastWordBreak = -1;
+  let wrapped = false;
+  for (const char of text) {
+    const charWidth = measureChar(char);
+    const blank = char === ' ' || char === '\t';
+    if (row && rowWidth + charWidth > maxWidth) {
+      if (!blank && preserveWords && lastWordBreak > 0) {
+        // The final word fits on the next line; never split it just because
+        // character-by-character layout used up the remaining space.
+        yield row.slice(0, lastWordBreak).trimEnd();
+        row = row.slice(lastWordBreak).trimStart();
+        rowWidth = 0;
+        for (const retained of row) rowWidth += measureChar(retained);
+      } else {
+        yield row.trimEnd();
+        row = '';
+        rowWidth = 0;
+      }
+      lastWordBreak = -1;
+      wrapped = true;
+      if (blank) continue; // A word boundary is not a new line's content.
+    }
+    if (wrapped && !row && blank) continue;
+    if (preserveWords && blank && row && row.at(-1) !== ' ' && row.at(-1) !== '\t') {
+      lastWordBreak = row.length;
+    }
+    row += char;
+    rowWidth += charWidth;
+  }
+  if (row) yield row.trimEnd();
+}
+
 export function parseTextBlocks(source, markdown = false) {
   const value = normalizeText(source);
   const blocks = [];
