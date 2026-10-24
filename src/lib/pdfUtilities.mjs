@@ -2,7 +2,7 @@ import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
 import JSZip from 'jszip';
 import { pageNumberPlacement } from './pageNumberGeometry.mjs';
 import {
-  UTILITY_LIMITS, requestedPages, parseTextBlocks, textContentToLines,
+  UTILITY_LIMITS, validatedImageScale, requestedPages, parseTextBlocks, textContentToLines,
   linesToReadableText, summarizeTextCoverage, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
   enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled,
 } from './utilityCore.mjs';
@@ -73,7 +73,7 @@ async function renderPageAsBlob(page, format = 'image/jpeg', scale = 1.5, qualit
 export async function convertPdfToImages(pdf, options = {}, reportProgress = () => {}) {
   const format = options.format === 'png' ? 'png' : 'jpg';
   const mime = format === 'png' ? 'image/png' : 'image/jpeg';
-  const scale = options.scale === 2 ? 2 : options.scale === 1 ? 1 : 1.5;
+  const scale = validatedImageScale(options.scale);
   const selected = requestedPages(options.pages ?? '', pdf.count);
   enforceImageBatchLimit(selected.length, options.locale);
   const document = await openPdfJs(pdf.bytes);
