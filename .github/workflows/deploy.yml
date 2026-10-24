@@ -151,8 +151,13 @@ jobs:
             status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' plainmile-pdf-tools 2>/dev/null || true)
             if [ "$status" = healthy ]; then
               working_dir=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' plainmile-pdf-tools)
+              image=$(docker inspect -f '{{.Config.Image}}' plainmile-pdf-tools)
               if [ "$working_dir" != /opt/compose/pdf-tools ]; then
                 echo "Unexpected Compose working directory: $working_dir" >&2
+                exit 1
+              fi
+              if [ "$image" != "ghcr.io/plainmile/pdf-tools:$IMAGE_TAG" ]; then
+                echo "Healthy container is running a different image: $image" >&2
                 exit 1
               fi
               exit 0
