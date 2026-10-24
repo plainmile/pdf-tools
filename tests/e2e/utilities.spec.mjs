@@ -405,7 +405,9 @@ test('CJK text PDF is rendered near the top of the page, not upside-down at the 
       if (!upper && !lower) continue;
       for (let x = 14; x < width - 14; x++) {
         const offset = (y * width + x) * 4;
-        if (pixels[offset] < 190 && pixels[offset + 1] < 190 && pixels[offset + 2] < 190) {
+        // Unrendered HTML canvas pixels are transparent black (RGBA 0,0,0,0).
+        // Count only opaque rendered PDF ink, not yet-to-be-painted rows.
+        if (pixels[offset + 3] >= 200 && pixels[offset] < 190 && pixels[offset + 1] < 190 && pixels[offset + 2] < 190) {
           if (upper) top++;
           if (lower) bottom++;
         }
