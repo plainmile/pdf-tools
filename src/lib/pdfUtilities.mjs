@@ -167,18 +167,28 @@ export async function addPageNumbers(pdf, opts = {}, reportProgress = () => {}) 
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const size = opts.fontSize === 16 ? 16 : opts.fontSize === 10 ? 10 : 12;
   const start = Number(opts.start ?? 1);
-  if (!Number.isSafeInteger(start) || start < 1 || start > 99999) throw new Error('Starting page number must be from 1 to 99999.');
-  if (start + doc.getPageCount() - 1 > 99999) throw new Error('Page numbers cannot exceed 99999. Lower the starting number.');
-  const position = ['bottom-center', 'bottom-right', 'top-right'].includes(opts.position) ? opts.position : 'bottom-center';
   const pageCount = doc.getPageCount();
+  const firstPage = Number(opts.firstPage ?? 1);
+  if (!Number.isSafeInteger(start) || start < 1 || start > 99999) throw new Error('Starting page number must be from 1 to 99999.');
+  if (!Number.isSafeInteger(firstPage) || firstPage < 1 || firstPage > pageCount) {
+    throw new Error(`First PDF page to number must be from 1 to ${pageCount}.`);
+  }
+  // Only pages at/after firstPage get labels. Pages before it (covers, table
+  // of contents) are copied unchanged, and firstPage gets printed number start.
+  if (start + pageCount - firstPage > 99999) throw new Error('Page numbers cannot exceed 99999. Lower the starting number.');
+  const position = ['bottom-center', 'bottom-right', 'top-right'].includes(opts.position) ? opts.position : 'bottom-center';
   for (let i = 0; i < pageCount; i++) {
     // Yield while numbering books: otherwise the browser cannot dispatch
     // the Cancel click until all synchronous page annotations are finished.
     if (i > 0 && i % 8 === 0) await new Promise(resolve => setTimeout(resolve, 0));
     checkCancelled(opts.signal);
+    if (i < firstPage - 1) {
+      reportProgress(i + 1, pageCount);
+      continue; // No numbering or other content modification on cover pages.
+    }
     const page = doc.getPage(i);
     const box = page.getCropBox();
-    const text = String(start + i);
+    const text = String(start + i - (firstPage - 1));
     const textWidth = font.widthOfTextAtSize(text, size);
     // Use visible page coordinates, compensating PDF /Rotate and CropBox origin.
     const placement = pageNumberPlacement(box, page.getRotation().angle, textWidth, size, position);
