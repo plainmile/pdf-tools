@@ -18,6 +18,7 @@ const COPY = {
     compressionLowerBound: 'At least', previewAction: 'Generate PDF preview', previewTitle: 'Generated PDF preview', previewFirst: 'Previewing page 1 of {pages}', previewFailed: 'Preview unavailable; you can still download the PDF.', downloadPdf: 'Download PDF',
     textWarning: 'Extracts existing selectable PDF text only, not OCR. Columns, tables and heading formatting may not be preserved. Check the exported text.',
     missingTextPages: 'Important: {missing} of {total} pages have no selectable text (pages {pages}). Those pages may be blank or scanned images. Their content was not extracted; OCR would be required for scanned text. Check your original PDF.',
+    partialTextReady: 'Some PDF pages were not extracted. Review the warning before choosing to download this incomplete text file.',
     markdownWarning: 'Markdown conversion is approximate; headings are inferred from font size. Complex PDF layout cannot be faithfully recovered.',
     textLabel: 'Text to convert', textPlaceholder: 'Paste text here or import a .txt / .md file…',
     textInputHint: 'Import UTF-8 or BOM-marked UTF-16 text. Built-in-font text stays selectable; Chinese and unsupported characters use local browser fonts as non-searchable image pages.',
@@ -42,6 +43,7 @@ const COPY = {
     compressionLowerBound: '至少', previewAction: '生成 PDF 预览', previewTitle: '生成的 PDF 预览', previewFirst: '第 1 页预览（共 {pages} 页）', previewFailed: '无法生成预览，但仍可下载 PDF。', downloadPdf: '下载 PDF',
     textWarning: '只提取 PDF 中已有的可选择文字，不具备 OCR。多栏、表格和段落顺序可能不准确，请核对导出内容。',
     missingTextPages: '重要提示：共 {total} 页中有 {missing} 页未检测到可选择文字（第 {pages} 页）。这些页可能是空白页或扫描图片，其内容未被提取；扫描文字需要 OCR。请对照原始 PDF 核查。',
+    partialTextReady: '有些 PDF 页面未能提取文字。请先查看缺页提示，再决定是否下载这份不完整的文字文件。',
     markdownWarning: 'Markdown 为近似转换：根据字号推测标题，复杂 PDF 的版式无法完整还原。',
     textLabel: '需要转换的文本', textPlaceholder: '粘贴文字，或选择 .txt / .md 文件……',
     textInputHint: '支持 UTF-8 或带 BOM 的 UTF-16 文本。拉丁文字尽量保留可选中内容；中文等文字使用本地字体输出为不可搜索的图片页。',
@@ -259,7 +261,9 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     // Keep successfully generated PDF bytes available while adjusting text
     // or retrying a conversion. Failed/cancelled attempts cannot erase the
     // last undownloaded result. Replacing a valid source still requires consent.
-    if (isCompress || isTextInput) {
+    if (isCompress || isTextInput || isTextOutput) {
+      // Retain an incomplete text extraction until the user downloads or replaces it.
+      // A failed/cancelled retry must not erase the only recoverable result.
       setClearConfirm(false); setNotice(''); setError(''); setProgress(null);
       setShowCompressionPreview(false);
     } else {
@@ -319,7 +323,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         const value = await extractPdfText(pdf, markdown, report, controller.signal,
           coverage => { textCoverage = coverage; });
         ensureNotCancelled();
-        if (textCoverage?.missingPages.length) {
+        const incomplete = Boolean(textCoverage?.missingPages.length);
+        if (incomplete) {
           const { missingPages, total } = textCoverage;
           const previewPages = missingPages.slice(0, 6).join(', ') +
             (missingPages.length > 6 ? ', …' : '');
@@ -327,11 +332,22 @@ export default function PdfUtility({ mode, locale = 'en' }) {
             .replace('{missing}', missingPages.length)
             .replace('{total}', total)
             .replace('{pages}', previewPages));
+        } else {
+          setExtractionWarning('');
         }
         setPreview(value.slice(0, 1600));
         result = { bytes: new TextEncoder().encode(value), mime: 'text/plain;charset=utf-8', name: `${pdfName}.${markdown ? 'md' : 'txt'}` };
-        save(result);
-        setNotice(`${t.ready}: ${formatBytes(result.bytes.length)}`);
+        if (incomplete) {
+          // Never auto-download a file that silently omits some source pages.
+          // Keep it for explicit review and allow repeated download after consent.
+          setOutput({ ...result, partialText: true });
+          setNotDownloaded(true);
+          setNotice('');
+        } else {
+          setOutput(null);
+          save(result);
+          setNotice(`${t.ready}: ${formatBytes(result.bytes.length)}`);
+        }
       } else if (isTextInput) {
         const encoded = new TextEncoder().encode(sourceText);
         if (!sourceText.trim()) throw new Error(t.noText);
@@ -478,6 +494,11 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         {notice && <div className="notice notice-success" role="status">{notice}</div>}
         {extractionWarning && <div className="utility-note" role="alert"
           data-testid="text-extraction-warning">{extractionWarning}</div>}
+        {isTextOutput && output?.partialText && <div className="utility-result" data-testid="partial-text-result">
+          <p className="utility-note">{t.partialTextReady}</p>
+          <button type="button" className="button button-primary" data-testid="partial-text-download"
+            onClick={() => save(output)}>{t.download} ↓</button>
+        </div>}
         {notice && <p className="utility-note" data-testid="utility-next-step"><a href={locale === 'zh' ? '/zh/#all-tools' : '/#all-tools'}>{t.nextStep} →</a></p>}
         {isTextOutput && preview && <div className="utility-preview"><label className="utility-field-label" htmlFor="utility-preview">{t.resultPreview}</label><textarea id="utility-preview" readOnly rows={8} value={preview} /></div>}
       </div>

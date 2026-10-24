@@ -1003,7 +1003,14 @@ test('mixed selectable text and genuine scanned-image page warns about omitted t
   ]) {
     await page.goto(route);
     await upload(page, bytes);
-    const result = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+    const downloads = [];
+    const onDownload = item => downloads.push(item.suggestedFilename());
+    page.on('download', onDownload);
+    await page.getByTestId('utility-run').click();
+    await expect(page.getByTestId('partial-text-result')).toBeVisible({ timeout: 30000 });
+    expect(downloads).toEqual([]);
+    const result = await getDownload(page, () => page.getByTestId('partial-text-download').click(), 30000);
+    page.off('download', onDownload);
     expect(result.name).toMatch(new RegExp('\\.' + ext + '$'));
     const text = result.bytes.toString('utf8');
     expect(text).toContain('Searchable cover');
@@ -1013,6 +1020,21 @@ test('mixed selectable text and genuine scanned-image page warns about omitted t
     await expect(warning).toContainText(hint);
     await expect(warning).toContainText('2');
   }
+});
+
+test('incomplete text result allows repeat downloads without reprocessing', async ({ page }) => {
+  const doc = await PDFDocument.create();
+  doc.addPage([400, 600]).drawText('Partial source report', { x: 25, y: 500 });
+  doc.addPage([400, 600]);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, Buffer.from(await doc.save()));
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('partial-text-result')).toBeVisible();
+  const first = await getDownload(page, () => page.getByTestId('partial-text-download').click());
+  expect(first.bytes.toString('utf8')).toContain('Partial source report');
+  await expect(page.getByTestId('partial-text-download')).toBeEnabled();
+  const second = await getDownload(page, () => page.getByTestId('partial-text-download').click());
+  expect(second.bytes.equals(first.bytes)).toBe(true);
 });
 
 test('fully searchable PDF text does not show an incomplete-extraction warning', async ({ page }) => {
