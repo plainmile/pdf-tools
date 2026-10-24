@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline,
   textContentToLines, linesToReadableText, summarizeTextCoverage, sanitizeFilename, workspaceFilenameStem,
-  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
+  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
 
 test('text importer decodes UTF-8 and BOM-marked Windows UTF-16 without data loss', () => {
@@ -155,6 +155,16 @@ test('image rasterizer rejects extreme aspect ratios before allocating browser c
   assert.throws(() => enforceRasterViewport({ width: 300, height: 17000 }), /too large to rasterize/);
   assert.throws(() => enforceRasterViewport({ width: 4000, height: 4000 }), /too large to rasterize/);
   assert.throws(() => enforceRasterViewport({ width: NaN, height: 10 }), /too large to rasterize/);
+});
+
+test('iOS and desktop-style iPadOS use the safer 4096-pixel canvas bound', () => {
+  assert.equal(rasterCanvasSideLimit('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)'), 4096);
+  assert.equal(rasterCanvasSideLimit('Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)'), 4096);
+  assert.equal(rasterCanvasSideLimit('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)', 5), 4096);
+  assert.equal(rasterCanvasSideLimit('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)', 0), 16384);
+  assert.equal(rasterCanvasSideLimit('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'), 16384);
+  assert.throws(() => enforceRasterViewport({ width: 4500, height: 300 }, 4096), /too large to rasterize/);
+  assert.equal(enforceRasterViewport({ width: 3900, height: 300 }, 4096), true);
 });
 
 test('image conversion selects any 60 pages from a 500-page book, not only first 60', () => {
