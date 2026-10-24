@@ -385,7 +385,14 @@ function readableMarkdownReferences(source) {
       else if (source[at] === ')') depth--;
       at++;
     }
-    if (depth !== 0) continue; // Preserve the malformed link verbatim.
+    if (depth !== 0) {
+      // No closing parenthesis exists before this line ends. Retrying each
+      // nested-looking "[label](" would rescan the same suffix repeatedly
+      // (quadratic work on user-pasted malformed Markdown). Treat the rest
+      // of this line as literal text; resume matching on the next line.
+      opening.lastIndex = at;
+      continue;
+    }
     const target = source.slice(opening.lastIndex, at - 1).trim()
       .replace(/\s+(?:"[^"]*"|'[^']*')$/, '').trim();
     const label = match[1].trim();
