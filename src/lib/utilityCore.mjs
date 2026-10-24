@@ -1,6 +1,15 @@
 import { parsePageRanges } from './pageOperations.mjs';
 
 const MiB = 1024 * 1024;
+// PDF coordinates are expressed as 72 points per inch. Print export uses
+// 220 DPI, but the existing per-page 12 MP and per-batch 64 MiB caps still apply.
+export const IMAGE_PRINT_DPI = 220;
+export const IMAGE_PRINT_SCALE = IMAGE_PRINT_DPI / 72;
+export function validatedImageScale(value) {
+  // Reject arbitrary scales from callers rather than bypassing pixel budgets.
+  return [1, 1.5, 2, IMAGE_PRINT_SCALE].includes(value) ? value : 1.5;
+}
+
 export const UTILITY_LIMITS = Object.freeze({
   maxPdfBytes: 100 * MiB,
   maxPages: 1000,
