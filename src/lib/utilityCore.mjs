@@ -225,12 +225,29 @@ export function normalizeText(source) {
 export function parseTextBlocks(source, markdown = false) {
   const value = normalizeText(source);
   const blocks = [];
-  let fenced = false;
+  // CommonMark fences can be longer than three marks and may use tildes.
+  // A shorter run, a different mark, or a closing run with trailing text
+  // must remain literal CODE rather than silently change later paragraphs.
+  let fence = null;
   for (const raw of value.split('\n')) {
     const line = raw.trimEnd();
-    if (markdown && /^\s*```/.test(line)) { fenced = !fenced; continue; }
+    if (markdown) {
+      if (fence) {
+        const closing = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+        if (closing && closing[1][0] === fence.mark && closing[1].length >= fence.length) {
+          fence = null;
+          continue;
+        }
+      } else {
+        const opening = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+        if (opening && (opening[1][0] !== '`' || !opening[2].includes('`'))) {
+          fence = { mark: opening[1][0], length: opening[1].length };
+          continue;
+        }
+      }
+    }
+    if (markdown && fence && line.trim()) { blocks.push({ text: line, size: 10, kind: 'code' }); continue; }
     if (!line.trim()) { blocks.push({ text: '', size: 12, kind: 'gap' }); continue; }
-    if (markdown && fenced) { blocks.push({ text: line, size: 10, kind: 'code' }); continue; }
     if (markdown && /^\s{0,3}#{1,3} /.test(line)) {
       const match = /^\s{0,3}(#{1,3})\s+(.*)$/.exec(line);
       blocks.push({ text: stripMarkdownInline(match[2]), size: [0, 21, 17, 14][match[1].length], kind: 'heading' });
@@ -254,6 +271,37 @@ export function parseTextBlocks(source, markdown = false) {
 const PLAIN_MARKDOWN_HTML_TAGS = new Set(
   'a abbr article aside b blockquote br code del div em h1 h2 h3 h4 h5 h6 hr i img input li ol p pre s script section small span strong style table tbody td th thead tr u ul'.split(' '),
 );
+// Show Markdown link destinations as plain PDF text. We don't create PDF link
+// annotations or fetch remote images, but must not silently lose URL data.
+// A bounded label match keeps malformed book-length input inexpensive;
+// balanced parentheses handle common Wikipedia and documentation URLs.
+function readableMarkdownReferences(source) {
+  const opening = /!?\[([^\]\n]{0,512})\]\(/g;
+  let result = '';
+  let cursor = 0;
+  let match;
+  while ((match = opening.exec(source))) {
+    let depth = 1;
+    let at = opening.lastIndex;
+    while (at < source.length && depth > 0 && source[at] !== '\n') {
+      if (source[at] === '\\' && at + 1 < source.length) { at += 2; continue; }
+      if (source[at] === '(') depth++;
+      else if (source[at] === ')') depth--;
+      at++;
+    }
+    if (depth !== 0) continue; // Preserve the malformed link verbatim.
+    const target = source.slice(opening.lastIndex, at - 1).trim()
+      .replace(/\s+(?:"[^"]*"|'[^']*')$/, '').trim();
+    const label = match[1].trim();
+    const visible = label || target;
+    result += source.slice(cursor, match.index) +
+      (target && target !== visible ? `${visible} (${target})` : visible);
+    cursor = at;
+    opening.lastIndex = at;
+  }
+  return result + source.slice(cursor);
+}
+
 // Intentionally a minimal CommonMark subset: never execute HTML, remote images or scripts.
 export function stripMarkdownInline(source) {
   // Shield single-backtick inline code before stripping links, HTML or emphasis.
@@ -264,7 +312,7 @@ export function stripMarkdownInline(source) {
   const outsideCode = source.replace(/`([^`\n]+)`/g, (_token, literal) => {
     return `${marker}${inlineCode.push(literal) - 1}${marker}`;
   });
-  return outsideCode.replace(/!?\[([^\]]+)\]\([^\n)]+\)/g, '$1')
+  return readableMarkdownReferences(outsideCode)
     // Strip only recognizable HTML tags with syntactically valid attributes.
     // Preserve "List<T>", "<username>", and "a<b && c>d" verbatim.
     .replace(/<!--[\s\S]*?-->|<\/?([A-Za-z][\w:-]*)(?:\s+[A-Za-z_:][\w:.-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*\s*\/?>/g,
