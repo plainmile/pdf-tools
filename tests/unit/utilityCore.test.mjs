@@ -240,9 +240,15 @@ test('explicit multi-column text order keeps each column together and handles ro
   assert.deepEqual(textContentToReadingOrderLines(content, 'rows').map(x=>x.text), ['L1 R1','L2 R2']);
   assert.deepEqual(textContentToReadingOrderLines(content, 'left-first', viewport).map(x=>x.text), ['L1','L2','R1','R2']);
   assert.deepEqual(textContentToReadingOrderLines(content, 'right-first', viewport).map(x=>x.text), ['R1','R2','L1','L2']);
-  assert.deepEqual(textContentToReadingOrderLines(content, 'left-first', {
-    width:800, convertToViewportPoint:(x,y)=>[y,x],
-  }).map(x=>x.text), ['L2 R2', 'L1 R1']); // Rotated visual columns are based on viewport X.
+  const rotated = { items: [
+    { str:'L1', transform:[1,0,0,12,600,100], height:12, width:18 },
+    { str:'R1', transform:[1,0,0,12,600,500], height:12, width:18 },
+    { str:'L2', transform:[1,0,0,12,630,100], height:12, width:18 },
+    { str:'R2', transform:[1,0,0,12,630,500], height:12, width:18 },
+  ] };
+  const rotatedViewport = { width:800, convertToViewportPoint:(x,y)=>[y,x] };
+  assert.deepEqual(textContentToReadingOrderLines(rotated,'left-first',rotatedViewport).map(x=>x.text),
+    ['L1','L2','R1','R2']); // Split the rotated VISUAL X, not PDF user-space X.
   assert.throws(()=>textContentToReadingOrderLines(content,'unknown',viewport),/Unsupported/);
   assert.throws(()=>textContentToReadingOrderLines(content,'left-first',null),/viewport/);
 });
