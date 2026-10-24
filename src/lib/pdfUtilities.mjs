@@ -251,7 +251,9 @@ export async function textToPdf(text, markdown = false, options = {}) {
         ctx.font = entry.cssFont;
         ctx.fillStyle = '#22313e';
         ctx.textBaseline = 'alphabetic';
-        ctx.fillText(entry.text, margin, entry.y);
+        // PDF text baselines use bottom-left origin; Canvas uses top-left.
+        // Invert Y or Chinese lines start near the bottom and flow upward.
+        ctx.fillText(entry.text, margin, pdfHeight - entry.y);
       }
       const jpg = await new Promise((resolve, reject) => canvas.toBlob(
         blob => blob ? resolve(blob) : reject(new Error('Text rendering failed.')), 'image/jpeg', .92));
