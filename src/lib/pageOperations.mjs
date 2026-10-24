@@ -112,16 +112,21 @@ export function shiftPage(pages, pageId, delta) {
   return next;
 }
 
-/** Explicit image-batch actions; never silently reorder on import. */
+/** Explicit page-order actions; never silently reorder on import. */
 export function reversePages(pages) {
   return pages.length < 2 ? pages : [...pages].reverse();
 }
 
-export function sortPagesByFilename(pages, sources, locale = 'en') {
+/** Explicitly sort complete source-file groups by filename. Within each file,
+ * keep the pages in their current relative order (including edits/rotations).
+ * A-Z and Z-A must NOT be implemented by reversing every PDF page.
+ */
+export function sortPagesByFilename(pages, sources, locale = 'en', direction = 'asc') {
   const names = new Map(sources.map((source) => [source.id, source.name]));
   const compare = new Intl.Collator(locale === 'zh' ? 'zh' : 'en', { numeric: true, sensitivity: 'base' });
+  const multiplier = direction === 'desc' ? -1 : 1;
   return pages.map((page, index) => ({ page, index }))
-    .sort((a, b) => compare.compare(names.get(a.page.sourceId) || '', names.get(b.page.sourceId) || '') || a.index - b.index)
+    .sort((a, b) => multiplier * compare.compare(names.get(a.page.sourceId) || '', names.get(b.page.sourceId) || '') || a.index - b.index)
     .map(({ page }) => page);
 }
 
