@@ -417,6 +417,11 @@ export function linesToReadableText(pages, markdown = false) {
     return markdown && pages.length > 1 ? `<!-- Page ${index + 1} -->\n${body}` : body;
   }).join('\n\n');
 }
+// Windows also reserves device names with ANY extension (e.g. NUL.tar.gz)
+// and superscript digits in COM¹/²/³ and LPT¹/²/³. The matched device part
+// must end or be followed by a dot; COM10 and CONTRACT remain valid filenames.
+const WINDOWS_RESERVED_DEVICE_STEM = /^(?:CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])(?:\.|$)/i;
+
 /** Sanitize a user-supplied output stem locally, never treat it as a path.
  * A missing or punctuation-only input leaves the suggested name untouched.
  * Users can type ".pdf" once without accidentally generating ".pdf.pdf".
@@ -428,7 +433,7 @@ export function workspaceFilenameStem(input, fallback = '') {
     .replace(/^[._-]+|[._-]+$/g, '').slice(0, 70);
   if (!stem) return fallback;
   // These names are reserved on Windows even when given a PDF extension.
-  return /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(stem)
+  return WINDOWS_RESERVED_DEVICE_STEM.test(stem)
     ? `plainmile-${stem}` : stem;
 }
 export function sanitizeFilename(filename) {
@@ -438,6 +443,6 @@ export function sanitizeFilename(filename) {
   // Windows reserves device names even when followed by .pdf, .txt or .md.
   // The workspace custom-name field already guards these; utility-generated
   // converter filenames must follow the same rule.
-  return /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(stem)
+  return WINDOWS_RESERVED_DEVICE_STEM.test(stem)
     ? `plainmile-${stem}` : stem;
 }
