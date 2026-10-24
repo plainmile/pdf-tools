@@ -627,6 +627,17 @@ test('text import accepts more than 1 MB, rejects files larger than 5 MiB', asyn
   await expect(page.getByRole('alert')).toContainText('Text exceeds 5 MB');
 });
 
+test('pasting over the 5 MiB text limit shows a precise error without truncating or replacing the draft', async ({ page }) => {
+  test.setTimeout(45000);
+  await page.goto('/txt-to-pdf/');
+  const editor = page.getByTestId('utility-text');
+  await editor.fill('Keep this exact draft');
+  await editor.fill('A'.repeat(5 * 1024 * 1024 + 1));
+  await expect(page.getByRole('alert')).toContainText('Text exceeds 5 MB');
+  await expect(editor).toHaveValue('Keep this exact draft');
+  await expect(page.getByTestId('utility-run')).toBeEnabled();
+});
+
 test('rasterizer refuses a giant page before allocating a large canvas', async ({ page }) => {
   const huge = await PDFDocument.create();
   huge.addPage([16000,16000]);
