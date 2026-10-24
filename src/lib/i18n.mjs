@@ -56,7 +56,7 @@ export const siteCopy = {
 
 export const chineseTools = {
   workspace: { title: 'PDF 工作台', short: '一个地方，整理全部页面', headline: '自由整理每一页 PDF。', description: '在浏览器本地整理 PDF：拖拽排序、旋转、复制页面、插入空白页、删除或提取，不上传原始文件。', details: '添加 PDF 或图片后预览全部页面；可复制选中页，或按相邻纸张大小插入空白页，再下载新的 PDF。', steps: ['添加 PDF 或图片', '按需调整页面顺序', '导出 PDF'] },
-  'merge-pdf': { title: '合并 PDF', short: '多个文件，合并成一个', headline: '按您指定的顺序合并 PDF。', description: '合并多个 PDF，导出前可预览、逐页调整顺序。不必上传文件到服务器。', details: '不仅能调整文件顺序，还能混排不同文件中的页面，旋转扫描件并删除不需要的页面。', steps: ['添加多个 PDF', '调整页面顺序', '导出合并后的 PDF'] },
+  'merge-pdf': { title: '合并 PDF', short: '多个文件，合并成一个', headline: '按您指定的顺序合并 PDF。', description: '在浏览器本地合并 PDF、调整逐页顺序，并支持两份单面扫描文件按正反面交错合并或反面倒序。', details: '不仅能调整文件顺序，还能混排、旋转、删除页面。对正反面分别扫描的两份 PDF，展开“合并双面扫描”选择是否反转背面页，再交错合并。两份文件的页数需相同，或正面只多一页。原文件不会被修改。', steps: ['添加多个 PDF', '调整顺序或选择双面交错合并', '导出合并后的 PDF'] },
   'split-pdf': { title: '拆分 PDF', short: '按范围或固定页数拆分', headline: '将 PDF 拆分成需要的部分。', description: '按页码范围或每 N 页拆分 PDF，单份直接下载 PDF，多份打包 ZIP。文件在本地处理。', details: '输入 1-3, 4-6 等范围，每个范围独立输出；也可以按固定页数自动拆分。', steps: ['添加 PDF', '输入拆分范围或每份页数', '下载 PDF 或 ZIP'] },
   'organize-pdf': { title: '整理 PDF 页面', short: '缩略图拖拽排序', headline: '让每一页出现在正确位置。', description: '可视化排序、复制 PDF 页面、插入空白页，还能旋转与删除。支持撤销、重做和本地导出。', details: '跨文件调整页面顺序，复制选中页或插入与相邻页面等尺寸的空白页。支持键盘操作，不上传文档。', steps: ['添加文件', '预览并排序', '导出 PDF'] },
   'rotate-pdf': { title: '旋转 PDF 页面', short: '修正方向不对的扫描页', headline: '轻松调整歪倒的页面。', description: '选中一页或多页，以 90° 为单位旋转，再导出新的 PDF。', details: '选中方向不正确的页面，向左或向右旋转。原始文件不会被修改。', steps: ['添加 PDF', '选择并旋转页面', '导出 PDF'] },
