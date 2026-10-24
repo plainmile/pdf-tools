@@ -624,7 +624,7 @@ test('text import accepts more than 1 MB, rejects files larger than 5 MiB', asyn
   await expect.poll(async () => (await page.getByTestId('utility-text').inputValue()).length).toBe(text.length);
   const tooBig = Buffer.alloc(5 * 1024 * 1024 + 1, 65);
   await page.getByTestId('utility-file-input').setInputFiles({ name: 'huge.txt', mimeType: 'text/plain', buffer: tooBig });
-  await expect(page.getByRole('alert')).toContainText('supported file');
+  await expect(page.getByRole('alert')).toContainText('Text exceeds 5 MB');
 });
 
 test('rasterizer refuses a giant page before allocating a large canvas', async ({ page }) => {
