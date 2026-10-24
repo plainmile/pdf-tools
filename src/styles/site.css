@@ -357,6 +357,11 @@ main { flex: 1; }
 .split-fields > input { border: 1px solid var(--border); border-radius: 5px; padding: 10px 12px; height: 41px; background: var(--surface); color: var(--text); }
 .input-note { color: var(--subtle); font-size: 11px; line-height: 1.6; margin: 8px 0 0; }
 .split-estimate { font-size: 12px; color: var(--muted); margin-top: 17px; }
+.split-coverage-review { display: grid; gap: 8px; min-width: 0; margin-top: 9px; }
+.split-coverage-review .input-note { margin: 0; }
+.split-output-preview { max-width: 100%; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); padding: 9px 12px; }
+.split-output-preview > summary { cursor: pointer; color: var(--text); font-size: 12px; font-weight: 650; overflow-wrap: anywhere; }
+.split-output-preview ol { max-height: 220px; overflow: auto; color: var(--muted); font-size: 12px; line-height: 1.8; padding-left: 22px; margin: 10px 0 0; overflow-wrap: anywhere; }
 .split-download { margin-top: 12px; align-self: flex-start; }
 .workspace-foot { display: flex; gap: 14px; align-items: center; justify-content: space-between; padding: 14px 20px; background: var(--panel); border-top: 1px solid var(--border); color: var(--muted); font-size: 11px; }
 .workspace-foot > span:first-child { color: var(--success); font-weight: 650; }
