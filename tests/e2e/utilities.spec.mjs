@@ -898,6 +898,19 @@ test('Markdown links and nested code fences survive real PDF download and text e
   ]) expect(text).toContain(snippet);
 });
 
+test('malformed repeated Markdown links do not freeze browser-side PDF conversion', async ({ page }) => {
+  await page.goto('/markdown-to-pdf/');
+  const malformed = '[broken]('.repeat(2000);
+  await page.getByTestId('utility-text').fill(malformed + '\n' + '[Valid](https://example.com/ok)');
+  const output = await generateTextPdfAndDownload(page, 30000);
+  const doc = await PDFDocument.load(output.bytes);
+  expect(doc.getPageCount()).toBeGreaterThan(0);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, output.bytes);
+  const extracted = await getDownload(page, () => page.getByTestId('utility-run').click(), 20000);
+  expect(extracted.bytes.toString('utf8')).toContain('Valid (https://example.com/ok)');
+});
+
 test('Markdown technical comparisons survive an actual PDF download and TXT round-trip', async ({ page }) => {
   await page.goto('/markdown-to-pdf/');
   await page.getByTestId('utility-text').fill('Logic: a < 3 && b > 2\nBounds: x <= 40 && y >= 8\n**Safe** <strong>HTML</strong> text');
