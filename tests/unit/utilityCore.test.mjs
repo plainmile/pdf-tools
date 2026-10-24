@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline, wrapTextLines,
   textContentToLines, linesToReadableText, summarizeTextCoverage, sanitizeFilename, workspaceFilenameStem,
-  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
+  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageFilename, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
 
 test('text importer decodes UTF-8 and BOM-marked Windows UTF-16 without data loss', () => {
@@ -261,6 +261,19 @@ test('PDF image ZIP filename labels preserve localized and nonconsecutive output
   const label = imagePageSelectionLabel(longList, 125);
   assert.match(label, /^selection-first1-last119-60pages$/);
   assert.throws(() => imagePageSelectionLabel('4-1', 5), /reversed/);
+});
+
+test('PDF image filenames preserve lexicographic page order on a 1000-page book', () => {
+  assert.equal(imagePageFilename(1, 999, 'png'), 'page-001.png');
+  assert.equal(imagePageFilename(999, 999, 'jpg'), 'page-999.jpg');
+  assert.equal(imagePageFilename(1, 1000, 'png'), 'page-0001.png');
+  assert.equal(imagePageFilename(999, 1000, 'jpg'), 'page-0999.jpg');
+  assert.equal(imagePageFilename(1000, 1000, 'jpg'), 'page-1000.jpg');
+  const generated = [1, 2, 99, 100, 999, 1000].map(n => imagePageFilename(n, 1000));
+  assert.deepEqual([...generated].sort(), generated);
+  assert.throws(() => imagePageFilename(1001, 1000), /Invalid PDF image/);
+  assert.throws(() => imagePageFilename(1, 1001), /Invalid PDF image/);
+  assert.throws(() => imagePageFilename(1, 10, 'exe'), /Invalid PDF image/);
 });
 
 test('image batch suggestions cover the entire book without overlapping or exceeding 60 pages', () => {
