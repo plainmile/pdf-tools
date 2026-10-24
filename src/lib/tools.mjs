@@ -10,8 +10,8 @@ export const tools = [
   {
     slug: 'merge-pdf', title: 'Merge PDF', short: 'Combine many into one',
     headline: 'Merge PDFs in the order you choose.',
-    description: 'Combine multiple PDF files into one. Preview and reorder any individual page before you export. Files never leave your browser.',
-    details: 'Unlike simple file-level merging, you can interleave individual pages from different documents, remove unwanted pages and rotate sideways scans.',
+    description: 'Merge PDF files locally, reorder pages, or interleave two front/back scanner PDFs (including reverse-order backs). Files never leave your browser.',
+    details: 'Unlike simple file-level merging, you can move, delete and rotate pages. For exactly two PDFs scanned on separate front/back passes, expand Recombine two-sided scans and optionally reverse the back pages before alternating. Both scans must have matching page counts or fronts one page more.',
     steps: ['Add two or more PDFs', 'Arrange files and individual pages', 'Export one combined PDF'],
   },
   {
