@@ -59,6 +59,37 @@ test('exports without any watermark by default and only marks pages after opt-in
   expect(watermarkImageCounts(plainAgain)).toEqual([0, 0, 0]);
 });
 
+test('pristine single PDF export preserves original form fields and source bytes', async ({ page }) => {
+  const original = await PDFDocument.create();
+  original.setTitle('Original editable form');
+  const sheet = original.addPage([420, 595]);
+  const field = original.getForm().createTextField('recipient');
+  field.setText('Alice');
+  field.addToPage(sheet);
+  const bytes = Buffer.from(await original.save());
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles({ name: 'form.pdf', mimeType: 'application/pdf', buffer: bytes });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export PDF' }).click();
+  const saved = await readFile(await (await downloadPromise).path());
+  expect(Buffer.from(saved).equals(bytes)).toBe(true);
+});
+
+test('organize/split tabs support arrow keys and expose the active panel', async ({ page }) => {
+  await loadInput(page);
+  const organize = page.getByRole('tab', { name: 'Organize' });
+  const split = page.getByRole('tab', { name: 'Split' });
+  await organize.focus();
+  await organize.press('ArrowRight');
+  await expect(split).toBeFocused();
+  await expect(split).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tabpanel', { name: 'Split' })).toBeVisible();
+  await split.press('Home');
+  await expect(organize).toBeFocused();
+  await expect(page.getByRole('tabpanel', { name: 'Organize' })).toBeVisible();
+});
+
 test('watermark requires custom text, never inserts a default brand watermark', async ({ page }) => {
   await loadInput(page);
   await page.getByTestId('export-options-button').click();
