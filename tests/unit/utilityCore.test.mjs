@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline, wrapTextLines,
   textContentToLines, linesToReadableText, summarizeTextCoverage, sanitizeFilename, workspaceFilenameStem,
-  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageFilename, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
+  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageFilename, imageExportFilenames, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
 
 test('text importer decodes UTF-8 and BOM-marked Windows UTF-16 without data loss', () => {
@@ -274,6 +274,23 @@ test('PDF image filenames preserve lexicographic page order on a 1000-page book'
   assert.throws(() => imagePageFilename(1001, 1000), /Invalid PDF image/);
   assert.throws(() => imagePageFilename(1, 1001), /Invalid PDF image/);
   assert.throws(() => imagePageFilename(1, 10, 'exe'), /Invalid PDF image/);
+});
+
+test('ZIP image filenames preserve custom non-ascending page order when sorted by filename', () => {
+  assert.deepEqual(imageExportFilenames([3, 1], 8, 'png'),
+    ['order-001-page-003.png', 'order-002-page-001.png']);
+  assert.deepEqual(imageExportFilenames([5, 2, 7], 8, 'jpg'),
+    ['order-001-page-005.jpg', 'order-002-page-002.jpg', 'order-003-page-007.jpg']);
+  assert.deepEqual(imageExportFilenames([301, 300, 1000], 1000, 'jpg'),
+    ['order-001-page-0301.jpg', 'order-002-page-0300.jpg', 'order-003-page-1000.jpg']);
+  const names = imageExportFilenames([3, 1, 2], 3);
+  assert.deepEqual([...names].sort(), names);
+  // Existing standard ascending exports and single-image downloads are unchanged.
+  assert.deepEqual(imageExportFilenames([1, 3, 5], 8, 'png'),
+    ['page-001.png', 'page-003.png', 'page-005.png']);
+  assert.deepEqual(imageExportFilenames([1000], 1000), ['page-1000.jpg']);
+  assert.throws(() => imageExportFilenames([2, 2], 4), /Invalid PDF image page selection/);
+  assert.throws(() => imageExportFilenames([], 4), /Invalid PDF image page selection/);
 });
 
 test('image batch suggestions cover the entire book without overlapping or exceeding 60 pages', () => {
