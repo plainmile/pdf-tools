@@ -85,7 +85,22 @@ export function compressedImageDimensions(type, bytes) {
       throw new Error('Invalid image header.');
     }
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    return { width: view.getUint32(16), height: view.getUint32(20) };
+    const dimensions = { width: view.getUint32(16), height: view.getUint32(20) };
+    // APNG is still named .png and is backwards-compatible with static PNG
+    // decoders. A normal PDF embed can silently keep only the default frame.
+    // The APNG spec requires its acTL animation declaration BEFORE IDAT.
+    // Inspect only bounded chunk headers; never decode image pixels here.
+    let offset = 8, inspected = 0;
+    while (offset + 12 <= bytes.length) {
+      if (++inspected > 4096) throw new Error('Invalid image header.');
+      const size = view.getUint32(offset, false);
+      if (size > bytes.length - offset - 12) break; // Malformed PNG is rejected by the actual decoder.
+      const tag = String.fromCharCode(...bytes.subarray(offset + 4, offset + 8));
+      if (tag === 'acTL') throw new Error('Animated PNG is not supported.');
+      if (tag === 'IDAT') break;
+      offset += size + 12;
+    }
+    return dimensions;
   }
   if (type === 'image/jpeg') {
     if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) throw new Error('Invalid image header.');
@@ -410,7 +425,7 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}) {
     }
     if (error?.message === 'Image dimensions are too large.' ||
         error?.message === 'JPEG metadata could not be safely removed.' ||
-        /^Animated (AVIF|WebP) is not supported\.$/.test(error?.message) ||
+        /^Animated (AVIF|WebP|PNG) is not supported\.$/.test(error?.message) ||
         /^This AVIF could not be decoded/.test(error?.message)) throw error;
     throw new Error(`${file.name}: image could not be converted to PDF.`);
   } finally {
