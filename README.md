@@ -153,7 +153,7 @@ CI builds the final image, smoke-tests routes and static assets, and runs Playwr
 
 Repository: `https://github.com/plainmile/pdf-tools` (public). Make changes on `feature/*`, open a PR to `main`, and wait for all CI checks including browser-level verification of generated PDF contents before merging. Publishing is handled by `.github/workflows/publish.yml` on `main` and outputs both `latest` and immutable commit-SHA GHCR image tags.
 
-A committed `package-lock.json` is recommended for reproducible builds. CI currently supports an initial unpinned bootstrapping build if the lock is absent; do not claim the release is fully reproducible until the lock has been generated and committed in a separate PR.
+Dependency versions are pinned through the committed npm v3 `package-lock.json` (generated and validated with Node 22 inside Docker). The production Dockerfile and CI use `npm ci` and fail if the lock is missing or mismatched. This makes **npm dependencies** reproducible; it does not guarantee byte-for-byte identical images across changing Node/Nginx base image tags, platforms, or registries. Pin and review exact image digests where stronger supply-chain reproducibility is required.
 
 ## Production deployment on netcup
 
