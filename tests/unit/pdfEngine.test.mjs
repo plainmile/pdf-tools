@@ -27,6 +27,19 @@ test('reject massive PNG before decoding image memory', () => {
   assert.throws(() => compressedImageDimensions('image/png', new Uint8Array([1,2,3])), /Invalid image header/);
 });
 
+test('APNG declared before IDAT is rejected before PNG decoding, while a static PNG remains supported', () => {
+  const staticPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/b9kAAAAASUVORK5CYII=', 'base64');
+  assert.deepEqual(compressedImageDimensions('image/png', staticPng), { width: 1, height: 1 });
+  const animationHeader = Buffer.alloc(20);
+  animationHeader.writeUInt32BE(8, 0);
+  animationHeader.write('acTL', 4);
+  animationHeader.writeUInt32BE(2, 8);
+  const animated = Buffer.concat([staticPng.subarray(0, 33), animationHeader, staticPng.subarray(33)]);
+  assert.throws(() => compressedImageDimensions('image/png', animated), /Animated PNG is not supported/);
+  // Both a normal PNG and a still PNG with unrelated metadata remain valid.
+  assert.deepEqual(compressedImageDimensions('image/png', staticPng), { width: 1, height: 1 });
+});
+
 test('JPEG progressive and baseline dimensions can be read from SOF markers', () => {
   for (const marker of [0xc0, 0xc2]) {
     const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, marker, 0, 8, 8, 0, 12, 0, 22, 1, 0xff, 0xd9]);
