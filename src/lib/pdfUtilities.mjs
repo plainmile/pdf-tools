@@ -291,7 +291,7 @@ export async function textToPdf(text, markdown = false, options = {}) {
       const lineHeight = size * 1.55;
       const isBold = block.kind === 'heading';
       const font = block.kind === 'code' ? mono : isBold ? bold : regular;
-      if (!block.text) { y -= 9; if (y < margin) await newPage(); continue; }
+      if (!block.text) { y -= block.kind === 'code' ? lineHeight : 9; if (y < margin) await newPage(); continue; }
       const cssFont = block.kind === 'code' ? 'monospace' : 'system-ui, "Noto Sans CJK SC", "Microsoft YaHei", sans-serif';
       measure.font = `${isBold ? 'bold ' : ''}${size}px ${cssFont}`;
       // A Latin page in a mixed document uses the embedded PDF font; a CJK
