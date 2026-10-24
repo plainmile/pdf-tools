@@ -353,6 +353,48 @@ test('numbered PDF stores the requested starting numbers as selectable text', as
   expect(text).toMatch(/\b8\b/);
 });
 
+test('numbered PDF skips cover and contents so page 3 starts at printed 1', async ({ page }) => {
+  const original = await PDFDocument.create();
+  const font = await original.embedFont(StandardFonts.Helvetica);
+  for (let index = 0; index < 5; index++) {
+    const sheet = original.addPage([595.28, 841.89]);
+    if (index === 0) sheet.drawText('COVER WITHOUT NUMBER', { x: 40, y: 700, font, size: 14 });
+    if (index === 1) sheet.drawText('CONTENTS WITHOUT NUMBER', { x: 40, y: 700, font, size: 14 });
+  }
+  await page.goto('/add-page-numbers/');
+  await upload(page, Buffer.from(await original.save()));
+  await expect(page.getByTestId('number-first-pdf-page')).toHaveValue('1');
+  await expect(page.getByTestId('number-first-page-hint')).toContainText('stay unnumbered');
+  await page.getByTestId('number-first-pdf-page').fill('3');
+  await page.getByTestId('number-start').fill('1');
+  const numbered = await getDownload(page, () => page.getByTestId('utility-run').click(), 15000);
+  expect((await PDFDocument.load(numbered.bytes)).getPageCount()).toBe(5);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, numbered.bytes);
+  const extracted = await getDownload(page, () => page.getByTestId('utility-run').click(), 15000);
+  const parts = extracted.bytes.toString('utf8').trim().split(/\n\s*\n/).map(s => s.trim());
+  expect(parts).toEqual(['COVER WITHOUT NUMBER', 'CONTENTS WITHOUT NUMBER', '1', '2', '3']);
+});
+
+test('Chinese mobile PDF numbering validates starting PDF page and last printed number', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/add-page-numbers/');
+  await upload(page, await fixturePdf('Chinese numbering control', 5));
+  await expect(page.getByTestId('number-first-page-hint')).toContainText('封面');
+  await page.getByTestId('number-first-pdf-page').fill('6');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByRole('alert')).toContainText('开始编号的 PDF 页码超出范围');
+  await page.getByTestId('number-first-pdf-page').fill('3');
+  await page.getByTestId('number-start').fill('99999');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByRole('alert')).toContainText('不能超过 99999');
+  await page.getByTestId('number-first-pdf-page').fill('5');
+  const output = await getDownload(page, () => page.getByTestId('utility-run').click(), 15000);
+  expect((await PDFDocument.load(output.bytes)).getPageCount()).toBe(5);
+  const viewport = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, width: document.documentElement.clientWidth }));
+  expect(viewport.scroll).toBeLessThanOrEqual(viewport.width + 2);
+});
+
 test('all new Chinese/English landing routes and footer open-source attribution', async ({ page }) => {
   for (const path of ['pdf-to-images','compress-pdf','pdf-to-txt','pdf-to-markdown','txt-to-pdf','markdown-to-pdf','add-page-numbers']) {
     for (const prefix of ['/', '/zh/']) {
