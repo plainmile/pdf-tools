@@ -371,7 +371,7 @@ test('mixed English and Chinese TXT rasterizes only the CJK page and preserves s
   });
   expect(imageCounts).toEqual([0, 1, 0]);
   await expect(page.getByRole('status')).toContainText('1 of 3 pages contain unsupported characters');
-  await expect(page.getByRole('status')).toContainText('other 2 pages remain selectable');
+  await expect(page.getByRole('status')).toContainText('other 2 pages retain selectable text');
 
   // Check actual PDF text with the site's own converter; the CJK page has no
   // hidden fake searchable layer, but both untouched English pages do.
