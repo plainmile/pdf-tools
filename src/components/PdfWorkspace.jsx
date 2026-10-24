@@ -1001,7 +1001,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <button type="button" data-testid="reverse-all-pages" disabled={busy} onClick={() => commit(reversePages)}>{onlyImages ? t.reverseOrder : t.reversePdfOrder}</button>
                 </div>}
                 {canSortSourceFiles && !onlyImages && <p className="input-note" data-testid="source-sort-hint">{t.sortPdfFilesHint}</p>}
-                {canInterleaveDuplex && <details className="page-jump-panel" data-testid="duplex-interleave-panel">
+                {canInterleaveDuplex && <details className="page-jump-panel duplex-interleave-panel" data-testid="duplex-interleave-panel">
                   <summary>{t.duplexToggle}</summary>
                   <p className="input-note" data-testid="duplex-interleave-hint">{interpolate(t.duplexHint, {
                     front: sourceLookup.get(sourceGroups[0].sourceId)?.name ?? t.document,
