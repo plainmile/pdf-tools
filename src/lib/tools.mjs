@@ -87,15 +87,15 @@ export const tools = [
   {
     slug: 'txt-to-pdf', title: 'TXT to PDF', short: 'Make a PDF from plain text',
     headline: 'Turn UTF-8 plain text into a readable PDF.',
-    description: 'Convert pasted or uploaded TXT text into an A4 PDF locally. English is selectable; non-Latin characters render using browser fonts as image pages.',
-    details: 'Write or import .txt content. Chinese and other scripts use image-rendered PDF pages, so those output pages do not support text search.',
+    description: 'Turn pasted or uploaded TXT into an A4 PDF locally. Pages with unsupported characters use browser fonts as images; other pages retain selectable text.',
+    details: 'Write or import .txt content. Only pages requiring Chinese or other unsupported glyphs are rendered as images; the remaining pages stay searchable. Image-only pages cannot be searched.',
     steps: ['Paste or import a TXT file', 'Review the text', 'Download the PDF'],
   },
   {
     slug: 'markdown-to-pdf', title: 'Markdown to PDF', short: 'Simple headings and lists',
     headline: 'Turn simple Markdown into a PDF document.',
-    description: 'Convert basic Markdown headings, lists, quotes, paragraphs and code into PDF locally. Non-Latin pages are rendered as images; complex Markdown is not supported.',
-    details: 'Import or paste Markdown. External images, HTML, advanced tables and remote resources are not rendered. Check the export for exact layout.',
+    description: 'Convert basic Markdown headings, lists, quotes, paragraphs and code into PDF locally. Only pages needing unsupported characters are image-based; complex Markdown is not supported.',
+    details: 'Import or paste Markdown. Pages with unsupported glyphs are image-only while other pages keep selectable text. External images, HTML, advanced tables and remote resources are not rendered. Check the layout.',
     steps: ['Paste or import Markdown', 'Use simple headings and lists', 'Download a readable PDF'],
   },
   {

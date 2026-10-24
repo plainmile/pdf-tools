@@ -349,6 +349,79 @@ test('TXT to PDF yields selectable text after real download and re-import', asyn
   expect(extracted.bytes.toString('utf8')).toContain('Hello selectable world');
 });
 
+test('mixed English and Chinese TXT rasterizes only the CJK page and preserves searchable English pages', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/txt-to-pdf/');
+  // At 11 pt / 1.55 line height, 43 short lines occupy one A4 page.
+  // One CJK section in the middle must not rasterize the two English pages.
+  const input = [
+    ...Array.from({ length: 43 }, (_, i) => 'English opening page row ' + (i + 1)),
+    ...Array.from({ length: 43 }, (_, i) => '中文中间页 ' + (i + 1)),
+    ...Array.from({ length: 43 }, (_, i) => 'Searchable final page row ' + (i + 1)),
+  ].join('\n');
+  await page.getByTestId('utility-text').fill(input);
+  const result = await generateTextPdfAndDownload(page, 30000);
+  const doc = await PDFDocument.load(result.bytes);
+  expect(doc.getPageCount()).toBe(3);
+  const imageCounts = doc.getPages().map(pdfPage => {
+    const ref = pdfPage.node.Resources();
+    const resources = ref && doc.context.lookup(ref, PDFDict);
+    const objects = resources?.get(PDFName.of('XObject'));
+    return objects ? doc.context.lookup(objects, PDFDict).keys().length : 0;
+  });
+  expect(imageCounts).toEqual([0, 1, 0]);
+  await expect(page.getByRole('status')).toContainText('1 of 3 pages contain unsupported characters');
+  await expect(page.getByRole('status')).toContainText('other 2 pages retain selectable text');
+
+  // Check actual PDF text with the site's own converter; the CJK page has no
+  // hidden fake searchable layer, but both untouched English pages do.
+  await page.goto('/pdf-to-txt/');
+  await upload(page, result.bytes);
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('text-extraction-warning')).toContainText('1 of 3 pages have no selectable text');
+  const extracted = await getDownload(page, () => page.getByTestId('partial-text-download').click());
+  const text = extracted.bytes.toString('utf8');
+  expect(text).toContain('English opening page row 1');
+  expect(text).toContain('Searchable final page row 43');
+  expect(text).not.toContain('中文中间页');
+});
+
+test('CJK text PDF is rendered near the top of the page, not upside-down at the bottom', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/zh/txt-to-pdf/');
+  await page.getByTestId('utility-text').fill('中文第一行比较长：检查书写顺序和位置\n第二行文字');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible({ timeout: 30000 });
+  const canvas = page.getByTestId('utility-pdf-preview').locator('canvas');
+  const ink = () => canvas.evaluate(element => {
+    const { width, height } = element;
+    if (!width || !height) return { top: 0, bottom: 0 };
+    const pixels = element.getContext('2d').getImageData(0, 0, width, height).data;
+    let top = 0, bottom = 0;
+    // Count actual dark pixels in the rendered PDF, not the JSX success text.
+    // A4 text starts at PDF Y~796, corresponding to CANVAS top Y~46.
+    for (let y = Math.floor(height * .04); y < Math.floor(height * .96); y++) {
+      const upper = y < height * .30, lower = y > height * .70;
+      if (!upper && !lower) continue;
+      for (let x = 14; x < width - 14; x++) {
+        const offset = (y * width + x) * 4;
+        // Unrendered HTML canvas pixels are transparent black (RGBA 0,0,0,0).
+        // Count only opaque rendered PDF ink, not yet-to-be-painted rows.
+        if (pixels[offset + 3] >= 200 && pixels[offset] < 190 && pixels[offset + 1] < 190 && pixels[offset + 2] < 190) {
+          if (upper) top++;
+          if (lower) bottom++;
+        }
+      }
+    }
+    return { top, bottom };
+  });
+  await expect.poll(async () => (await ink()).top, { timeout: 30000 }).toBeGreaterThan(50);
+  const bands = await ink();
+  expect(bands.bottom).toBeLessThan(5);
+  const output = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
+  expect((await PDFDocument.load(output.bytes)).getPageCount()).toBe(1);
+});
+
 test('Chinese Markdown to PDF produces a real local raster image page', async ({ page }) => {
   // CJK page rendering runs browser fonts, canvas and PDF.js preview before
   // download. Give this heavier workflow its own budget on public CI runners.
