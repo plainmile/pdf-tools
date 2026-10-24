@@ -209,7 +209,11 @@ Only the `pdf-tools` service is created or updated. No database migrations, user
 
 ## Rollback
 
-With a previous reviewed GHCR image tag, change the server-local `IMAGE_TAG`, run `docker compose -f compose.prod.yaml up -d`, and verify `/healthz`. No user documents or persistent storage need to migrate.
+**Automatic, guarded image rollback:** At the start of each production deployment, GitHub Actions reads the SHA tag of the **currently running healthy** `plainmile-pdf-tools` container (only when its Compose working directory is `/opt/compose/pdf-tools`). If the image health check, public HTTPS check or complete public Playwright E2E fails after the new SHA is attempted, the workflow restores the previously healthy image SHA and verifies that the container becomes healthy again. The workflow still reports **failure** and retains the failed E2E diagnostics; rolling back does not mean the release passed. It never restarts the shared Edge Nginx, touches other Compose applications, or prunes Docker images.
+
+The rollback is deliberately skipped on first installs, when the previous image has no recognized 40-character SHA or was unhealthy, or if the server's `.env` no longer points at the failed SHA (for example, an operator has deployed another version). This is an **image-version rollback**, not a rollback of arbitrary Compose configuration changes or external Cloudflare routing. If the old image is unavailable or rollback fails, inspect the failing workflow and recover manually. An application outage or test infrastructure failure can still occur; there is no zero-downtime or guaranteed recovery claim.
+
+**Manual recovery:** With a previous reviewed GHCR image tag, change the server-local `IMAGE_TAG`, run `docker compose -f compose.prod.yaml up -d`, and verify `/healthz`. No user documents or persistent storage need to migrate.
 
 ## License
 

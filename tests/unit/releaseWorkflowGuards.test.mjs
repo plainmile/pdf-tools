@@ -77,6 +77,7 @@ test('production Compose deployment uses /opt/compose/pdf-tools and safely migra
   assert.match(yaml, /\[ "\$working_dir" != \/opt\/compose\/pdf-tools \]/);
   assert.match(yaml, /docker network inspect edge/);
   assert.match(yaml, /docker compose -f compose\.prod\.yaml up -d/);
+  assert.match(yaml, /if \[ "\$image" != "ghcr\.io\/plainmile\/pdf-tools:\$IMAGE_TAG" \]; then/);
 
   assert.match(docs, /deployment uses `\/opt\/compose\/pdf-tools\/`/);
   assert.match(docs, /cd \/opt\/compose\/pdf-tools/);
@@ -88,3 +89,27 @@ test('production Compose deployment uses /opt/compose/pdf-tools and safely migra
   assert.match(agentPolicy, /must live in `\/opt\/compose\/pdf-tools\/`/);
 });
 
+test('failed public E2E or unhealthy deploy rolls back only this service to a previously healthy SHA', () => {
+  const yaml = readWorkflow('deploy.yml');
+  const checkpoint = yaml.indexOf('id: checkpoint');
+  const deploy = yaml.indexOf('id: deploy');
+  const publicE2E = yaml.indexOf('- name: Public browser E2E and SEO against deployed site');
+  const rollback = yaml.indexOf('- name: Restore last healthy image if release checks fail');
+  assert.ok(checkpoint > 0 && checkpoint < deploy && deploy < publicE2E && publicE2E < rollback);
+  // Never trust a stale .env; only a healthy, correctly owned running image.
+  assert.match(yaml, /image=\$\(docker inspect -f '\{\{\.Config\.Image\}\}' plainmile-pdf-tools/);
+  assert.match(yaml, /if \[ "\$health" = healthy \] && \[ "\$working_dir" = \/opt\/compose\/pdf-tools \]/);
+  assert.match(yaml, /case "\$image" in[\s\S]*?ghcr\.io\/plainmile\/pdf-tools:\*/);
+  assert.match(yaml, /printf 'previous_sha=%s\\n' "\$previous_sha" >> "\$GITHUB_OUTPUT"/);
+  // Only rollback on actual failure, after deploy was attempted, with a safe checkpoint.
+  assert.match(yaml, /if: \$\{\{ failure\(\) && steps\.checkpoint\.outputs\.previous_sha != '' && steps\.deploy\.outcome != 'skipped' \}\}/);
+  assert.match(yaml, /PREVIOUS_SHA: \$\{\{ steps\.checkpoint\.outputs\.previous_sha \}\}/);
+  assert.match(yaml, /FAILED_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
+  assert.match(yaml, /if ! grep -qx "IMAGE_TAG=\$FAILED_SHA" \.env; then/);
+  assert.match(yaml, /if \[ -n "\$working_dir" \] && \[ "\$working_dir" != \/opt\/compose\/pdf-tools \]; then/);
+  assert.match(yaml, /printf 'IMAGE_TAG=%s\\n' "\$PREVIOUS_SHA" > \.env/);
+  assert.match(yaml, /docker compose -f compose\.prod\.yaml up -d/);
+  assert.match(yaml, /if \[ "\$working_dir" = \/opt\/compose\/pdf-tools \] &&[\s\S]*?\[ "\$image" = "ghcr\.io\/plainmile\/pdf-tools:\$PREVIOUS_SHA" \]; then/);
+  // Rollback must never restart the VPS edge, touch other Compose stacks or prune images.
+  assert.doesNotMatch(yaml, /docker compose down|docker system prune|docker image prune/);
+});
