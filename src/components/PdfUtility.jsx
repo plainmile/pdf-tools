@@ -17,6 +17,7 @@ const COPY = {
     noSavingEarly: 'Stopped early: JPEG data already exceeds the original size. Keep the original or lower the resolution.',
     compressionLowerBound: 'At least', previewAction: 'Generate PDF preview', previewTitle: 'Generated PDF preview', previewFirst: 'Previewing page 1 of {pages}', previewFailed: 'Preview unavailable; you can still download the PDF.', downloadPdf: 'Download PDF',
     textWarning: 'Extracts existing selectable PDF text only, not OCR. Columns, tables and heading formatting may not be preserved. Check the exported text.',
+    textOrderLabel: 'Text reading order', textOrderRows: 'By rows (single-column documents and tables)', textOrderLeft: 'Two columns: left first', textOrderRight: 'Two columns: right first', textOrderHint: 'For newspapers and side-by-side articles. Full-width headings, tables and complex layouts can still need manual review.', textOrderStale: 'This download uses your previous reading order. Convert again to apply the new selection.',
     missingTextPages: 'Important: {missing} of {total} pages have no selectable text (pages {pages}). Those pages may be blank or scanned images. Their content was not extracted; OCR would be required for scanned text. Check your original PDF.',
     partialTextReady: 'Some PDF pages were not extracted. Review the warning before choosing to download this incomplete text file.',
     markdownWarning: 'Markdown conversion is approximate; headings are inferred from font size. Complex PDF layout cannot be faithfully recovered.',
@@ -42,6 +43,7 @@ const COPY = {
     noSavingEarly: '已提前停止：JPEG 数据已不小于原文件，继续转换也不能节省空间。请保留原文件或降低清晰度。',
     compressionLowerBound: '至少', previewAction: '生成 PDF 预览', previewTitle: '生成的 PDF 预览', previewFirst: '第 1 页预览（共 {pages} 页）', previewFailed: '无法生成预览，但仍可下载 PDF。', downloadPdf: '下载 PDF',
     textWarning: '只提取 PDF 中已有的可选择文字，不具备 OCR。多栏、表格和段落顺序可能不准确，请核对导出内容。',
+    textOrderLabel: '文字阅读顺序', textOrderRows: '按行读取（单栏文档、表格）', textOrderLeft: '双栏：先左栏后右栏', textOrderRight: '双栏：先右栏后左栏', textOrderHint: '适用于报纸、双栏论文等。跨栏标题、表格和复杂版式仍需人工核对。', textOrderStale: '当前结果使用之前的阅读顺序。请重新转换以应用新设置。',
     missingTextPages: '重要提示：共 {total} 页中有 {missing} 页未检测到可选择文字（第 {pages} 页）。这些页可能是空白页或扫描图片，其内容未被提取；扫描文字需要 OCR。请对照原始 PDF 核查。',
     partialTextReady: '有些 PDF 页面未能提取文字。请先查看缺页提示，再决定是否下载这份不完整的文字文件。',
     markdownWarning: 'Markdown 为近似转换：根据字号推测标题，复杂 PDF 的版式无法完整还原。',
@@ -128,6 +130,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const [sourceText, setSourceText] = useState('');
   const [pages, setPages] = useState('');
   const [format, setFormat] = useState('jpg');
+  const [readingOrder, setReadingOrder] = useState('rows');
   const [scale, setScale] = useState('1.5');
   const [compressMode, setCompressMode] = useState('balanced');
   const [start, setStart] = useState('1');
@@ -343,7 +346,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         const markdown = mode === 'pdf-to-markdown';
         let textCoverage = null;
         const value = await extractPdfText(pdf, markdown, report, controller.signal,
-          coverage => { textCoverage = coverage; });
+          coverage => { textCoverage = coverage; }, readingOrder);
         ensureNotCancelled();
         const incomplete = Boolean(textCoverage?.missingPages.length);
         if (incomplete) {
@@ -362,13 +365,13 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         if (incomplete) {
           // Never auto-download a file that silently omits some source pages.
           // Keep it for explicit review and allow repeated download after consent.
-          setOutput({ ...result, partialText: true });
+          setOutput({ ...result, partialText: true, readingOrder });
           setNotDownloaded(true);
           setNotice('');
         } else {
           // Keep successful full extractions available for a second download.
           // This does not change the existing one-click automatic download.
-          setOutput({ ...result, partialText: false });
+          setOutput({ ...result, partialText: false, readingOrder });
           save(result);
           setNotice(`${t.ready}: ${formatBytes(result.bytes.length)}`);
         }
@@ -488,6 +491,16 @@ export default function PdfUtility({ mode, locale = 'en' }) {
               data-testid="utility-batch-resume" onClick={resumeImageBatches} disabled={inputLocked}>{t.batchResume}</button>
           </div>}
         </div>}
+        {isTextOutput && <div className="utility-options">
+          <label><span>{t.textOrderLabel}</span><select data-testid="text-reading-order"
+            aria-label={t.textOrderLabel} value={readingOrder} disabled={inputLocked}
+            onChange={event => { setReadingOrder(event.target.value); setNotice(''); setError(''); }}>
+            <option value="rows">{t.textOrderRows}</option>
+            <option value="left-first">{t.textOrderLeft}</option>
+            <option value="right-first">{t.textOrderRight}</option>
+          </select></label>
+        </div>}
+        {isTextOutput && <p className="utility-note" data-testid="text-reading-order-hint">{t.textOrderHint}</p>}
         {isCompress && <div className="utility-options"><label><span>{t.compressionMethod}</span><select aria-label={t.compressionMethod} value={compressMode} disabled={inputLocked} onChange={e => { setCompressMode(e.target.value); setNotice(''); setError(''); }}><option value="compact">{t.compressionLow}</option><option value="balanced">{t.compressionMid}</option><option value="clearer">{t.compressionHigh}</option></select></label></div>}
         {mode === 'add-page-numbers' && <div className="utility-options">
           <label><span>{t.pageStart}</span><input data-testid="number-start" type="number" min="1" max="99999" value={start} disabled={inputLocked} onChange={e => { setStart(e.target.value); clearOutput(); }} /></label>
@@ -528,6 +541,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         {isTextOutput && output?.bytes && <div className="utility-result"
           data-testid={output.partialText ? 'partial-text-result' : 'complete-text-result'}>
           {output.partialText && <p className="utility-note">{t.partialTextReady}</p>}
+          {output.readingOrder !== readingOrder && <p className="utility-note" role="status" data-testid="text-reading-order-stale">{t.textOrderStale}</p>}
           <button type="button" className="button button-primary"
             data-testid={output.partialText ? 'partial-text-download' : 'complete-text-download'}
             onClick={() => save(output)}>{output.partialText ? t.download : t.downloadAgain} ↓</button>

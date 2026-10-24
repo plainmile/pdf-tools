@@ -515,6 +515,42 @@ export function textContentToLines(content) {
     return { text: text.trim(), fontSize: line.fontSize };
   }).filter(line => line.text);
 }
+
+/** Explicit two-column reading order. PDF text streams are positioned, not
+ * semantically ordered: a baseline-first scan interleaves two newspaper
+ * columns. Keep the existing row-major algorithm as the default for tables.
+ * The supplied PDF.js viewport maps CropBox origin / page rotation into the
+ * visible page coordinate system before dividing the page vertically.
+ * Full-width headings and complex tables are still approximate.
+ */
+export function textContentToReadingOrderLines(content, order = 'rows', viewport = null) {
+  if (order === 'rows') return textContentToLines(content);
+  if (!['left-first', 'right-first'].includes(order)) throw new Error('Unsupported PDF text reading order.');
+  if (!viewport || !Number.isFinite(viewport.width) || viewport.width <= 0 ||
+      typeof viewport.convertToViewportPoint !== 'function') {
+    throw new Error('PDF page viewport is required for column reading order.');
+  }
+  const columns = [[], []];
+  for (const item of content.items) {
+    if (typeof item.str !== 'string' || !item.str.trim()) continue;
+    const x = Number(item.transform?.[4]);
+    const y = Number(item.transform?.[5]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      // A malformed item cannot be safely allocated to a column; returning
+      // original row order is less damaging than silently dropping its text.
+      return textContentToLines(content);
+    }
+    const [visibleX, visibleY] = viewport.convertToViewportPoint(x, y);
+    if (!Number.isFinite(visibleX) || !Number.isFinite(visibleY)) return textContentToLines(content);
+    const normalized = {
+      ...item,
+      transform: [0, 0, 0, 0, visibleX, -visibleY],
+    };
+    columns[visibleX < viewport.width / 2 ? 0 : 1].push(normalized);
+  }
+  const ordered = order === 'left-first' ? columns : [columns[1], columns[0]];
+  return ordered.flatMap(items => textContentToLines({ items }));
+}
 /** Surface incomplete PDF text extraction instead of implying success.
  * A blank page and an image-only/scanned page are indistinguishable by their
  * text layer alone, so report "no selectable text", not "scanned".

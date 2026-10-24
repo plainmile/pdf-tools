@@ -42,6 +42,41 @@ async function getDownload(page, action, timeout = 6000) {
   return { name: download.suggestedFilename(), bytes: await readFile(await download.path()) };
 }
 
+test('two-column PDF text extraction has explicit row, left and right orders and preserves old results', async ({ page }) => {
+  const source = await PDFDocument.create();
+  const pagePdf = source.addPage([600, 800]);
+  for (let n=0; n<3; n++) {
+    const y=700-n*28;
+    pagePdf.drawText('LEFT'+(n+1), { x:40, y, size:12 });
+    pagePdf.drawText('RIGHT'+(n+1), { x:340, y, size:12 });
+  }
+  const bytes = Buffer.from(await source.save());
+  await page.goto('/pdf-to-txt/');
+  await upload(page, bytes);
+  const picker = page.getByTestId('text-reading-order');
+  await expect(picker).toHaveValue('rows');
+  const rows = (await getDownload(page, () => page.getByTestId('utility-run').click(), 20000)).bytes.toString('utf8');
+  expect(rows.indexOf('RIGHT1')).toBeLessThan(rows.indexOf('LEFT2'));
+  await picker.selectOption('left-first');
+  await expect(page.getByTestId('text-reading-order-stale')).toBeVisible();
+  const leftFirst = (await getDownload(page, () => page.getByTestId('utility-run').click(), 20000)).bytes.toString('utf8');
+  expect(leftFirst).toContain('LEFT1\nLEFT2\nLEFT3\nRIGHT1\nRIGHT2\nRIGHT3');
+  await picker.selectOption('right-first');
+  await expect(page.getByTestId('text-reading-order-stale')).toBeVisible();
+  const rightFirst = (await getDownload(page, () => page.getByTestId('utility-run').click(), 20000)).bytes.toString('utf8');
+  expect(rightFirst).toContain('RIGHT1\nRIGHT2\nRIGHT3\nLEFT1\nLEFT2\nLEFT3');
+  await page.goto('/zh/pdf-to-markdown/');
+  await page.setViewportSize({width:375,height:812});
+  await upload(page,bytes);
+  const zhPicker=page.getByTestId('text-reading-order');
+  await expect(zhPicker.locator('option')).toHaveCount(3);
+  await zhPicker.selectOption('left-first');
+  const markdown = (await getDownload(page, () => page.getByTestId('utility-run').click(), 20000)).bytes.toString('utf8');
+  expect(markdown.indexOf('LEFT3')).toBeLessThan(markdown.indexOf('RIGHT1'));
+  const viewport = await page.evaluate(() => ({scroll:document.documentElement.scrollWidth,width:document.documentElement.clientWidth}));
+  expect(viewport.scroll).toBeLessThanOrEqual(viewport.width+2);
+});
+
 test('localized image page range downloads named ZIP containing the correct images', async ({ page }) => {
   await page.goto('/zh/pdf-to-images/');
   await upload(page, await fixturePdf('Localized range source', 8));
