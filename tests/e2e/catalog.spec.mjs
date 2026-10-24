@@ -18,11 +18,19 @@ test('tool search filters only relevant tools and clear restores all options', a
   await expect(page.locator('[data-tool-card]:visible')).toHaveCount(1);
   await expect(page.locator('a.tool-card[href="/compress-pdf/"]')).toBeVisible();
   await expect(page.locator('[data-tool-group]:visible')).toHaveCount(1);
+  await expect(page.locator('[data-tool-group]:visible [data-tool-group-count]')).toHaveText('1 tool');
+  await expect(page.locator('[data-category-link]:visible')).toHaveCount(1);
+  const visibleGroupId = await page.locator('[data-tool-group]:visible').getAttribute('id');
+  await expect(page.locator('[data-category-link]:visible')).toHaveAttribute('href', '#' + visibleGroupId);
   await search.fill('no-such-tool-match');
   await expect(page.locator('[data-tool-card]:visible')).toHaveCount(0);
   await expect(page.getByText('No tools match that search')).toBeVisible();
+  await expect(page.locator('[data-category-jump]')).toBeHidden();
   await page.getByRole('button', { name: 'Clear' }).click();
   await expect(page.locator('[data-tool-card]:visible')).toHaveCount(16);
+  await expect(page.locator('[data-category-link]:visible')).toHaveCount(4);
+  const groupCounts = await page.locator('[data-tool-group-count]').allTextContents();
+  expect(groupCounts.reduce((sum, label) => sum + Number.parseInt(label, 10), 0)).toBe(16);
 });
 
 test('Chinese catalog search, categories and links work on mobile without overflow', async ({ page }) => {
@@ -33,6 +41,8 @@ test('Chinese catalog search, categories and links work on mobile without overfl
   await box.fill('水印');
   await expect(page.locator('[data-tool-card]:visible')).toHaveCount(1);
   await expect(page.locator('a.tool-card[href="/zh/watermark-pdf/"]')).toBeVisible();
+  await expect(page.locator('[data-tool-group]:visible [data-tool-group-count]')).toHaveText('1 个工具');
+  await expect(page.locator('[data-category-link]:visible')).toHaveCount(1);
   await box.fill('');
   await expect(page.locator('[data-tool-card]:visible')).toHaveCount(16);
   const dimensions = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth }));
