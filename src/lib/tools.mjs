@@ -99,11 +99,11 @@ export const tools = [
     steps: ['Paste or import Markdown', 'Use simple headings and lists', 'Download a readable PDF'],
   },
   {
-    slug: 'add-page-numbers', title: 'Add PDF Page Numbers', short: 'Number every page',
+    slug: 'add-page-numbers', title: 'Add PDF Page Numbers', short: 'Skip covers or number every page',
     headline: 'Add clear page numbers to your PDF.',
-    description: 'Add selectable page numbers with a custom starting number, position and font size. PDF files stay on your device.',
-    details: 'Choose the starting number, place it at the bottom center, bottom right or top right, and download your newly numbered PDF.',
-    steps: ['Choose a PDF', 'Set starting number and position', 'Download the numbered document'],
+    description: 'Add selectable page numbers starting on any chosen PDF page, with a custom first number, position and font size. Skip cover pages locally.',
+    details: 'Choose the first PDF page to number and the number printed on it. Earlier cover or contents pages remain unnumbered. Place numbers at the bottom center, bottom right or top right.',
+    steps: ['Choose a PDF', 'Choose which page starts numbering', 'Download the numbered document'],
   },
   {
     slug: 'image-to-pdf', title: 'Images to PDF', short: 'Custom pages and margins',
