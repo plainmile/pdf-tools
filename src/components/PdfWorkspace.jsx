@@ -9,7 +9,7 @@ import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges,
-  getRangePages, splitCoversAllPagesExactlyOnce, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
+  getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
 function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview, onOpen, outputPosition, busy }) {
@@ -207,12 +207,17 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const navigationWouldLoseWork = recoverableDeletedPages ||
     Boolean(pages.length && documentRevision !== lastDownloadedRevision);
   const splitNeedsInput = splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim();
-  const splitEstimate = useMemo(() => {
+  const splitPlan = useMemo(() => {
     if (!pages.length || (splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim())) return null;
     try {
-      return splitMode === 'ranges' ? parsePageRanges(ranges, pages.length).length : chunkPageRanges(pages.length, Number(chunkSize)).length;
+      const parts = splitMode === 'ranges'
+        ? parsePageRanges(ranges, pages.length)
+        : chunkPageRanges(pages.length, Number(chunkSize));
+      const coverage = splitCoverageDetails(parts, pages.length);
+      return coverage ? { parts, coverage } : null;
     } catch (_error) { return null; }
   }, [pages.length, splitMode, ranges, chunkSize]);
+  const splitEstimate = splitPlan?.parts.length ?? null;
 
   // Retain PDF.js loading tasks so the worker and its memory are truly released on reset/unmount.
   const getPreviewDoc = useCallback((source) => {
@@ -1131,6 +1136,26 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
                   <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} placeholder="5" onChange={(event) => setChunkSize(event.target.value)} disabled={splitMode !== 'chunks' || busy} />
                   <div className="split-estimate" aria-live="polite">{splitEstimate === null ? (splitNeedsInput ? (splitMode === 'ranges' ? t.enterSplitRanges : t.enterSplitSize) : t.invalidRange) : interpolate(t.estimate, { files: splitEstimate })}</div>
+                  {splitPlan && <div className="split-coverage-review" aria-live="polite" data-testid="split-coverage-review">
+                    {splitPlan.coverage.complete && <p className="input-note" data-testid="split-coverage-complete">{interpolate(t.splitCoverageComplete, { total: splitPlan.coverage.total })}</p>}
+                    {splitPlan.coverage.omitted.length > 0 && <p className="utility-note" data-testid="split-coverage-omitted">{interpolate(t.splitCoverageOmitted, {
+                      included: splitPlan.coverage.included,
+                      total: splitPlan.coverage.total,
+                      count: splitPlan.coverage.omitted.length,
+                      pages: splitPlan.coverage.omitted.slice(0, 8).join(', ') + (splitPlan.coverage.omitted.length > 8 ? ', …' : ''),
+                    })}</p>}
+                    {splitPlan.coverage.repeated.length > 0 && <p className="utility-note" data-testid="split-coverage-repeated">{interpolate(t.splitCoverageRepeated, {
+                      count: splitPlan.coverage.repeated.length,
+                      pages: splitPlan.coverage.repeated.slice(0, 8).join(', ') + (splitPlan.coverage.repeated.length > 8 ? ', …' : ''),
+                    })}</p>}
+                    <details className="split-output-preview" data-testid="split-output-preview">
+                      <summary>{interpolate(t.splitPreviewToggle, { files: splitPlan.parts.length })}</summary>
+                      <ol>{splitPlan.parts.map((part, index) =>
+                        <li key={index}>{interpolate(t.splitPreviewPart, {
+                          index: index + 1, start: part.start, end: part.end, count: part.end - part.start + 1,
+                        })}</li>)}</ol>
+                    </details>
+                  </div>}
                    <p className="input-note" data-testid="split-output-budget">{t.splitOutputBudget}</p>
                    {splitProgress && <p className="utility-note" role="status" data-testid="split-progress" aria-live="polite">{splitProgress.phase === 'parts'
                      ? interpolate(t.splitPartsProgress, { done: splitProgress.done, total: splitProgress.total })
