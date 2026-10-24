@@ -2,7 +2,7 @@ import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
 import JSZip from 'jszip';
 import { pageNumberPlacement } from './pageNumberGeometry.mjs';
 import {
-  UTILITY_LIMITS, requestedPages, parseTextBlocks, textContentToLines,
+  UTILITY_LIMITS, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, requestedPages, parseTextBlocks, textContentToLines,
   linesToReadableText, summarizeTextCoverage, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
   enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled,
 } from './utilityCore.mjs';
@@ -52,7 +52,7 @@ function freeCanvas(canvas) { if (canvas) { canvas.width = 1; canvas.height = 1;
 async function renderPageAsBlob(page, format = 'image/jpeg', scale = 1.5, quality = .8, signal) {
   checkCancelled(signal);
   const viewport = page.getViewport({ scale });
-  if (viewport.width * viewport.height > UTILITY_LIMITS.maxPixelCount) throw new Error('This page is too large to rasterize safely.');
+  enforceRasterViewport(viewport, rasterCanvasSideLimit(navigator.userAgent, navigator.maxTouchPoints));
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(viewport.width));
   canvas.height = Math.max(1, Math.round(viewport.height));
@@ -73,7 +73,7 @@ async function renderPageAsBlob(page, format = 'image/jpeg', scale = 1.5, qualit
 export async function convertPdfToImages(pdf, options = {}, reportProgress = () => {}) {
   const format = options.format === 'png' ? 'png' : 'jpg';
   const mime = format === 'png' ? 'image/png' : 'image/jpeg';
-  const scale = options.scale === 2 ? 2 : options.scale === 1 ? 1 : 1.5;
+  const scale = validatedImageScale(options.scale);
   const selected = requestedPages(options.pages ?? '', pdf.count);
   enforceImageBatchLimit(selected.length, options.locale);
   const document = await openPdfJs(pdf.bytes);

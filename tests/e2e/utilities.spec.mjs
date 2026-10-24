@@ -75,6 +75,43 @@ test('PDF to image PNG selected pages ZIP has valid images, JPG single page vali
   expect(Array.from(single.bytes.slice(0, 3))).toEqual([255,216,255]);
 });
 
+test('220 DPI PDF-to-PNG export matches real pixel dimensions and keeps safety limit', async ({ page }) => {
+  const document = await PDFDocument.create();
+  document.addPage([72, 72]).drawRectangle({ x: 8, y: 8, width: 50, height: 50 });
+  await page.goto('/pdf-to-images/');
+  await upload(page, Buffer.from(await document.save()));
+  await page.getByRole('combobox', { name: 'Image format' }).selectOption('png');
+  const resolution = page.getByRole('combobox', { name: 'Render resolution' });
+  await resolution.selectOption({ label: 'Print quality (220 DPI)' });
+  await expect(page.getByTestId('image-print-hint')).toContainText('Large pages');
+  const printPng = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+  expect(printPng.name).toMatch(/page-001\.png$/);
+  expect(printPng.bytes.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+  expect([printPng.bytes.readUInt32BE(16), printPng.bytes.readUInt32BE(20)]).toEqual([220, 220]);
+  await resolution.selectOption('2');
+  const normalPng = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+  expect([normalPng.bytes.readUInt32BE(16), normalPng.bytes.readUInt32BE(20)]).toEqual([144, 144]);
+  const oversized = await PDFDocument.create();
+  oversized.addPage([1800, 1800]);
+  await upload(page, Buffer.from(await oversized.save()));
+  await resolution.selectOption({ label: 'Print quality (220 DPI)' });
+  const downloads = [];
+  const track = result => downloads.push(result);
+  page.on('download', track);
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByRole('alert')).toContainText('too large to rasterize', { timeout: 15000 });
+  expect(downloads).toHaveLength(0);
+  page.off('download', track);
+
+  // Very wide but low-area pages must also fail before creating a canvas:
+  // 6,100 pt × 80 pt at 220 DPI is under 12 MP but >16,384 px wide.
+  const wide = await PDFDocument.create();
+  wide.addPage([6100, 80]);
+  await upload(page, Buffer.from(await wide.save()));
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByRole('alert')).toContainText('too large to rasterize', { timeout: 15000 });
+});
+
 test('compression never auto-downloads, blocks a larger PDF, and shows actual byte sizes', async ({ page }) => {
   const small = await fixturePdf('Small page', 1);
   await page.goto('/compress-pdf/');

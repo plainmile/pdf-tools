@@ -1,6 +1,15 @@
 import { parsePageRanges } from './pageOperations.mjs';
 
 const MiB = 1024 * 1024;
+// PDF coordinates are expressed as 72 points per inch. Print export uses
+// 220 DPI, but the existing per-page 12 MP and per-batch 64 MiB caps still apply.
+export const IMAGE_PRINT_DPI = 220;
+export const IMAGE_PRINT_SCALE = IMAGE_PRINT_DPI / 72;
+export function validatedImageScale(value) {
+  // Reject arbitrary scales from callers rather than bypassing pixel budgets.
+  return [1, 1.5, 2, IMAGE_PRINT_SCALE].includes(value) ? value : 1.5;
+}
+
 export const UTILITY_LIMITS = Object.freeze({
   maxPdfBytes: 100 * MiB,
   maxPages: 1000,
@@ -14,7 +23,30 @@ export const UTILITY_LIMITS = Object.freeze({
   // JPEG buffers and PDF serialization coexist in browser memory.
   maxCompressionImageBytes: 96 * MiB,
   maxPixelCount: 12_000_000,
+  // Conservative cross-browser maximum; a long narrow poster can be below
+  // 12 MP but still exceed the canvas width/height supported by Safari.
+  maxCanvasSide: 16_384,
+  // iPhone/iPad canvas dimensions can be as low as 4,096 px per axis.
+  maxIOSCanvasSide: 4_096,
 });
+
+export function rasterCanvasSideLimit(userAgent = '', maxTouchPoints = 0) {
+  // iPadOS can advertise a desktop Macintosh UA, but remains touch-based.
+  const ios = /\b(?:iPhone|iPad|iPod)\b/i.test(userAgent) ||
+    (/\bMacintosh\b/.test(userAgent) && Number(maxTouchPoints) > 1);
+  return ios ? UTILITY_LIMITS.maxIOSCanvasSide : UTILITY_LIMITS.maxCanvasSide;
+}
+
+export function enforceRasterViewport({ width, height }, maxSide = UTILITY_LIMITS.maxCanvasSide) {
+  const pixelsWide = Math.round(width);
+  const pixelsHigh = Math.round(height);
+  if (![width, height].every(value => Number.isFinite(value) && value > 0) ||
+      pixelsWide > maxSide || pixelsHigh > maxSide ||
+      pixelsWide * pixelsHigh > UTILITY_LIMITS.maxPixelCount) {
+    throw new Error('This page is too large to rasterize safely.');
+  }
+  return true;
+}
 
 export function enforceUtilityPdfLimits({ size, count }, mode, locale = 'en') {
   const zh = locale === 'zh';
