@@ -39,10 +39,49 @@ test('basic Markdown headings and list semantics without inserting remote HTML',
   const blocks = parseTextBlocks('# Hello **PlainMile**\r\n- Item with [link](https://example.com)\n```js\nconst x = 1\n```', true);
   assert.equal(blocks[0].text, 'Hello PlainMile');
   assert.equal(blocks[0].kind, 'heading');
-  assert.equal(blocks[1].text, '• Item with link');
+  assert.equal(blocks[1].text, '• Item with link (https://example.com)');
   assert.equal(blocks.at(-1).kind, 'code');
   assert.equal(normalizeText('a\r\nb\rc'), 'a\nb\nc');
 });
+test('Markdown links preserve targets with nested parentheses and optional titles', () => {
+  assert.equal(stripMarkdownInline('[docs](https://example.com/docs)'), 'docs (https://example.com/docs)');
+  assert.equal(stripMarkdownInline('[Function](https://en.wikipedia.org/wiki/Function_(mathematics))'),
+    'Function (https://en.wikipedia.org/wiki/Function_(mathematics))');
+  assert.equal(stripMarkdownInline('[Guide](./guide.md "Read me")'), 'Guide (./guide.md)');
+  assert.equal(stripMarkdownInline('![Diagram](https://example.com/image_(2).png)'),
+    'Diagram (https://example.com/image_(2).png)');
+  assert.equal(stripMarkdownInline('[https://example.com](https://example.com)'), 'https://example.com');
+  assert.equal(stripMarkdownInline('Broken [link](https://example.com/a_(b)'),
+    'Broken [link](https://example.com/a_(b)');
+  assert.equal(stripMarkdownInline('Literal `[docs](https://example.com)` stays literal'),
+    'Literal [docs](https://example.com) stays literal');
+});
+
+test('Markdown code fences respect marker type, opening length and closing-line syntax', () => {
+  const blocks = parseTextBlocks([
+    '````js',
+    '```',
+    '# code content, not a heading',
+    '```not a closing fence',
+    '````',
+    'Plain after a four-tick fence',
+    '~~~python',
+    'print("tildes")',
+    '```',
+    '~~~',
+    '# Markdown heading again',
+  ].join('\n'), true);
+  assert.deepEqual(blocks.map(block => block.kind),
+    ['code', 'code', 'code', 'paragraph', 'code', 'code', 'heading']);
+  assert.equal(blocks[0].text, '```');
+  assert.equal(blocks[1].text, '# code content, not a heading');
+  assert.equal(blocks[2].text, '```not a closing fence');
+  assert.equal(blocks[3].text, 'Plain after a four-tick fence');
+  assert.equal(blocks[6].text, 'Markdown heading again');
+  const unfinished = parseTextBlocks('```js\nconst x = 1;\n```not closed\nconst y = 2;', true);
+  assert.deepEqual(unfinished.map(block => block.kind), ['code', 'code', 'code']);
+});
+
 test('Markdown PDF parser preserves comparison operators instead of mistaking them for HTML', () => {
   const blocks = parseTextBlocks(
     '# Report\nLogic: a < 3 && b > 2\nBounds: x <= 40 && y >= 8\nCode: \`value < 5 && size > 1\`\nSafe <strong>bold</strong> <!-- hidden --> text',
@@ -61,7 +100,7 @@ test('Markdown inline formatting preserves identifiers, arithmetic and unmatched
   assert.equal(stripMarkdownInline('**bold**, *italic*, _em_, __strong__, ~~old~~, and \`code_var\`'),
     'bold, italic, em, strong, old, and code_var');
   assert.equal(stripMarkdownInline('See [docs](https://example.com) and <strong>marked</strong> text'),
-    'See docs and marked text');
+    'See docs (https://example.com) and marked text');
   const headings = parseTextBlocks('# Technical user_id\nResult: a*b + x**2 and c_d', true);
   assert.equal(headings[0].text, 'Technical user_id');
   assert.equal(headings[1].text, 'Result: a*b + x**2 and c_d');
