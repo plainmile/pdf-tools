@@ -82,13 +82,17 @@ jobs:
             mcr.microsoft.com/playwright:v1.55.0-noble \
             bash -lc '
               set -eu
-              mkdir -p /tmp/pdf-e2e/tests/e2e
+              mkdir -p /tmp/pdf-e2e/tests/e2e /tmp/pdf-e2e/tests/cross-browser
               cp /work/tests/e2e/*.spec.mjs /tmp/pdf-e2e/tests/e2e/
-              cp /work/playwright.config.mjs /tmp/pdf-e2e/
+              cp /work/tests/cross-browser/*.spec.mjs /tmp/pdf-e2e/tests/cross-browser/
+              cp /work/playwright.config.mjs /work/playwright.cross-browser.config.mjs /tmp/pdf-e2e/
               cd /tmp/pdf-e2e
               npm init -y >/dev/null
               npm install --no-audit --no-fund @playwright/test@1.55.0 pdf-lib@1.17.1 jszip@3.10.1
+              echo "=== Full Chromium E2E ==="
               PDF_BASE_URL=http://127.0.0.1:18081 npx playwright test
+              echo "=== Firefox and WebKit PDF workflow smoke ==="
+              PDF_BASE_URL=http://127.0.0.1:18081 npx playwright test --config=playwright.cross-browser.config.mjs
             '
       - name: Cleanup
         if: always()
