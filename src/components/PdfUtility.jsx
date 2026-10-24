@@ -23,7 +23,7 @@ const COPY = {
     textLabel: 'Text to convert', textPlaceholder: 'Paste text here or import a .txt / .md file…',
     textInputHint: 'Import UTF-8 or BOM-marked UTF-16 text. Built-in-font text stays selectable; Chinese and unsupported characters use local browser fonts as non-searchable image pages.',
     markdownInputHint: 'Import UTF-8 or BOM-marked UTF-16 text. Supports simple headings, lists, quotes and code blocks, not external images, HTML, full tables or complex Markdown. Link addresses are shown as text, not clickable PDF links. Non-Latin scripts become image pages.',
-    pageStart: 'First printed number', firstPage: 'Start numbering on PDF page', firstPageHint: 'Pages before this page (such as a cover or contents) stay unnumbered. The first numbered page displays the number above.', pagePosition: 'Position', pageSize: 'Font size', bottomCenter: 'Bottom center', bottomRight: 'Bottom right', topRight: 'Top right',
+    pageStart: 'First printed number', firstPage: 'Start numbering on PDF page', firstPageReset: 'The new PDF is shorter than the previous starting page. Numbering has been reset to PDF page 1.', firstPageHint: 'Pages before this page (such as a cover or contents) stay unnumbered. The first numbered page displays the number above.', pagePosition: 'Position', pageSize: 'Font size', bottomCenter: 'Bottom center', bottomRight: 'Bottom right', topRight: 'Top right',
     numbersHint: 'Adds selectable page numbers starting at the chosen PDF page, leaving earlier pages unnumbered. Preserves page size. Review annotations and digital signatures before using this modified file.',
     ready: 'Ready to download', noPdf: 'Select a PDF first.', noText: 'Enter text to convert.', sizeLimit: 'PDF up to 100 MB / 1,000 pages; TXT / Markdown up to 5 MB.', limitText: 'TXT / Markdown up to 5 MB; PDF output: up to 1,000 pages (300 image-based pages for CJK).', limitImages: 'PDF up to 100 MB / 1,000 pages; up to 60 selected image pages per batch.', limitCompression: 'PDF up to 100 MB / 120 pages; JPEG output safety budget 96 MB.', limitGeneral: 'PDF up to 100 MB / 1,000 pages.', heavyWarning: 'Large document: processing hundreds of pages may take time and require substantial device memory. Close other heavy tabs if necessary.', progressLabel: 'Processed {done} of {total} pages', tooMuchText: 'Text exceeds 5 MB.',
     noteUnicode: 'This PDF uses rasterized pages for non-Latin characters. Text in the result cannot be selected.', noteSearch: 'Output text is selectable.',
@@ -48,7 +48,7 @@ const COPY = {
     textLabel: '需要转换的文本', textPlaceholder: '粘贴文字，或选择 .txt / .md 文件……',
     textInputHint: '支持 UTF-8 或带 BOM 的 UTF-16 文本。拉丁文字尽量保留可选中内容；中文等文字使用本地字体输出为不可搜索的图片页。',
     markdownInputHint: '导入支持 UTF-8 或带 BOM 的 UTF-16。支持基础标题、列表、引用和代码块；不支持远程图片、HTML、完整表格或复杂 Markdown。链接地址将作为文字显示，不会成为可点击的 PDF 链接。中文会输出为图片页。',
-    pageStart: '显示的起始数字', firstPage: '从 PDF 第几页开始编号', firstPageHint: '前面的封面、目录等页面不会添加页码；开始编号的那一页使用上方指定的起始数字。', pagePosition: '页码位置', pageSize: '字号', bottomCenter: '底部居中', bottomRight: '右下角', topRight: '右上角',
+    pageStart: '显示的起始数字', firstPage: '从 PDF 第几页开始编号', firstPageReset: '新 PDF 的页数不足以使用之前的起始编号位置，已重置为从 PDF 第 1 页开始。', firstPageHint: '前面的封面、目录等页面不会添加页码；开始编号的那一页使用上方指定的起始数字。', pagePosition: '页码位置', pageSize: '字号', bottomCenter: '底部居中', bottomRight: '右下角', topRight: '右上角',
     numbersHint: '从指定 PDF 页开始添加可选择的页码，前面的页面不添加页码；保持原有纸张尺寸。重要文件请检查注释和数字签名。',
     ready: '文件已经生成', noPdf: '请先选择 PDF 文件。', noText: '请输入待转换的文字。', sizeLimit: 'PDF 最多 100 MB / 1000 页；TXT / Markdown 最多 5 MB。', limitText: 'TXT / Markdown 最多 5 MB；输出最多 1000 页（中文等图片化内容最多 300 页）。', limitImages: 'PDF 最多 100 MB / 1000 页；每批最多导出选定的 60 页图片。', limitCompression: 'PDF 最多 100 MB / 120 页；JPEG 数据累计上限 96 MB。', limitGeneral: 'PDF 最多 100 MB / 1000 页。', heavyWarning: '大文档提示：处理数百页时可能占用较多设备内存，并需要更长时间。建议关闭其他高负载标签页。', progressLabel: '已处理 {done} / {total} 页', tooMuchText: '文本内容超过 5 MB。',
     noteUnicode: '由于含有非拉丁文字，此 PDF 输出为图片页，无法选择和搜索文字。', noteSearch: '输出文字可选择和搜索。',
@@ -231,6 +231,13 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         const loaded = await loadPdf(file, mode, locale);
         clearOutput();
         setPdf(loaded);
+        if (mode === 'add-page-numbers' &&
+            (!Number.isSafeInteger(Number(firstPage)) || Number(firstPage) < 1 || Number(firstPage) > loaded.count)) {
+          // The old file may have 100 pages and the new one only two. Do not
+          // silently carry an impossible physical page number into Run.
+          setFirstPage('1');
+          setNotice(t.firstPageReset);
+        }
         setBatchIndex(0);
         setPages(mode === 'pdf-to-images' && loaded.count > UTILITY_LIMITS.maxImagePagesPerRun
           ? imagePageBatch(loaded.count).range : '');

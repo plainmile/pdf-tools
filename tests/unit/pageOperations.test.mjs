@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, parsePageRanges,
-  chunkPageRanges, getRangePages, splitCoversAllPagesExactlyOnce, commitHistory, makeHistoryState, undoHistory, redoHistory,
+  chunkPageRanges, getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
   reversePages, sortPagesByFilename, interleaveDuplexPages, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges, pageIdsForParity, invertPageIdSelection,
 } from '../../src/lib/pageOperations.mjs';
@@ -135,6 +135,21 @@ test('split downloads count as saved only when all current pages are covered exa
   assert.equal(splitCoversAllPagesExactlyOnce([null], 4), false);
   assert.equal(splitCoversAllPagesExactlyOnce([], 4), false);
   assert.equal(splitCoversAllPagesExactlyOnce([{ start: 1, end: 1 }], 0), false);
+});
+
+test('split preview counts omitted and repeated output pages without changing the range order', () => {
+  const omitted = splitCoverageDetails(parsePageRanges('1-2,4', 4), 4);
+  assert.deepEqual(omitted, { total: 4, included: 3, omitted: [3], repeated: [], complete: false });
+  const repeated = splitCoverageDetails(parsePageRanges('3-4,1-3', 4), 4);
+  assert.deepEqual(repeated, { total: 4, included: 4, omitted: [], repeated: [3], complete: false });
+  assert.deepEqual(splitCoverageDetails(chunkPageRanges(7, 3), 7), {
+    total: 7, included: 7, omitted: [], repeated: [], complete: true,
+  });
+  assert.equal(splitCoverageDetails([{ start: 0, end: 2 }], 4), null);
+  assert.equal(splitCoverageDetails([{ start: 1, end: 5 }], 4), null);
+  assert.equal(splitCoverageDetails([], 4), null);
+  assert.equal(splitCoverageDetails([{ start: 1, end: 1 }], 601), null);
+  assert.equal(splitCoversAllPagesExactlyOnce(parsePageRanges('3-4,1-3', 4), 4), false);
 });
 
 test('localized page range punctuation is normalized but still validates bounds', () => {
