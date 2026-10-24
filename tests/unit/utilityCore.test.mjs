@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline,
   textContentToLines, linesToReadableText, summarizeTextCoverage, sanitizeFilename, workspaceFilenameStem,
-  UTILITY_LIMITS, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
+  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
 
 test('text importer decodes UTF-8 and BOM-marked Windows UTF-16 without data loss', () => {
@@ -135,6 +135,17 @@ test('oversized PDFs and 1001-page PDFs fail before expensive rasterization', ()
   assert.throws(() => enforceUtilityPdfLimits({ size: 2000, count: 121 }, 'compress-pdf'), /120 pages/);
   assert.equal(enforceUtilityPdfLimits({ size: 2000, count: 120 }, 'compress-pdf'), true);
   assert.throws(() => enforceUtilityPdfLimits({ size: 2000, count: 121 }, 'compress-pdf', 'zh'), /120 页/);
+});
+
+test('220 DPI image export scale is exact and untrusted scales fall back safely', () => {
+  assert.equal(IMAGE_PRINT_DPI, 220);
+  assert.equal(IMAGE_PRINT_SCALE * 72, 220);
+  assert.equal(validatedImageScale(IMAGE_PRINT_SCALE), IMAGE_PRINT_SCALE);
+  assert.equal(validatedImageScale(1), 1);
+  assert.equal(validatedImageScale(1.5), 1.5);
+  assert.equal(validatedImageScale(2), 2);
+  assert.equal(validatedImageScale(500), 1.5);
+  assert.equal(validatedImageScale(3), 1.5);
 });
 
 test('image conversion selects any 60 pages from a 500-page book, not only first 60', () => {
