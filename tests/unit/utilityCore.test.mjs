@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline, wrapTextLines,
-  textContentToLines, linesToReadableText, summarizeTextCoverage, sanitizeFilename, workspaceFilenameStem,
+  textContentToLines, textContentToReadingOrderLines, linesToReadableText, summarizeTextCoverage, sanitizeFilename, workspaceFilenameStem,
   UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageFilename, imageExportFilenames, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
 
@@ -229,6 +229,24 @@ test('inline Markdown code preserves literal HTML tags, URL text and arithmetic'
   assert.equal(blocks[0].text, 'Using <a> tags');
   assert.equal(blocks[1].text, 'Example: <div class="x"> and [link](https://plainmile.com)');
 });
+test('explicit multi-column text order keeps each column together and handles rotation', () => {
+  const content = { items: [
+    { str: 'L1', transform: [1,0,0,12,40,700], height:12, width:18 },
+    { str: 'R1', transform: [1,0,0,12,345,700], height:12, width:18 },
+    { str: 'L2', transform: [1,0,0,12,40,675], height:12, width:18 },
+    { str: 'R2', transform: [1,0,0,12,345,675], height:12, width:18 },
+  ] };
+  const viewport = { width:600, convertToViewportPoint:(x,y)=>[x,800-y] };
+  assert.deepEqual(textContentToReadingOrderLines(content, 'rows').map(x=>x.text), ['L1 R1','L2 R2']);
+  assert.deepEqual(textContentToReadingOrderLines(content, 'left-first', viewport).map(x=>x.text), ['L1','L2','R1','R2']);
+  assert.deepEqual(textContentToReadingOrderLines(content, 'right-first', viewport).map(x=>x.text), ['R1','R2','L1','L2']);
+  assert.deepEqual(textContentToReadingOrderLines(content, 'left-first', {
+    width:800, convertToViewportPoint:(x,y)=>[y,x],
+  }).map(x=>x.text), ['L2 R2', 'L1 R1']); // Rotated visual columns are based on viewport X.
+  assert.throws(()=>textContentToReadingOrderLines(content,'unknown',viewport),/Unsupported/);
+  assert.throws(()=>textContentToReadingOrderLines(content,'left-first',null),/viewport/);
+});
+
 test('PDF positioned text is approximately sorted by vertical position then X', () => {
   const items = [
     { str: 'right', transform: [1,0,0,12, 100, 300], height: 12, width: 25 },
