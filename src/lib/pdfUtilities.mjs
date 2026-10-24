@@ -2,7 +2,7 @@ import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
 import JSZip from 'jszip';
 import { pageNumberPlacement } from './pageNumberGeometry.mjs';
 import {
-  UTILITY_LIMITS, validatedImageScale, requestedPages, parseTextBlocks, textContentToLines,
+  UTILITY_LIMITS, validatedImageScale, enforceRasterViewport, requestedPages, parseTextBlocks, textContentToLines,
   linesToReadableText, summarizeTextCoverage, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
   enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled,
 } from './utilityCore.mjs';
@@ -52,7 +52,7 @@ function freeCanvas(canvas) { if (canvas) { canvas.width = 1; canvas.height = 1;
 async function renderPageAsBlob(page, format = 'image/jpeg', scale = 1.5, quality = .8, signal) {
   checkCancelled(signal);
   const viewport = page.getViewport({ scale });
-  if (viewport.width * viewport.height > UTILITY_LIMITS.maxPixelCount) throw new Error('This page is too large to rasterize safely.');
+  enforceRasterViewport(viewport);
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(viewport.width));
   canvas.height = Math.max(1, Math.round(viewport.height));
