@@ -488,6 +488,7 @@ summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .tool-card p { font-size: 12px; line-height: 1.45; color: var(--muted); padding-right: 12px; }
 .tool-card .tool-arrow { right: 12px; bottom: 12px; font-size: 15px; }
 .tool-card[hidden], .tool-group[hidden], .tool-empty[hidden] { display: none !important; }
+.category-jump[hidden], .category-jump a[hidden] { display: none !important; }
 .tool-faq { border-top: 1px solid var(--border); padding-top: 30px; padding-bottom: 51px; }
 .tool-faq h2 { font-size: 23px; margin-bottom: 18px; }
 .tool-faq-items { max-width: 860px; border-top: 1px solid var(--border); }
