@@ -819,6 +819,30 @@ test('English prose wraps at whole-word boundaries in actual selectable TXT and 
   }
 });
 
+test('wide-glyph words and code spacing create readable, bounded PDF pages', async ({ page }) => {
+  await page.goto('/markdown-to-pdf/');
+  const code = 'abc   def  ghi  tail';
+  const longWord = 'W'.repeat(180) + ' FINISH-MARKER';
+  await page.getByTestId('utility-text').fill([
+    '# Long document wrapping',
+    'Prefix ' + longWord,
+    '```js',
+    code,
+    '        const value = 12;  // aligned',
+    '```',
+  ].join('\n'));
+  const generated = await generateTextPdfAndDownload(page, 25000);
+  const output = await PDFDocument.load(generated.bytes);
+  expect(output.getPageCount()).toBeGreaterThanOrEqual(1);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, generated.bytes);
+  const extracted = await getDownload(page, () => page.getByTestId('utility-run').click(), 20000);
+  const words = extracted.bytes.toString('utf8');
+  expect(words).toContain('FINISH-MARKER');
+  expect(words).toContain('const value = 12;');
+  expect(words).toContain('tail');
+});
+
 test('English Markdown quotes, rules and numbered steps produce searchable PDF text', async ({ page }) => {
   await page.goto('/markdown-to-pdf/');
   await page.getByTestId('utility-text').fill('# Weekly report\n\n> Important notice\n\n---\n\n1. First step\n2) Second step');
