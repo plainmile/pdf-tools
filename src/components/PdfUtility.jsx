@@ -157,7 +157,15 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const textResultStale = Boolean(isTextInput && output?.bytes && output.textRevision !== textRevision);
 
 
-  function clearOutput() { setClearConfirm(false); setOutput(null); setNotice(''); setError(''); setPreview(''); setExtractionWarning(''); setProgress(null); setShowCompressionPreview(false); setCompressionRetryKept(false); setNotDownloaded(true); }
+  function clearOutput() {
+    // Importing an original PDF or changing a conversion option is not
+    // unsaved work. Only a generated result pending download, or user-edited
+    // text, should block navigation. The original file remains on disk.
+    setClearConfirm(false); setOutput(null); setNotice(''); setError('');
+    setPreview(''); setExtractionWarning(''); setProgress(null);
+    setShowCompressionPreview(false); setCompressionRetryKept(false);
+    setNotDownloaded(false);
+  }
   function clearSession() {
     if (operationRef.current) return;
     setPdf(null); setSourceText(''); setPages(''); setTextFileName('');
