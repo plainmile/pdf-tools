@@ -624,6 +624,23 @@ test('Markdown technical identifiers and arithmetic survive actual PDF and TXT r
   expect(extracted).toContain('Emphasis: bold and italic');
 });
 
+test('multiple unspaced exponents and underscores survive real Markdown-to-PDF and TXT round-trip', async ({ page }) => {
+  await page.goto('/markdown-to-pdf/');
+  await page.getByTestId('utility-text').fill(
+    'Powers: x**2 and y**3; fields: a__2 and b__5\nMultiply: 2*3*4\nStyle: **bold** and *italic*',
+  );
+  const created = await generateTextPdfAndDownload(page);
+  expect((await PDFDocument.load(created.bytes)).getPageCount()).toBe(1);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, created.bytes);
+  const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
+  const text = extracted.bytes.toString('utf8');
+  expect(text).toContain('x**2 and y**3');
+  expect(text).toContain('a__2 and b__5');
+  expect(text).toContain('Multiply: 2*3*4');
+  expect(text).toContain('Style: bold and italic');
+});
+
 test('technical Markdown generics, placeholders and tight comparisons survive actual PDF-to-TXT round-trip', async ({ page }) => {
   await page.goto('/markdown-to-pdf/');
   await page.getByTestId('utility-text').fill(
