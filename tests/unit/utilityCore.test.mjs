@@ -111,6 +111,19 @@ test('Markdown links preserve targets with nested parentheses and optional title
     'Literal [docs](https://example.com) stays literal');
 });
 
+test('many unclosed Markdown links do not trigger quadratic rescanning or lose later valid links', () => {
+  const malformed = '[broken]('.repeat(12000);
+  const input = malformed + '\n' + '[Valid](https://example.com/a_(b))';
+  const start = performance.now();
+  const result = stripMarkdownInline(input);
+  const elapsed = performance.now() - start;
+  assert.equal(result, malformed + '\n' + 'Valid (https://example.com/a_(b))');
+  // A legitimate sub-50 KB editor input must finish well within a few seconds
+  // even on a shared CI runner. Previously each failed opener rescanned the
+  // entire remaining line, causing ~288 million redundant character visits.
+  assert.ok(elapsed < 1800, `Malformed Markdown parsing took ${Math.round(elapsed)} ms`);
+});
+
 test('Markdown code fences preserve trailing spaces and whitespace-only lines before PDF wrapping', () => {
   const input = [
     '```js',
