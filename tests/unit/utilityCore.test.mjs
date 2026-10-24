@@ -2,9 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline, wrapTextLines,
-  textContentToLines, textContentToReadingOrderLines, linesToReadableText, summarizeTextCoverage, sanitizeFilename, workspaceFilenameStem,
+  textContentToLines, textContentToReadingOrderLines, linesToReadableText, summarizeTextCoverage, textFitsUtf8Budget, sanitizeFilename, workspaceFilenameStem,
   UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageFilename, imageExportFilenames, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
+
+test('UTF-8 text edit budget rejects whole oversize pastes without silently clipping code units', () => {
+  assert.equal(textFitsUtf8Budget('a'.repeat(10), 10), true);
+  assert.equal(textFitsUtf8Budget('a'.repeat(11), 10), false);
+  assert.equal(textFitsUtf8Budget('中文', 6), true);
+  assert.equal(textFitsUtf8Budget('中文', 5), false);
+  assert.equal(textFitsUtf8Budget('😀😀', 8), true);
+  assert.equal(textFitsUtf8Budget('😀😀', 7), false);
+  assert.equal(textFitsUtf8Budget('', 0), true);
+  assert.equal(textFitsUtf8Budget('abc', -1), false);
+});
 
 test('text importer decodes UTF-8 and BOM-marked Windows UTF-16 without data loss', () => {
   const sample = 'Report 2026: Café and 中文';
