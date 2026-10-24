@@ -81,7 +81,7 @@ test('cover image layout clips inside margins and image sorting is reversible', 
   ]);
   await expect(page.getByTestId('page-tile')).toHaveCount(2);
   await expect(page.getByTestId('image-batch-actions')).toBeVisible();
-  await page.getByRole('button', { name: 'Sort images by filename' }).click();
+  await page.getByTestId('sort-source-asc').click();
   await expect(page.getByTestId('page-tile').first().locator('.tile-info')).toContainText('image2.png');
   await page.getByRole('button', { name: 'Reverse image order' }).click();
   await expect(page.getByTestId('page-tile').first().locator('.tile-info')).toContainText('image10.png');

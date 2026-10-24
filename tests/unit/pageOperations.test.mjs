@@ -197,6 +197,42 @@ test('image-batch filename sorting is numeric, stable, reversible and never alte
   assert.strictEqual(reversePages([]).length, 0);
 });
 
+test('PDF filename sorting groups interleaved sources but preserves each source page order', () => {
+  const original = Object.freeze([
+    { id: 'z0', sourceId: 'z', pageIndex: 0, rotation: 90 },
+    { id: 'a0', sourceId: 'a', pageIndex: 0, rotation: 0 },
+    { id: 'z1', sourceId: 'z', pageIndex: 1, rotation: 270 },
+    { id: 'a1', sourceId: 'a', pageIndex: 1, rotation: 0 },
+  ].map(page => Object.freeze(page)));
+  const sources = [{ id: 'z', name: 'scan10.pdf' }, { id: 'a', name: 'scan2.pdf' }];
+  const ascending = sortPagesByFilename(original, sources, 'en', 'asc');
+  const descending = sortPagesByFilename(original, sources, 'en', 'desc');
+  assert.deepEqual(ids(ascending), ['a0', 'a1', 'z0', 'z1']);
+  assert.deepEqual(ids(descending), ['z0', 'z1', 'a0', 'a1']);
+  assert.equal(ascending[2].rotation, 90);
+  assert.equal(ascending[3].rotation, 270);
+  assert.deepEqual(ids(original), ['z0', 'a0', 'z1', 'a1']);
+  const modified = commitHistory(makeHistoryState(original), descending);
+  assert.deepEqual(ids(undoHistory(modified).present), ids(original));
+  assert.deepEqual(ids(redoHistory(undoHistory(modified)).present), ids(descending));
+  assert.strictEqual(commitHistory(makeHistoryState(ascending),
+    sortPagesByFilename(ascending, sources, 'en', 'asc')).past.length, 0);
+});
+
+test('identically named source PDFs sort as separate files using import order', () => {
+  const mixed = [
+    { id: '2-0', sourceId: 'second' },
+    { id: '1-0', sourceId: 'first' },
+    { id: '2-1', sourceId: 'second' },
+    { id: '1-1', sourceId: 'first' },
+  ];
+  const sources = [{ id: 'first', name: 'same.pdf' }, { id: 'second', name: 'same.pdf' }];
+  assert.deepEqual(ids(sortPagesByFilename(mixed, sources, 'en', 'asc')),
+    ['1-0', '1-1', '2-0', '2-1']);
+  assert.deepEqual(ids(sortPagesByFilename(mixed, sources, 'en', 'desc')),
+    ['1-0', '1-1', '2-0', '2-1']);
+});
+
 test('duplicate selected pages immediately after originals using distinct IDs; Undo/Redo preserve all page data', () => {
   let id = 0;
   const result = duplicatePages(pages, ['a', 'c'], () => 'copy-' + (++id));

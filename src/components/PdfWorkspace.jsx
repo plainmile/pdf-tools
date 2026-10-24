@@ -178,6 +178,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const outputBase = userDownloadStem || fileBase;
   const activeSourceCount = useMemo(() => countActiveSources(pages.filter(page => !sourceLookup.get(page.sourceId)?.isGeneratedBlank)), [pages, sourceLookup]);
   const onlyImages = pages.length > 1 && pages.every(page => sourceLookup.get(page.sourceId)?.isImage);
+  // Sorting inserted blank-page sources on their own would detach them from
+  // neighboring content. Offer file sorting only for original source groups.
+  const canSortSourceFiles = activeSourceCount > 1 &&
+    pages.every(page => !sourceLookup.get(page.sourceId)?.isGeneratedBlank);
   const hasOriginalPdf = pages.some(page => { const src = sourceLookup.get(page.sourceId); return src && !src.isImage && !src.isGeneratedBlank; });
   const activeFormSourceCount = countActiveSources(pages.filter(page => sourceLookup.get(page.sourceId)?.hasInteractiveForms));
   const activeBookmarkSourceCount = countActiveSources(pages.filter(page => sourceLookup.get(page.sourceId)?.hasOutlineBookmarks));
@@ -967,9 +971,17 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   </form>
                 </details>}
                 {pages.length > 1 && <div className="page-action-buttons" data-testid={onlyImages ? 'image-batch-actions' : 'page-order-actions'}>
-                  {onlyImages && <button type="button" disabled={busy} onClick={() => commit(previous => sortPagesByFilename(previous, sources, locale))}>{t.sortFilename}</button>}
+                  {canSortSourceFiles && <>
+                    <button type="button" data-testid="sort-source-asc" disabled={busy}
+                      onClick={() => commit(previous => sortPagesByFilename(previous, sources, locale, 'asc'))}>
+                      {onlyImages ? t.sortFilename : t.sortPdfFilesAsc}</button>
+                    <button type="button" data-testid="sort-source-desc" disabled={busy}
+                      onClick={() => commit(previous => sortPagesByFilename(previous, sources, locale, 'desc'))}>
+                      {onlyImages ? t.sortImagesDesc : t.sortPdfFilesDesc}</button>
+                  </>}
                   <button type="button" data-testid="reverse-all-pages" disabled={busy} onClick={() => commit(reversePages)}>{onlyImages ? t.reverseOrder : t.reversePdfOrder}</button>
                 </div>}
+                {canSortSourceFiles && !onlyImages && <p className="input-note" data-testid="source-sort-hint">{t.sortPdfFilesHint}</p>}
                 {pageView === 'grouped' ? (
                   <div className="source-groups" data-testid="source-groups">
                     <div className="source-group-actions">
