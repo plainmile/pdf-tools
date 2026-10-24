@@ -6,6 +6,34 @@ function readWorkflow(filename) {
   return readFileSync(new URL(`../../.github/workflows/${filename}`, import.meta.url), 'utf8');
 }
 
+test('production and CI must install a real committed npm v3 lockfile, not floating versions', () => {
+  const packageJson = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+  const lock = JSON.parse(readFileSync(new URL('../../package-lock.json', import.meta.url), 'utf8'));
+  assert.equal(lock.lockfileVersion, 3);
+  assert.equal(lock.name, packageJson.name);
+  assert.deepEqual(lock.packages[''].dependencies, packageJson.dependencies);
+  assert.deepEqual(lock.packages[''].devDependencies, packageJson.devDependencies);
+  assert.ok(Object.keys(lock.packages).length > 200, 'the transitive npm tree must be resolved');
+  for (const essential of [
+    'node_modules/astro',
+    'node_modules/@astrojs/react',
+    'node_modules/pdf-lib',
+    'node_modules/pdfjs-dist',
+    'node_modules/jszip',
+    'node_modules/react',
+  ]) {
+    assert.ok(lock.packages[essential]?.version, 'missing resolved ' + essential);
+    assert.ok(lock.packages[essential]?.integrity, 'missing npm integrity for ' + essential);
+  }
+  assert.equal(lock.packages['node_modules/pdfjs-dist'].version, '6.3.289');
+  const docker = readFileSync(new URL('../../Dockerfile', import.meta.url), 'utf8');
+  const ci = readWorkflow('ci.yml');
+  assert.match(docker, /^RUN npm ci --no-audit --no-fund$/m);
+  assert.match(ci, /npm ci --no-audit --no-fund; npm run test:unit; npm run build/);
+  assert.doesNotMatch(docker, /npm install|else npm ci|else npm install/);
+  assert.doesNotMatch(ci, /else npm install/);
+});
+
 test('only main-branch CI can trigger an image publish workflow run', () => {
   const yaml = readWorkflow('publish.yml');
   const trigger = yaml.split(/^permissions:/m)[0];
@@ -60,30 +88,3 @@ test('production Compose deployment uses /opt/compose/pdf-tools and safely migra
   assert.match(agentPolicy, /must live in `\/opt\/compose\/pdf-tools\/`/);
 });
 
-test('production and CI must install a real committed npm v3 lockfile, not floating versions', () => {
-  const packageJson = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
-  const lock = JSON.parse(readFileSync(new URL('../../package-lock.json', import.meta.url), 'utf8'));
-  assert.equal(lock.lockfileVersion, 3);
-  assert.equal(lock.name, packageJson.name);
-  assert.deepEqual(lock.packages[''].dependencies, packageJson.dependencies);
-  assert.deepEqual(lock.packages[''].devDependencies, packageJson.devDependencies);
-  assert.ok(Object.keys(lock.packages).length > 200, 'the transitive npm tree must be resolved');
-  for (const essential of [
-    'node_modules/astro',
-    'node_modules/@astrojs/react',
-    'node_modules/pdf-lib',
-    'node_modules/pdfjs-dist',
-    'node_modules/jszip',
-    'node_modules/react',
-  ]) {
-    assert.ok(lock.packages[essential]?.version, 'missing resolved ' + essential);
-    assert.ok(lock.packages[essential]?.integrity, 'missing npm integrity for ' + essential);
-  }
-  assert.equal(lock.packages['node_modules/pdfjs-dist'].version, '6.3.289');
-  const docker = readFileSync(new URL('../../Dockerfile', import.meta.url), 'utf8');
-  const ci = readWorkflow('ci.yml');
-  assert.match(docker, /^RUN npm ci --no-audit --no-fund$/m);
-  assert.match(ci, /npm ci --no-audit --no-fund; npm run test:unit; npm run build/);
-  assert.doesNotMatch(docker, /npm install|else npm ci|else npm install/);
-  assert.doesNotMatch(ci, /else npm install/);
-});
