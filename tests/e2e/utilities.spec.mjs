@@ -219,6 +219,8 @@ test('Windows-reserved source names produce safe TXT and Markdown downloads', as
   for (const [route, name, expected] of [
     ['/pdf-to-txt/', 'CON.pdf', 'plainmile-CON.txt'],
     ['/pdf-to-markdown/', 'nul.pdf', 'plainmile-nul.md'],
+    ['/pdf-to-txt/', 'NUL.tar.pdf', 'plainmile-NUL.tar.txt'],
+    ['/pdf-to-markdown/', 'COM¹.pdf', 'plainmile-COM¹.md'],
   ]) {
     await page.goto(route);
     await page.getByTestId('utility-file-input').setInputFiles({
