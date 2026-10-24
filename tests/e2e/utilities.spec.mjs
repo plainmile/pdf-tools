@@ -231,6 +231,27 @@ test('Windows-reserved source names produce safe TXT and Markdown downloads', as
   }
 });
 
+test('complete PDF text can be downloaded again without reprocessing (TXT and Chinese Markdown)', async ({ page }) => {
+  const pdf = await fixturePdf('Retained complete text', 2);
+  for (const [route, ext, label] of [
+    ['/pdf-to-txt/', '.txt', 'Download again'],
+    ['/zh/pdf-to-markdown/', '.md', '再次下载'],
+  ]) {
+    await page.goto(route);
+    await upload(page, pdf);
+    const first = await getDownload(page, () => page.getByTestId('utility-run').click());
+    expect(first.name.endsWith(ext)).toBe(true);
+    const repeatButton = page.getByTestId('complete-text-download');
+    await expect(repeatButton).toBeVisible();
+    await expect(repeatButton).toContainText(label);
+    await expect(page.getByTestId('partial-text-result')).toHaveCount(0);
+    const second = await getDownload(page, () => repeatButton.click());
+    expect(second.name).toBe(first.name);
+    expect(second.bytes.equals(first.bytes)).toBe(true);
+    expect(second.bytes.toString('utf8')).toContain('Retained complete text');
+  }
+});
+
 test('PDF to TXT and Markdown extract actual text, reject empty scanned pages', async ({ page }) => {
   const pdf = await fixturePdf('Hello searchable PlainMile');
   for (const [path, extension] of [['/pdf-to-txt/', 'txt'], ['/pdf-to-markdown/', 'md']]) {

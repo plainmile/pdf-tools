@@ -10,7 +10,7 @@ const COPY = {
     privacy: 'No files are uploaded. Processing may use significant device memory on large documents.', clear: 'Clear', replaceConfirmTitle: 'Replace the current file?', replaceConfirmHint: 'Opening {name} will discard your unsaved PDF result or edited text. Download or copy your current work first, or cancel this replacement.', replaceKeep: 'Keep current work', replaceAccept: 'Replace file', clearConfirmTitle: 'Discard unsaved conversion?', clearConfirmHint: 'The generated PDF preview or edited text has not been safely saved. Clearing now will remove it from this browser.', clearKeep: 'Keep my work', clearConfirm: 'Discard and clear',
     pageRange: 'Pages (blank selects all if ≤60)', rangeHint: 'Example: 301-360. Long PDFs start with pages 1-60; use Next pages for later batches.', imageType: 'Image format', quality: 'Render resolution',
     low: 'Smaller (72 DPI)', medium: 'Balanced (108 DPI)', high: 'Sharper (144 DPI)', print: 'Print quality (220 DPI)', printHint: 'Best for printing. Large pages may be rejected to protect your device memory.',
-    download: 'Download result', compressionMethod: 'Compression level', compressionLow: 'Smaller size (lossier)', compressionMid: 'Balanced', compressionHigh: 'Clearer (larger)',
+    download: 'Download result', downloadAgain: 'Download again', compressionMethod: 'Compression level', compressionLow: 'Smaller size (lossier)', compressionMid: 'Balanced', compressionHigh: 'Clearer (larger)',
     compressionWarning: 'This method converts every PDF page into a JPEG image. Text stops being searchable or selectable. Forms, annotations, hyperlinks and signatures are not preserved. Keep the original and inspect the output.',
     original: 'Original', result: 'Result', saved: 'Saved', increased: 'Size increase', unchanged: 'No change', noSaving: 'No size reduction. This file was not downloaded; try a lower resolution or keep the original.',
     compressionReady: 'The output is smaller. Check text sharpness before using it.', compressionResultStale: 'This is the previous result, made with a different compression level. You can still download it, or run again with the new setting.', compressionRetryKept: 'The new attempt did not reduce file size. The numbers and download below still belong to your previous successful result.', previewCompressed: 'Preview compressed page 1', hidePreview: 'Hide preview',
@@ -35,7 +35,7 @@ const COPY = {
     privacy: '文件不上传服务器。大文件可能消耗较多设备内存。', clear: '清空', replaceConfirmTitle: '确定替换当前文件？', replaceConfirmHint: '打开 {name} 将丢弃尚未下载的 PDF 结果或未保存的文字修改。请先下载或复制当前内容，也可以取消替换。', replaceKeep: '保留当前工作', replaceAccept: '确认替换文件', clearConfirmTitle: '确定丢弃未保存的转换结果？', clearConfirmHint: '当前生成的 PDF 预览或编辑后的文字尚未妥善保存。清空将从浏览器删除这些内容。', clearKeep: '继续编辑', clearConfirm: '丢弃并清空',
     pageRange: '选择页码（总页数不超过 60 时可留空）', rangeHint: '例如 301-360。长 PDF 默认选前 60 页，可用“下一批”继续。', imageType: '图片格式', quality: '渲染清晰度',
     low: '更小（72 DPI）', medium: '平衡（108 DPI）', high: '高清（144 DPI）', print: '打印高清（220 DPI）', printHint: '适合打印。超大页面可能因设备内存安全限制而无法转换。',
-    download: '下载结果', compressionMethod: '压缩强度', compressionLow: '更小体积（画质较低）', compressionMid: '平衡', compressionHigh: '画质较清晰（体积较大）',
+    download: '下载结果', downloadAgain: '再次下载', compressionMethod: '压缩强度', compressionLow: '更小体积（画质较低）', compressionMid: '平衡', compressionHigh: '画质较清晰（体积较大）',
     compressionWarning: '此压缩方式会将 PDF 各页重新渲染为 JPEG 图片。输出将失去文本搜索和选中能力，也无法保留表单、注释、链接及数字签名。请保存原文件并检查输出画质。',
     original: '原文件', result: '输出文件', saved: '节省', increased: '体积增加', unchanged: '无变化', noSaving: '未缩小文件，因此没有自动下载。可尝试降低清晰度，或保留原文件。',
     compressionReady: '输出文件确实更小。请先核对文字清晰度。', compressionResultStale: '这是之前压缩强度生成的结果。您仍可下载，或按当前设置重新处理。', compressionRetryKept: '新一轮处理未能缩小文件。下方的大小比较和下载按钮仍对应上一次成功的压缩结果。', previewCompressed: '预览压缩后的首页', hidePreview: '收起预览',
@@ -350,7 +350,9 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           setNotDownloaded(true);
           setNotice('');
         } else {
-          setOutput(null);
+          // Keep successful full extractions available for a second download.
+          // This does not change the existing one-click automatic download.
+          setOutput({ ...result, partialText: false });
           save(result);
           setNotice(`${t.ready}: ${formatBytes(result.bytes.length)}`);
         }
@@ -500,10 +502,12 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         {notice && <div className="notice notice-success" role="status">{notice}</div>}
         {extractionWarning && <div className="utility-note" role="alert"
           data-testid="text-extraction-warning">{extractionWarning}</div>}
-        {isTextOutput && output?.partialText && <div className="utility-result" data-testid="partial-text-result">
-          <p className="utility-note">{t.partialTextReady}</p>
-          <button type="button" className="button button-primary" data-testid="partial-text-download"
-            onClick={() => save(output)}>{t.download} ↓</button>
+        {isTextOutput && output?.bytes && <div className="utility-result"
+          data-testid={output.partialText ? 'partial-text-result' : 'complete-text-result'}>
+          {output.partialText && <p className="utility-note">{t.partialTextReady}</p>}
+          <button type="button" className="button button-primary"
+            data-testid={output.partialText ? 'partial-text-download' : 'complete-text-download'}
+            onClick={() => save(output)}>{output.partialText ? t.download : t.downloadAgain} ↓</button>
         </div>}
         {notice && <p className="utility-note" data-testid="utility-next-step"><a href={locale === 'zh' ? '/zh/#all-tools' : '/#all-tools'}>{t.nextStep} →</a></p>}
         {isTextOutput && preview && <div className="utility-preview"><label className="utility-field-label" htmlFor="utility-preview">{t.resultPreview}</label><textarea id="utility-preview" readOnly rows={8} value={preview} /></div>}
