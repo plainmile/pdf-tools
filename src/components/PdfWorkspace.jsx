@@ -9,7 +9,7 @@ import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges,
-  getRangePages, reversePages, sortPagesByFilename, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
+  getRangePages, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
 function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview, onOpen, outputPosition, busy }) {
@@ -182,6 +182,11 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   // neighboring content. Offer file sorting only for original source groups.
   const canSortSourceFiles = activeSourceCount > 1 &&
     pages.every(page => !sourceLookup.get(page.sourceId)?.isGeneratedBlank);
+  const canInterleaveDuplex = (mode === 'merge-pdf' || mode === 'workspace') &&
+    sourceGroups.length === 2 && sourceGroups.every(group => {
+      const source = sourceLookup.get(group.sourceId);
+      return Boolean(source && !source.isImage && !source.isGeneratedBlank);
+    });
   const hasOriginalPdf = pages.some(page => { const src = sourceLookup.get(page.sourceId); return src && !src.isImage && !src.isGeneratedBlank; });
   const activeFormSourceCount = countActiveSources(pages.filter(page => sourceLookup.get(page.sourceId)?.hasInteractiveForms));
   const activeBookmarkSourceCount = countActiveSources(pages.filter(page => sourceLookup.get(page.sourceId)?.hasOutlineBookmarks));
@@ -290,6 +295,20 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setNotice('');
     setError('');
     setClearConfirm(false);
+  };
+
+  const interleaveDuplex = (reverseBacks) => {
+    if (busyRef.current || !canInterleaveDuplex) return;
+    try {
+      // Validate outside the React state updater: invalid counts must show a
+      // helpful message, never throw during rendering or destroy the workspace.
+      interleaveDuplexPages(pages, reverseBacks);
+      commit(previous => interleaveDuplexPages(previous, reverseBacks));
+      setNotice(t.duplexDone);
+    } catch (_error) {
+      setError(t.duplexInvalidCounts);
+      setNotice('');
+    }
   };
 
   const addFiles = async (incoming, { confirmedReimport = false } = {}) => {
@@ -982,6 +1001,19 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <button type="button" data-testid="reverse-all-pages" disabled={busy} onClick={() => commit(reversePages)}>{onlyImages ? t.reverseOrder : t.reversePdfOrder}</button>
                 </div>}
                 {canSortSourceFiles && !onlyImages && <p className="input-note" data-testid="source-sort-hint">{t.sortPdfFilesHint}</p>}
+                {canInterleaveDuplex && <details className="page-jump-panel" data-testid="duplex-interleave-panel">
+                  <summary>{t.duplexToggle}</summary>
+                  <p className="input-note" data-testid="duplex-interleave-hint">{interpolate(t.duplexHint, {
+                    front: sourceLookup.get(sourceGroups[0].sourceId)?.name ?? t.document,
+                    back: sourceLookup.get(sourceGroups[1].sourceId)?.name ?? t.document,
+                  })}</p>
+                  <div className="page-action-buttons">
+                    <button type="button" data-testid="duplex-interleave-forward" disabled={busy}
+                      onClick={() => interleaveDuplex(false)}>{t.duplexForward}</button>
+                    <button type="button" data-testid="duplex-interleave-reverse" disabled={busy}
+                      onClick={() => interleaveDuplex(true)}>{t.duplexReverse}</button>
+                  </div>
+                </details>}
                 {pageView === 'grouped' ? (
                   <div className="source-groups" data-testid="source-groups">
                     <div className="source-group-actions">
