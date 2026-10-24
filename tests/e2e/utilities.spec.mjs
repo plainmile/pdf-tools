@@ -102,6 +102,14 @@ test('220 DPI PDF-to-PNG export matches real pixel dimensions and keeps safety l
   await expect(page.getByRole('alert')).toContainText('too large to rasterize', { timeout: 15000 });
   expect(downloads).toHaveLength(0);
   page.off('download', track);
+
+  // Very wide but low-area pages must also fail before creating a canvas:
+  // 6,100 pt × 80 pt at 220 DPI is under 12 MP but >16,384 px wide.
+  const wide = await PDFDocument.create();
+  wide.addPage([6100, 80]);
+  await upload(page, Buffer.from(await wide.save()));
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByRole('alert')).toContainText('too large to rasterize', { timeout: 15000 });
 });
 
 test('compression never auto-downloads, blocks a larger PDF, and shows actual byte sizes', async ({ page }) => {
