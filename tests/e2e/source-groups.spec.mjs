@@ -114,7 +114,11 @@ test('duplex merge recombines odd fronts with backwards-scanned evens, with Undo
   await page.getByTestId('duplex-interleave-panel').locator('summary').click();
   await expect(page.getByTestId('duplex-interleave-hint')).toContainText('fronts.pdf');
   await expect(page.getByTestId('duplex-interleave-hint')).toContainText('backs.pdf');
+  // In grouped view the source cards would LOOK unchanged after interleaving.
+  // Switching to export order makes the new sequence visible before download.
+  await page.getByTestId('workspace-view-grouped').click();
   await page.getByTestId('duplex-interleave-reverse').click();
+  await expect(page.getByTestId('workspace-view-order')).toHaveAttribute('aria-pressed', 'true');
   const output = await exportPdf(page);
   expect(output.getPages().map(p => p.getWidth())).toEqual([301, 302, 303, 304, 305, 306]);
   await page.getByRole('button', { name: 'Undo' }).click();
