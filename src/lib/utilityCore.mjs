@@ -260,7 +260,7 @@ export function normalizeText(source) {
 const textGraphemeSegmenter = typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'
   ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
 function* textGraphemes(source) {
-  if (!textGraphemeSegmenter || /^[\\x00-\\x7f]*$/.test(source)) {
+  if (!textGraphemeSegmenter || /^[\x00-\x7f]*$/.test(source)) {
     yield* source;
     return;
   }
