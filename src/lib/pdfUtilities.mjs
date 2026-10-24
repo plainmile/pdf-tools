@@ -2,7 +2,7 @@ import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
 import JSZip from 'jszip';
 import { pageNumberPlacement } from './pageNumberGeometry.mjs';
 import {
-  UTILITY_LIMITS, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, requestedPages, parseTextBlocks, textContentToLines,
+  UTILITY_LIMITS, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, requestedPages, parseTextBlocks, wrapTextLines, textContentToLines,
   linesToReadableText, summarizeTextCoverage, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
   enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled,
 } from './utilityCore.mjs';
@@ -247,6 +247,7 @@ export async function textToPdf(text, markdown = false, options = {}) {
   try {
     await newPage();
     let processedCharacters = 0;
+    let nextYield = 4096;
     for (const block of blocks) {
       checkCancelled(options.signal);
       const size = block.size;
@@ -256,29 +257,24 @@ export async function textToPdf(text, markdown = false, options = {}) {
       if (!block.text) { y -= 9; if (y < margin) await newPage(); continue; }
       const cssFont = block.kind === 'code' ? 'monospace' : 'system-ui, "Noto Sans CJK SC", "Microsoft YaHei", sans-serif';
       measure.font = `${isBold ? 'bold ' : ''}${size}px ${cssFont}`;
-      const paragraphs = block.text.split('\n');
-      for (const para of paragraphs) {
-        let row = '';
-        let rowWidth = 0;
-        // Measure only the NEW character, not the full growing row: O(n)
-        // rather than O(n squared) on book-length paragraphs.
-        for (const char of para) {
-          if (++processedCharacters % 4096 === 0) {
-            // Yield to the browser event loop so Cancel remains responsive for book-sized text.
+      const measureChar = unicode
+        ? char => measure.measureText(char).width
+        : char => safeTextWidth(font, char, size);
+      for (const para of block.text.split('\n')) {
+        // Ordinary prose wraps at word boundaries; code preserves spacing.
+        // Oversized tokens and CJK still wrap by individual character.
+        for (const row of wrapTextLines(para, bodyWidth - 4, measureChar,
+          { preserveWords: block.kind !== 'code' })) {
+          processedCharacters += row.length;
+          if (processedCharacters >= nextYield) {
+            // Allow Cancel to interrupt even an enormous single paragraph.
             await new Promise(resolve => setTimeout(resolve, 0));
             checkCancelled(options.signal);
+            nextYield = processedCharacters + 4096;
           }
-          const charWidth = unicode ? measure.measureText(char).width : safeTextWidth(font, char, size);
-          if (row && rowWidth + charWidth > bodyWidth - 4) {
-            if (y - lineHeight < margin) await newPage();
-            drawLine(row.trimEnd(), font, size, isBold, cssFont); y -= lineHeight;
-            row = char.trimStart();
-            rowWidth = row ? charWidth : 0;
-          } else { row += char; rowWidth += charWidth; }
-        }
-        if (row) {
           if (y - lineHeight < margin) await newPage();
-          drawLine(row.trimEnd(), font, size, isBold, cssFont); y -= lineHeight;
+          drawLine(row, font, size, isBold, cssFont);
+          y -= lineHeight;
         }
       }
       if (block.kind === 'heading') y -= 7;
