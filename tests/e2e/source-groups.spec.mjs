@@ -59,6 +59,50 @@ test('grouped file view reveals true positions but never changes interleaved PDF
   expect(restored.getPages().map(p => p.getWidth())).toEqual([300, 310, 320]);
 });
 
+test('merge PDFs explicitly sorts whole source files A-Z/Z-A without reversing pages; Undo restores interleaving', async ({ page }) => {
+  await page.goto('/merge-pdf/');
+  await page.getByTestId('file-input').setInputFiles([
+    { name: 'scan10.pdf', mimeType: 'application/pdf', buffer: await makePdf([510, 520]) },
+    { name: 'scan2.pdf', mimeType: 'application/pdf', buffer: await makePdf([310, 320]) },
+  ]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(4);
+  await expect(page.getByTestId('source-sort-hint')).toContainText('Undo restores your previous order');
+  await page.getByRole('button', { name: 'Move page 3 left' }).click();
+  const interleaved = await exportPdf(page);
+  expect(interleaved.getPages().map(p => p.getWidth())).toEqual([510, 310, 520, 320]);
+
+  await page.getByTestId('sort-source-asc').click();
+  const ascending = await exportPdf(page);
+  expect(ascending.getPages().map(p => p.getWidth())).toEqual([310, 320, 510, 520]);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  const restored = await exportPdf(page);
+  expect(restored.getPages().map(p => p.getWidth())).toEqual([510, 310, 520, 320]);
+
+  await page.getByTestId('sort-source-desc').click();
+  const descending = await exportPdf(page);
+  expect(descending.getPages().map(p => p.getWidth())).toEqual([510, 520, 310, 320]);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  const restoredAgain = await exportPdf(page);
+  expect(restoredAgain.getPages().map(p => p.getWidth())).toEqual([510, 310, 520, 320]);
+});
+
+test('Chinese mobile PDF source sorting is explicit and stays usable at 375px', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 780 });
+  await page.goto('/zh/merge-pdf/');
+  await page.getByTestId('file-input').setInputFiles([
+    { name: 'z10.pdf', mimeType: 'application/pdf', buffer: await makePdf([520, 530]) },
+    { name: 'a2.pdf', mimeType: 'application/pdf', buffer: await makePdf([310]) },
+  ]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(3);
+  await expect(page.getByTestId('sort-source-asc')).toContainText('A–Z');
+  await expect(page.getByTestId('source-sort-hint')).toContainText('可使用撤销恢复');
+  await page.getByTestId('sort-source-asc').click();
+  const result = await exportPdf(page, '导出 PDF');
+  expect(result.getPages().map(p => p.getWidth())).toEqual([310, 520, 530]);
+  const widths = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth }));
+  expect(widths.scroll).toBeLessThanOrEqual(widths.viewport + 2);
+});
+
 test('collapsed source group reveals hidden selections and can clear that group alone', async ({ page }) => {
   await importTwo(page);
   await page.getByTestId('workspace-view-grouped').click();
