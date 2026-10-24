@@ -267,21 +267,32 @@ export function chunkPageRanges(pageCount, chunkSize) {
  * appears in exactly one downloaded part. Keep the unsaved guard for gaps,
  * overlaps, malformed ranges and partial extracts, regardless of part order.
  */
-export function splitCoversAllPagesExactlyOnce(ranges, pageCount) {
+export function splitCoverageDetails(ranges, pageCount) {
   if (!Array.isArray(ranges) || !ranges.length ||
-      !Number.isSafeInteger(pageCount) || pageCount < 1) return false;
-  const seen = new Uint8Array(pageCount);
-  let covered = 0;
+      !Number.isSafeInteger(pageCount) || pageCount < 1 || pageCount > 600) return null;
+  // A byte per output page is enough: count 0, 1, or "two or more".
+  const occurrences = new Uint8Array(pageCount);
   for (const range of ranges) {
     if (!Number.isSafeInteger(range?.start) || !Number.isSafeInteger(range?.end) ||
-        range.start < 1 || range.end < range.start || range.end > pageCount) return false;
-    for (let number = range.start; number <= range.end; number++) {
-      if (seen[number - 1]) return false;
-      seen[number - 1] = 1;
-      covered++;
+        range.start < 1 || range.end < range.start || range.end > pageCount) return null;
+    for (let page = range.start; page <= range.end; page++) {
+      occurrences[page - 1] = Math.min(2, occurrences[page - 1] + 1);
     }
   }
-  return covered === pageCount;
+  const omitted = [];
+  const repeated = [];
+  occurrences.forEach((count, index) => {
+    if (count === 0) omitted.push(index + 1);
+    if (count > 1) repeated.push(index + 1);
+  });
+  return {
+    total: pageCount, included: pageCount - omitted.length,
+    omitted, repeated, complete: omitted.length === 0 && repeated.length === 0,
+  };
+}
+
+export function splitCoversAllPagesExactlyOnce(ranges, pageCount) {
+  return splitCoverageDetails(ranges, pageCount)?.complete === true;
 }
 
 export function getRangePages(pages, range) {
