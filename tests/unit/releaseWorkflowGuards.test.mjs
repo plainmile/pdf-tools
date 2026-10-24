@@ -49,6 +49,7 @@ test('production Compose deployment uses /opt/compose/pdf-tools and safely migra
   assert.match(yaml, /\[ "\$working_dir" != \/opt\/compose\/pdf-tools \]/);
   assert.match(yaml, /docker network inspect edge/);
   assert.match(yaml, /docker compose -f compose\.prod\.yaml up -d/);
+  assert.match(yaml, /if \[ "\$image" != "ghcr\.io\/plainmile\/pdf-tools:\$IMAGE_TAG" \]; then/);
 
   assert.match(docs, /deployment uses `\/opt\/compose\/pdf-tools\/`/);
   assert.match(docs, /cd \/opt\/compose\/pdf-tools/);
