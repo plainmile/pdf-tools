@@ -191,7 +191,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     if (!validType || !file.size || file.size > maximum) {
       const message = !validType
         ? isTextInput ? t.invalidFile : locale === 'zh' ? '请选择 PDF 文件。' : 'Choose a PDF file.'
-        : isTextInput ? t.invalidFile : locale === 'zh'
+        : isTextInput ? (file.size > maximum ? t.tooMuchText : t.invalidFile) : locale === 'zh'
           ? 'PDF 文件大小须在 1 字节至 100 MB 之间。' : 'PDF must be between 1 byte and 100 MB.';
       const existing = pdf?.name || textFileName;
       setError(message + (existing ? ' ' + t.replacedFailed.replace('{name}', existing) : ''));
@@ -225,7 +225,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     setBusy(true);
     try {
       if (isTextInput) {
-        if (!/\.(?:txt|md|markdown)$/i.test(file.name) || !file.size || file.size > UTILITY_LIMITS.maxTextBytes) throw new Error(t.invalidFile);
+        if (!/\.(?:txt|md|markdown)$/i.test(file.name) || !file.size || file.size > UTILITY_LIMITS.maxTextBytes) throw new Error(file.size > UTILITY_LIMITS.maxTextBytes ? t.tooMuchText : t.invalidFile);
         const content = decodeImportedText(new Uint8Array(await file.arrayBuffer()), locale);
         // UTF-16 can be smaller on disk than the UTF-8 text we actually
         // convert. Reject at import time, before discarding the previous
@@ -464,7 +464,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           </div>
         </div>}
         {pdf && (pdf.count >= 250 || pdf.size >= 75 * 1024 * 1024) && <p className="utility-note" data-testid="large-document-note">{t.heavyWarning}</p>}
-        {isTextInput && <label className="utility-text-input"><span className="utility-field-label">{t.textLabel}</span><textarea data-testid="utility-text" rows={10} maxLength={UTILITY_LIMITS.maxTextBytes} placeholder={t.textPlaceholder} value={sourceText} onChange={e => { setSourceText(e.target.value); setTextRevision(previous => previous + 1); setTextEdited(Boolean(textFileName)); setNotDownloaded(true); setClearConfirm(false); setNotice(''); setError(''); setProgress(null); }} disabled={inputLocked} /></label>}
+        {isTextInput && <label className="utility-text-input"><span className="utility-field-label">{t.textLabel}</span><textarea data-testid="utility-text" rows={10} spellCheck={false} autoComplete="off" autoCorrect="off" autoCapitalize="off" maxLength={UTILITY_LIMITS.maxTextBytes} placeholder={t.textPlaceholder} value={sourceText} onChange={e => { setSourceText(e.target.value); setTextRevision(previous => previous + 1); setTextEdited(Boolean(textFileName)); setNotDownloaded(true); setClearConfirm(false); setNotice(''); setError(''); setProgress(null); }} disabled={inputLocked} /></label>}
         {isTextInput && !textFileName && sourceText.trim() && <button type="button"
           className="button button-secondary button-small" data-testid="utility-text-clear"
           disabled={inputLocked} onClick={reset}>{t.clear}</button>}
@@ -547,7 +547,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
             onClick={() => save(output)}>{output.partialText ? t.download : t.downloadAgain} ↓</button>
         </div>}
         {notice && <p className="utility-note" data-testid="utility-next-step"><a href={locale === 'zh' ? '/zh/#all-tools' : '/#all-tools'}>{t.nextStep} →</a></p>}
-        {isTextOutput && preview && <div className="utility-preview"><label className="utility-field-label" htmlFor="utility-preview">{t.resultPreview}</label><textarea id="utility-preview" readOnly rows={8} value={preview} /></div>}
+        {isTextOutput && preview && <div className="utility-preview"><label className="utility-field-label" htmlFor="utility-preview">{t.resultPreview}</label><textarea id="utility-preview" readOnly spellCheck={false} rows={8} value={preview} /></div>}
       </div>
       <div className="workspace-foot"><span>✓ {t.privacy}</span></div>
     </section>
