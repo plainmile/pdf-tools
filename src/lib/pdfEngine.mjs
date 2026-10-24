@@ -343,10 +343,11 @@ export async function createBlankPageSource(source, pageRef, name = 'blank-page.
   };
 }
 
-export async function reflowImageSources(sources, layout, report = () => {}, budgetError = 'Retained document data exceeds the 200 MiB workspace budget.', activeImageIds = null) {
+export async function reflowImageSources(sources, layout, report = () => {}, budgetError = 'Retained document data exceeds the 200 MiB workspace budget.', activeImageIds = null, signal = null) {
   const updated = [];
   let retainedBytes = 0;
   for (let index = 0; index < sources.length; index++) {
+    if (signal?.aborted) throw new Error('Photo layout update cancelled.');
     const source = sources[index];
     // Avoid decoding photos that are no longer in the visible workspace (only
     // stored for Undo), or photos that already match these paper settings.
@@ -368,6 +369,7 @@ export async function reflowImageSources(sources, layout, report = () => {}, bud
     report(index + 1, sources.length);
     // Allow React updates and UI progress during bulk photo reflow.
     if (index % 2 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+    if (signal?.aborted) throw new Error('Photo layout update cancelled.');
   }
   return updated;
 }
@@ -433,6 +435,19 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}) {
   }
 }
 
+/** Use original bytes only for a completely unchanged single-PDF export.
+ * This keeps outlines, fields and signatures byte-for-byte intact.
+ */
+export function pristinePdfBytes(sources, pageRefs, watermark = null) {
+  if (!pageRefs?.length || watermark?.enabled) return null;
+  const source = sources.find(item => item.id === pageRefs[0].sourceId);
+  if (!source || source.isImage || source.isGeneratedBlank ||
+      pageRefs.length !== source.pageCount) return null;
+  if (!pageRefs.every((page, index) => page.sourceId === source.id &&
+      page.pageIndex === index && page.rotation === 0)) return null;
+  return source.bytes;
+}
+
 /** Export pages in workspace order. The originals are never modified. */
 export async function composePdf(sources, pageRefs, options = {}) {
   if (!pageRefs.length) throw new Error('There are no pages to export.');
@@ -441,7 +456,7 @@ export async function composePdf(sources, pageRefs, options = {}) {
   // Page operations create a new document. Do not stamp brand or implicit
   // creator/producer metadata on the user's exported PDF.
   const destination = await PDFDocument.create({ updateMetadata: false });
-  const originalDocs = new Map();
+  const originalDocs = options.sourceDocuments ?? new Map();
   const byId = new Map(sources.map((source) => [source.id, source]));
   const checkAbort = () => {
     if (options.signal?.aborted) throw new Error(options.cancelMessage || 'Split cancelled.');
