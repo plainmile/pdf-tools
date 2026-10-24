@@ -346,13 +346,17 @@ export async function createBlankPageSource(source, pageRef, name = 'blank-page.
 export async function reflowImageSources(sources, layout, report = () => {}, budgetError = 'Retained document data exceeds the 200 MiB workspace budget.', activeImageIds = null, signal = null) {
   const updated = [];
   let retainedBytes = 0;
+  let updatedPhotos = 0;
+  const totalPhotos = sources.reduce((total, source) =>
+    total + Number(shouldReflowImageSource(source, layout, activeImageIds)), 0);
   for (let index = 0; index < sources.length; index++) {
     if (signal?.aborted) throw new Error('Photo layout update cancelled.');
     const source = sources[index];
     // Avoid decoding photos that are no longer in the visible workspace (only
     // stored for Undo), or photos that already match these paper settings.
     // Retain their original bytes and include them in the true RAM budget.
-    if (!shouldReflowImageSource(source, layout, activeImageIds)) {
+    const needsReflow = shouldReflowImageSource(source, layout, activeImageIds);
+    if (!needsReflow) {
       updated.push(source);
     } else {
       if (!source.originalImageBytes || !source.originalImageType) {
@@ -366,7 +370,7 @@ export async function reflowImageSources(sources, layout, report = () => {}, bud
     // A change in page size/cropping can produce considerably larger PDF data.
     retainedBytes += retainedSourceBytes(updated[updated.length - 1]);
     if (retainedBytes > LIMITS.maxCombinedBytes) throw new Error(budgetError);
-    report(index + 1, sources.length);
+    if (needsReflow) report(++updatedPhotos, totalPhotos);
     // Allow React updates and UI progress during bulk photo reflow.
     if (index % 2 === 0) await new Promise(resolve => setTimeout(resolve, 0));
     if (signal?.aborted) throw new Error('Photo layout update cancelled.');
