@@ -946,6 +946,19 @@ test('malformed repeated Markdown links do not freeze browser-side PDF conversio
   expect(extracted.bytes.toString('utf8')).toContain('Valid (https://example.com/ok)');
 });
 
+test('unclosed HTML comments do not stall real Markdown-to-PDF and TXT round-trip', async ({ page }) => {
+  await page.goto('/markdown-to-pdf/');
+  const malformed = '<!--'.repeat(1500);
+  await page.getByTestId('utility-text').fill(malformed + '\nAfter comments: **SAFE END**');
+  const generated = await generateTextPdfAndDownload(page, 30000);
+  const pdf = await PDFDocument.load(generated.bytes);
+  expect(pdf.getPageCount()).toBeGreaterThan(0);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, generated.bytes);
+  const output = await getDownload(page, () => page.getByTestId('utility-run').click(), 20000);
+  expect(output.bytes.toString('utf8')).toContain('After comments: SAFE END');
+});
+
 test('repeated malformed emphasis never stalls export or drops following text', async ({ page }) => {
   await page.goto('/markdown-to-pdf/');
   await page.getByTestId('utility-text').fill('*a '.repeat(2500) + '\nAfter markers: **Safe** and `code*x`');
