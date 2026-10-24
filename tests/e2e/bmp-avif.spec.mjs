@@ -99,6 +99,61 @@ test('malformed BMP and spoofed AVIF do not delete an already loaded PDF', async
   expect(output.getPageCount()).toBe(1);
 });
 
+function pngChunk(type, data) {
+  const chunk = Buffer.alloc(12 + data.length);
+  chunk.writeUInt32BE(data.length, 0);
+  chunk.write(type, 4, 4, 'ascii');
+  data.copy(chunk, 8);
+  let crc = 0xffffffff;
+  for (const byte of chunk.subarray(4, 8 + data.length)) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  chunk.writeUInt32BE((crc ^ 0xffffffff) >>> 0, 8 + data.length);
+  return chunk;
+}
+function animatedPngFixture() {
+  // A genuine two-frame 1x1 APNG: acTL, fcTL, original IDAT, fcTL, fdAT.
+  const still = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/b9kAAAAASUVORK5CYII=', 'base64');
+  const idatOffset = 33;
+  const idatSize = still.readUInt32BE(idatOffset);
+  const idatEnd = idatOffset + 12 + idatSize;
+  const idatData = still.subarray(idatOffset + 8, idatOffset + 8 + idatSize);
+  const animation = Buffer.alloc(8);
+  animation.writeUInt32BE(2, 0);
+  const frame = sequence => {
+    const data = Buffer.alloc(26);
+    data.writeUInt32BE(sequence, 0);
+    data.writeUInt32BE(1, 4); data.writeUInt32BE(1, 8);
+    data.writeUInt16BE(1, 20); data.writeUInt16BE(10, 22);
+    return pngChunk('fcTL', data);
+  };
+  const nextFrame = Buffer.alloc(4 + idatData.length);
+  nextFrame.writeUInt32BE(2, 0);
+  idatData.copy(nextFrame, 4);
+  return Buffer.concat([
+    still.subarray(0, idatOffset), pngChunk('acTL', animation), frame(0),
+    still.subarray(idatOffset, idatEnd), frame(1), pngChunk('fdAT', nextFrame),
+    still.subarray(idatEnd),
+  ]);
+}
+
+test('animated PNG is rejected in Chinese and leaves the previously imported page exportable', async ({ page }) => {
+  await page.goto('/zh/image-to-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'stable.bmp', mimeType: 'image/bmp', buffer: makeBmp(),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'animated.png', mimeType: 'image/png', buffer: animatedPngFixture(),
+  });
+  await expect(page.getByRole('alert')).toContainText('不支持动态 PNG');
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  const output = await downloadPdf(page, '导出 PDF');
+  expect(output.getPageCount()).toBe(1);
+  expect(imageSize(output, 0)).toEqual(expect.arrayContaining([{ width: 4, height: 3 }]));
+});
+
 test('animated AVIF and WebP reject instead of silently exporting only the first frame', async ({ page }) => {
   await page.goto('/image-to-pdf/');
   const animation = Buffer.from(AVIF_BASE64, 'base64');
