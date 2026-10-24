@@ -123,10 +123,14 @@ export function reversePages(pages) {
  */
 export function sortPagesByFilename(pages, sources, locale = 'en', direction = 'asc') {
   const names = new Map(sources.map((source) => [source.id, source.name]));
+  // Different sources can have the same filename. Keep each original file
+  // together, using import order as the stable tie-breaker for A-Z and Z-A.
+  const sourceOrder = new Map(sources.map((source, index) => [source.id, index]));
   const compare = new Intl.Collator(locale === 'zh' ? 'zh' : 'en', { numeric: true, sensitivity: 'base' });
   const multiplier = direction === 'desc' ? -1 : 1;
   return pages.map((page, index) => ({ page, index }))
-    .sort((a, b) => multiplier * compare.compare(names.get(a.page.sourceId) || '', names.get(b.page.sourceId) || '') || a.index - b.index)
+    .sort((a, b) => multiplier * compare.compare(names.get(a.page.sourceId) || '', names.get(b.page.sourceId) || '') ||
+      (sourceOrder.get(a.page.sourceId) ?? 0) - (sourceOrder.get(b.page.sourceId) ?? 0) || a.index - b.index)
     .map(({ page }) => page);
 }
 
