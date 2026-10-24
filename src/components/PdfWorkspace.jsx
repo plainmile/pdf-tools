@@ -446,7 +446,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     const controller = new AbortController();
     layoutAbortRef.current = controller;
     setLayoutCancelling(false);
-    setLayoutProgress({ done: 0, total: sources.length });
+    const changedPhotos = sources.filter(source => source.isImage &&
+      activeImageSources.has(source.id) && !sameImagePdfLayout(source.imageLayout, imageLayout)).length;
+    setLayoutProgress({ done: 0, total: changedPhotos });
     try {
       const updated = await reflowImageSources(sources, imageLayout,
         (done, total) => { if (!controller.signal.aborted) setLayoutProgress({ done, total }); },
@@ -522,7 +524,14 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       for (let index = 0; index < pieces.length; index++) {
         if (controller.signal.aborted) throw new Error('Split cancelled.');
         const range = pieces[index];
-        const contents = await composePdf(sources, getRangePages(pages, range), { watermark, signal: controller.signal, sourceDocuments });
+        const chosenPages = getRangePages(pages, range);
+        // One section that contains the untouched original is an export, not
+        // a real split. Preserve outlines, forms, signatures and metadata.
+        const pristine = !zip && completeSplit
+          ? pristinePdfBytes(sources, chosenPages, watermark) : null;
+        const contents = pristine ?? await composePdf(sources, chosenPages, {
+          watermark, signal: controller.signal, sourceDocuments,
+        });
         if (controller.signal.aborted) throw new Error('Split cancelled.');
         size = enforceSplitZipBudget(size, contents.length);
         if (!zip) {
