@@ -124,6 +124,20 @@ test('many unclosed Markdown links do not trigger quadratic rescanning or lose l
   assert.ok(elapsed < 1800, `Malformed Markdown parsing took ${Math.round(elapsed)} ms`);
 });
 
+test('unclosed emphasis markers parse quickly without losing scientific notation', () => {
+  const malformed = '*a '.repeat(12000);
+  const start = performance.now();
+  const result = stripMarkdownInline(malformed + '\nThen **bold** and _italic_ remain valid.');
+  const elapsed = performance.now() - start;
+  assert.equal(result, malformed + '\nThen bold and italic remain valid.');
+  // Previously roughly quadratic: 8,000 fragments took multiple seconds.
+  assert.ok(elapsed < 1800, 'Unclosed emphasis parsing took ' + Math.round(elapsed) + ' ms');
+  const technical = 'user_id x**2 and y**3, 2*3*4; nested: ***word***.';
+  assert.equal(stripMarkdownInline(technical), 'user_id x**2 and y**3, 2*3*4; nested: *word*.');
+  assert.equal(stripMarkdownInline('**Bold** and ~~removed~~ then `literal *x*`'),
+    'Bold and removed then literal *x*');
+});
+
 test('Markdown code fences preserve trailing spaces and whitespace-only lines before PDF wrapping', () => {
   const input = [
     '```js',
