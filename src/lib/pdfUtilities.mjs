@@ -2,7 +2,7 @@ import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
 import JSZip from 'jszip';
 import { pageNumberPlacement } from './pageNumberGeometry.mjs';
 import {
-  UTILITY_LIMITS, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, requestedPages, parseTextBlocks, wrapTextLines, textContentToLines,
+  UTILITY_LIMITS, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, requestedPages, imagePageFilename, parseTextBlocks, wrapTextLines, textContentToLines,
   linesToReadableText, summarizeTextCoverage, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
   enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled,
 } from './utilityCore.mjs';
@@ -86,7 +86,7 @@ export async function convertPdfToImages(pdf, options = {}, reportProgress = () 
       try {
         const blob = await renderPageAsBlob(page, mime, scale, .87, options.signal);
         accumulated = enforceImageBatchBytes(accumulated, blob.size, options.locale);
-        files.push({ name: `page-${String(index).padStart(3, '0')}.${format}`, bytes: new Uint8Array(await blob.arrayBuffer()) });
+        files.push({ name: imagePageFilename(index, pdf.count, format), bytes: new Uint8Array(await blob.arrayBuffer()) });
       } finally { page.cleanup(); }
       reportProgress(files.length, selected.length);
     }
