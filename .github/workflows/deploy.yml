@@ -90,7 +90,41 @@ jobs:
             -o StrictHostKeyChecking=yes compose.prod.yaml \
             "$DEPLOY_USER@$DEPLOY_HOST:/opt/compose/pdf-tools/compose.prod.yaml"
 
+      # Record the ACTUALLY RUNNING healthy SHA, never just an .env value.
+      - name: Capture previous healthy release
+        id: checkpoint
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+        run: |
+          set -euo pipefail
+          previous_sha=$(ssh -p "$DEPLOY_PORT" -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
+            '/bin/sh -s' <<'REMOTE'
+          set -eu
+          image=$(docker inspect -f '{{.Config.Image}}' plainmile-pdf-tools 2>/dev/null || true)
+          health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' plainmile-pdf-tools 2>/dev/null || true)
+          working_dir=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' plainmile-pdf-tools 2>/dev/null || true)
+          if [ "$health" = healthy ] && [ "$working_dir" = /opt/compose/pdf-tools ]; then
+            case "$image" in
+              ghcr.io/plainmile/pdf-tools:*)
+                tag=${image#ghcr.io/plainmile/pdf-tools:}
+                case "$tag" in
+                  *[!0-9a-f]*|'') ;;
+                  *) if [ "${#tag}" -eq 40 ]; then printf '%s\n' "$tag"; fi ;;
+                esac
+                ;;
+            esac
+          fi
+          REMOTE
+          )
+          # First installs and unknown/unhealthy previous images have no safe
+          # rollback target. Skip rather than guessing or changing other apps.
+          printf 'previous_sha=%s\n' "$previous_sha" >> "$GITHUB_OUTPUT"
+
       - name: Deploy the exact published image and check its health
+        id: deploy
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
@@ -117,8 +151,13 @@ jobs:
             status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' plainmile-pdf-tools 2>/dev/null || true)
             if [ "$status" = healthy ]; then
               working_dir=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' plainmile-pdf-tools)
+              image=$(docker inspect -f '{{.Config.Image}}' plainmile-pdf-tools)
               if [ "$working_dir" != /opt/compose/pdf-tools ]; then
                 echo "Unexpected Compose working directory: $working_dir" >&2
+                exit 1
+              fi
+              if [ "$image" != "ghcr.io/plainmile/pdf-tools:$IMAGE_TAG" ]; then
+                echo "Healthy container is running a different image: $image" >&2
                 exit 1
               fi
               exit 0
@@ -193,6 +232,69 @@ jobs:
                 exit 1
               }
             '
+
+      - name: Restore last healthy image if release checks fail
+        if: ${{ failure() && steps.checkpoint.outputs.previous_sha != '' && steps.deploy.outcome != 'skipped' }}
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          PREVIOUS_SHA: ${{ steps.checkpoint.outputs.previous_sha }}
+          FAILED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -eu
+          if [ "$PREVIOUS_SHA" = "$FAILED_SHA" ]; then
+            echo 'Previous healthy SHA equals attempted SHA; no rollback candidate.'
+            exit 0
+          fi
+          for tag in "$PREVIOUS_SHA" "$FAILED_SHA"; do
+            case "$tag" in
+              *[!0-9a-f]*|'') echo 'Invalid rollback SHA' >&2; exit 1 ;;
+            esac
+            test "${#tag}" -eq 40
+          done
+          ssh -p "$DEPLOY_PORT" -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
+            "PREVIOUS_SHA=$PREVIOUS_SHA FAILED_SHA=$FAILED_SHA /bin/sh -s" <<'REMOTE'
+          set -eu
+          cd /opt/compose/pdf-tools
+          # Never override a newer release or an operator's manual change.
+          if ! grep -qx "IMAGE_TAG=$FAILED_SHA" .env; then
+            echo 'Rollback skipped: desired SHA changed since this deploy.'
+            exit 0
+          fi
+          working_dir=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' plainmile-pdf-tools 2>/dev/null || true)
+          if [ -n "$working_dir" ] && [ "$working_dir" != /opt/compose/pdf-tools ]; then
+            echo 'Refusing to touch a container owned by another Compose project.' >&2
+            exit 1
+          fi
+          umask 077
+          printf 'IMAGE_TAG=%s\n' "$PREVIOUS_SHA" > .env
+          # The previously healthy tag should already be cached on the VPS.
+          if ! docker image inspect "ghcr.io/plainmile/pdf-tools:$PREVIOUS_SHA" >/dev/null 2>&1; then
+            docker compose -f compose.prod.yaml pull
+          fi
+          docker compose -f compose.prod.yaml up -d
+          for i in $(seq 1 24); do
+            status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' plainmile-pdf-tools 2>/dev/null || true)
+            if [ "$status" = healthy ]; then
+              working_dir=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' plainmile-pdf-tools)
+              image=$(docker inspect -f '{{.Config.Image}}' plainmile-pdf-tools)
+              if [ "$working_dir" = /opt/compose/pdf-tools ] &&
+                 [ "$image" = "ghcr.io/plainmile/pdf-tools:$PREVIOUS_SHA" ]; then
+                echo "Rollback restored healthy image $PREVIOUS_SHA"
+                exit 0
+              fi
+              echo 'Rollback produced an unexpected container/image.' >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          docker compose -f compose.prod.yaml ps
+          docker logs --tail 60 plainmile-pdf-tools || true
+          echo 'Rollback did not reach healthy status.' >&2
+          exit 1
+          REMOTE
 
       - name: Retain public E2E diagnostics only on failure
         if: failure()
