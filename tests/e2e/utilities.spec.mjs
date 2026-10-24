@@ -57,6 +57,30 @@ test('localized image page range downloads named ZIP containing the correct imag
   }
 });
 
+test('custom PDF image order survives ZIP extraction and alphabetical sorting', async ({ page }) => {
+  await page.goto('/pdf-to-images/');
+  await upload(page, await fixturePdf('Source image pages', 5));
+  await page.getByRole('combobox', { name: 'Image format' }).selectOption('png');
+  await page.getByTestId('utility-page-ranges').fill('3,1,2');
+  await expect(page.getByText('order-001', { exact: false })).toBeVisible();
+  const output = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+  expect(output.name).toMatch(/fixture-pages-3_1_2\.zip$/);
+  const archive = await JSZip.loadAsync(output.bytes);
+  const names = Object.keys(archive.files).sort();
+  expect(names).toEqual([
+    'order-001-page-003.png', 'order-002-page-001.png', 'order-003-page-002.png',
+  ]);
+  for (const name of names) {
+    const bytes = await archive.files[name].async('uint8array');
+    expect(Array.from(bytes.slice(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+  }
+  // An ordinary ascending selection keeps the existing stable image filenames.
+  await page.getByTestId('utility-page-ranges').fill('1,3');
+  const normal = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+  const standardZip = await JSZip.loadAsync(normal.bytes);
+  expect(Object.keys(standardZip.files).sort()).toEqual(['page-001.png', 'page-003.png']);
+});
+
 test('PDF to image PNG selected pages ZIP has valid images, JPG single page valid JPEG', async ({ page }) => {
   await page.goto('/pdf-to-images/');
   await upload(page, await fixturePdf());
