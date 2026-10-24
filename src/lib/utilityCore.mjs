@@ -272,7 +272,11 @@ export function stripMarkdownInline(source) {
     // Strip only MATCHED Markdown formatting markers. Removing every '*' and
     // '_' silently corrupts identifiers (user_id), multiplication (a*b) and
     // exponent notation (x**2) in technical reports.
-    .replace(/(?<![\p{L}\p{N}_])(\*\*|__|~~|`|\*|_)(?=\S)([^\n]*?\S)\1(?![\p{L}\p{N}_])/gu, '$2')
+    // Reject marker boundaries *inside* a doubled operator. Otherwise a
+    // sequence like "x**2 and y**2" matches the inner single stars and loses
+    // one multiplication symbol at each end even though no Markdown emphasis
+    // was intended. Preserve scientific notation and unspaced identifiers.
+    .replace(/(?<![\p{L}\p{N}_*~])(\*\*|__|~~|`|\*|_)(?=\S)([^\n]*?\S)\1(?![\p{L}\p{N}_*~])/gu, '$2')
     .replace(new RegExp(`${marker}(\\d+)${marker}`, 'g'),
       (_token, index) => inlineCode[Number(index)]);
 }
