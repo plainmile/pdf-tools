@@ -30,6 +30,17 @@ export const UTILITY_LIMITS = Object.freeze({
   maxIOSCanvasSide: 4_096,
 });
 
+/** Avoid silent browser maxLength truncation on pasted TXT or Markdown.
+ * UTF-8 can use more bytes than UTF-16 characters, so validate the exact byte
+ * budget; ASCII-length and three-byte upper-bound shortcuts stay inexpensive.
+ */
+export function textFitsUtf8Budget(value, maxBytes = UTILITY_LIMITS.maxTextBytes) {
+  if (typeof value !== 'string' || !Number.isSafeInteger(maxBytes) || maxBytes < 0) return false;
+  if (value.length > maxBytes) return false;
+  if (value.length * 3 <= maxBytes) return true;
+  return new TextEncoder().encode(value).byteLength <= maxBytes;
+}
+
 export function rasterCanvasSideLimit(userAgent = '', maxTouchPoints = 0) {
   // iPadOS can advertise a desktop Macintosh UA, but remains touch-based.
   const ios = /\b(?:iPhone|iPad|iPod)\b/i.test(userAgent) ||
