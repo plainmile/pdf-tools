@@ -61,6 +61,23 @@ test('variable-width words fall back to a hard wrap before overflowing PDF margi
   }
 });
 
+test('Unicode wrapping keeps combining accents, emoji modifiers, ZWJ sequences and flags intact', () => {
+  const emoji = '\u{1f469}\u{1f3fd}\u200d\u{1f4bb}';
+  const accented = 'e\u0301';
+  const flag = '\u{1f1fa}\u{1f1f3}';
+  const input = 'A' + emoji + accented + flag + 'B';
+  const measure = cluster => cluster === emoji || cluster === flag ? 2 : 1;
+  const codeRows = [...wrapTextLines(input, 2, measure, { preserveWords: false })];
+  assert.deepEqual(codeRows, ['A', emoji, accented, flag, 'B']);
+  assert.equal(codeRows.join(''), input);
+  assert.ok(codeRows.every(line => [...line].length === 1 || line === emoji || line === accented || line === flag));
+  const proseRows = [...wrapTextLines('A ' + emoji + 'B', 3, measure)];
+  assert.deepEqual(proseRows, ['A', emoji + 'B']);
+  // After a word-boundary reflow, recalculate widths by whole grapheme,
+  // not by the individual code points of the retained suffix.
+  assert.deepEqual([...wrapTextLines('a ' + emoji + emoji + 'z', 3, measure)], ['a', emoji, emoji + 'z']);
+});
+
 test('fenced-code wrapping does not erase spaces that fall on a line boundary', () => {
   const input = 'abc   def  ghi';
   const rows = [...wrapTextLines(input, 4, () => 1, { preserveWords: false })];
