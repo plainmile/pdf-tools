@@ -46,7 +46,30 @@ test('TXT and Markdown line wrapping keeps whole words when they fit and splits 
   // Code remains monospaced and may wrap at any character, never silently
   // losing the initial indentation or replacing symbols with Markdown syntax.
   assert.deepEqual(wrap('      let x = 1;', 7, { preserveWords: false }),
-    ['      l', 'et x =', '1;']);
+    ['      l', 'et x = ', '1;']);
+});
+
+test('variable-width words fall back to a hard wrap before overflowing PDF margins', () => {
+  const measure = (char) => char === 'Q' ? 4 : char === ' ' ? 0 : 1;
+  const rows = [...wrapTextLines('a QQQ', 10, measure)];
+  // Previously the word-boundary branch retained QQ, then appended a third
+  // 4-unit glyph without rechecking, producing a 12-unit line in a 10-unit box.
+  assert.deepEqual(rows, ['a', 'QQ', 'Q']);
+  for (const row of rows) {
+    const width = [...row].reduce((sum, char) => sum + measure(char), 0);
+    assert.ok(width <= 10, 'wrapped line must remain within its measured width');
+  }
+});
+
+test('fenced-code wrapping does not erase spaces that fall on a line boundary', () => {
+  const input = 'abc   def  ghi';
+  const rows = [...wrapTextLines(input, 4, () => 1, { preserveWords: false })];
+  assert.equal(rows.join(''), input); // Exact code spacing survives wrapping.
+  assert.ok(rows.every(row => row.length <= 4));
+  const indentation = '        const value = 12;  // aligned';
+  const parts = [...wrapTextLines(indentation, 7, () => 1, { preserveWords: false })];
+  assert.equal(parts.join(''), indentation);
+  assert.ok(parts.every(part => part.length <= 7));
 });
 
 test('basic Markdown headings and list semantics without inserting remote HTML', () => {
