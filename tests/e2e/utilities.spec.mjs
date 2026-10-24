@@ -400,6 +400,26 @@ test('numbered PDF skips cover and contents so page 3 starts at printed 1', asyn
   expect(parts).toEqual(['COVER WITHOUT NUMBER', 'CONTENTS WITHOUT NUMBER', '1', '2', '3']);
 });
 
+test('new shorter PDF resets stale page-number start while valid settings survive replacement', async ({ page }) => {
+  await page.goto('/add-page-numbers/');
+  await upload(page, await fixturePdf('Long file', 5));
+  await page.getByTestId('number-first-pdf-page').fill('5');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'short.pdf', mimeType: 'application/pdf', buffer: await fixturePdf('Short file', 2),
+  });
+  await expect(page.getByTestId('utility-file-summary')).toContainText('short.pdf');
+  await expect(page.getByTestId('number-first-pdf-page')).toHaveValue('1');
+  await expect(page.getByRole('status')).toContainText('reset to PDF page 1');
+  const numbered = await getDownload(page, () => page.getByTestId('utility-run').click(), 15000);
+  expect((await PDFDocument.load(numbered.bytes)).getPageCount()).toBe(2);
+  await page.getByTestId('number-first-pdf-page').fill('2');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'longer.pdf', mimeType: 'application/pdf', buffer: await fixturePdf('Longer file', 4),
+  });
+  await expect(page.getByTestId('utility-file-summary')).toContainText('longer.pdf');
+  await expect(page.getByTestId('number-first-pdf-page')).toHaveValue('2');
+});
+
 test('Chinese mobile PDF numbering validates starting PDF page and last printed number', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/zh/add-page-numbers/');
