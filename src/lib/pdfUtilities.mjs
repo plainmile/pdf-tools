@@ -228,32 +228,56 @@ export async function textToPdf(text, markdown = false, options = {}) {
   const measureCanvas = document.createElement('canvas');
   const measure = measureCanvas.getContext('2d');
   if (!measure) throw new Error('Canvas is unavailable.');
-  let pdfPage = null, y = 0, totalPages = 0;
+  let pdfPage = null, y = 0, totalPages = 0, rasterPages = 0;
+  let pageLines = [], pageRequiresRaster = false;
+  // In mixed-language books, keep ordinary PDF text searchable on pages
+  // that do not require browser-font rasterization. Buffer only ONE page of
+  // positioned lines; avoid accumulating a whole book before writing it.
+  const widthCaches = new Map();
   async function finishPage() {
     checkCancelled(options.signal);
-    if (unicode && pdfPage && canvas) {
-      const jpg = await new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('Text rendering failed.')), 'image/jpeg', .92));
+    if (!pdfPage) return;
+    if (pageRequiresRaster) {
+      if (++rasterPages > UTILITY_LIMITS.maxRasterTextPages) {
+        throw new Error('Non-Latin text can create up to 300 image-based PDF pages per conversion. Split the text into volumes.');
+      }
+      if (!canvas || !ctx) throw new Error('Canvas is unavailable for Unicode text.');
+      canvas.width = Math.ceil(pdfWidth * scale);
+      canvas.height = Math.ceil(pdfHeight * scale);
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, pdfWidth, pdfHeight);
+      for (const entry of pageLines) {
+        ctx.font = entry.cssFont;
+        ctx.fillStyle = '#22313e';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(entry.text, margin, entry.y);
+      }
+      const jpg = await new Promise((resolve, reject) => canvas.toBlob(
+        blob => blob ? resolve(blob) : reject(new Error('Text rendering failed.')), 'image/jpeg', .92));
       checkCancelled(options.signal);
       const img = await doc.embedJpg(await jpg.arrayBuffer());
+      checkCancelled(options.signal);
       pdfPage.drawImage(img, { x: 0, y: 0, width: pdfWidth, height: pdfHeight });
+    } else {
+      for (const entry of pageLines) {
+        pdfPage.drawText(entry.text || ' ', {
+          x: margin, y: entry.y, font: entry.font, size: entry.size, color: rgb(.13, .19, .24),
+        });
+      }
     }
+    pageLines = [];
+    pageRequiresRaster = false;
     freeCanvas(canvas);
   }
   async function newPage() {
     checkCancelled(options.signal);
     if (pdfPage) await finishPage();
-    if (++totalPages > (unicode ? UTILITY_LIMITS.maxRasterTextPages : UTILITY_LIMITS.maxOutputPages)) {
-      throw new Error(unicode
-        ? 'Non-Latin text can create up to 300 image-based PDF pages per conversion. Split the text into volumes.'
-        : 'Text exceeds 1,000 PDF pages. Split the text into volumes.');
+    if (++totalPages > UTILITY_LIMITS.maxOutputPages) {
+      throw new Error('Text exceeds 1,000 PDF pages. Split the text into volumes.');
     }
     pdfPage = doc.addPage([pdfWidth, pdfHeight]);
     y = pdfHeight - margin;
-    if (unicode) {
-      canvas.width = Math.ceil(pdfWidth * scale); canvas.height = Math.ceil(pdfHeight * scale);
-      ctx.setTransform(scale, 0, 0, scale, 0, 0);
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, pdfWidth, pdfHeight);
-    }
   }
   try {
     await newPage();
@@ -268,8 +292,21 @@ export async function textToPdf(text, markdown = false, options = {}) {
       if (!block.text) { y -= 9; if (y < margin) await newPage(); continue; }
       const cssFont = block.kind === 'code' ? 'monospace' : 'system-ui, "Noto Sans CJK SC", "Microsoft YaHei", sans-serif';
       measure.font = `${isBold ? 'bold ' : ''}${size}px ${cssFont}`;
+      // A Latin page in a mixed document uses the embedded PDF font; a CJK
+      // page uses system fonts. Conservatively measure both so either output
+      // stays within the page margins even when the fonts differ.
+      const widthKey = block.kind + ':' + size;
+      if (!widthCaches.has(widthKey)) widthCaches.set(widthKey, new Map());
+      const cachedWidths = widthCaches.get(widthKey);
       const measureChar = unicode
-        ? char => measure.measureText(char).width
+        ? char => {
+          if (cachedWidths.has(char)) return cachedWidths.get(char);
+          const browserWidth = measure.measureText(char).width;
+          const pdfWidth = safeTextWidth(font, char, size);
+          const width = Math.max(browserWidth, pdfWidth === 999999 ? 0 : pdfWidth);
+          cachedWidths.set(char, width);
+          return width;
+        }
         : char => safeTextWidth(font, char, size);
       for (const para of block.text.split('\n')) {
         // Ordinary prose wraps at word boundaries; code preserves spacing.
@@ -290,20 +327,22 @@ export async function textToPdf(text, markdown = false, options = {}) {
       }
       if (block.kind === 'heading') y -= 7;
     }
-    if (unicode) await finishPage();
+    if (pdfPage) await finishPage();
     checkCancelled(options.signal);
     const bytes = new Uint8Array(await doc.save({ useObjectStreams: true }));
     checkCancelled(options.signal);
-    return { bytes, searchable: !unicode, pageCount: totalPages };
+    return { bytes, searchable: rasterPages === 0, rasterPages, pageCount: totalPages };
   } finally { freeCanvas(canvas); freeCanvas(measureCanvas); }
 
   function drawLine(line, font, size, isBold, family) {
-    if (unicode) {
-      ctx.font = `${isBold ? 'bold ' : ''}${size}px ${family}`;
-      ctx.fillStyle = '#22313e'; ctx.textBaseline = 'alphabetic'; ctx.fillText(line, margin, y);
-    } else {
-      pdfPage.drawText(line || ' ', { x: margin, y, font, size, color: rgb(.13, .19, .24) });
-    }
+    // pdf-lib's built-in fonts cannot encode CJK and some symbols. A single
+    // unsupported line rasterizes only its own page, not unrelated pages.
+    try { font.encodeText(line || ' '); }
+    catch { pageRequiresRaster = true; }
+    pageLines.push({
+      text: line, font, size, y,
+      cssFont: (isBold ? 'bold ' : '') + size + 'px ' + family,
+    });
   }
 }
 function safeTextWidth(font, text, size) {
