@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import JSZip from 'jszip';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 import PageZoomDialog from './PageZoomDialog.jsx';
-import { LIMITS, composePdf, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId, createBlankPageSource, retainedSourceBytes, retainedSourcesBytes } from '../lib/pdfEngine.mjs';
+import { LIMITS, composePdf, pristinePdfBytes, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId, createBlankPageSource, retainedSourceBytes, retainedSourcesBytes } from '../lib/pdfEngine.mjs';
 import { sanitizeFilename, workspaceFilenameStem } from '../lib/utilityCore.mjs';
 import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLayout.mjs';
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
@@ -109,6 +109,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const previewDocuments = useRef(new Map());
   const splitAbortRef = useRef(null);
   const exportAbortRef = useRef(null);
+  const layoutAbortRef = useRef(null);
   const [sources, setSources] = useState([]);
   const [history, setHistory] = useState(() => makeHistoryState());
   const [selected, setSelected] = useState(() => new Set());
@@ -130,6 +131,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [splitCancelling, setSplitCancelling] = useState(false);
   const [exportProgress, setExportProgress] = useState(null);
   const [exportCancelling, setExportCancelling] = useState(false);
+  const [layoutProgress, setLayoutProgress] = useState(null);
+  const [layoutCancelling, setLayoutCancelling] = useState(false);
   const [imageLayout, setImageLayout] = useState(() => ({ ...IMAGE_PDF_LAYOUT_DEFAULT }));
   const [lastDownloadedRevision, setLastDownloadedRevision] = useState(null);
   const [notice, setNotice] = useState('');
@@ -245,7 +248,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     }
     previewDocuments.current.clear();
   }, []);
-  useEffect(() => () => { splitAbortRef.current?.abort(); exportAbortRef.current?.abort(); releasePreviewDocuments(); }, [releasePreviewDocuments]);
+  useEffect(() => () => { splitAbortRef.current?.abort(); exportAbortRef.current?.abort(); layoutAbortRef.current?.abort(); releasePreviewDocuments(); }, [releasePreviewDocuments]);
 
   // The 20-step history cap must also cap retained source bytes. Otherwise a
   // deleted PDF or photo that can no longer be restored remains in sources and
@@ -440,12 +443,23 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   });
 
   const applyImageLayout = () => withBusy(async () => {
-    const updated = await reflowImageSources(sources, imageLayout, () => {}, t.errorCombined, activeImageSources);
-    // Rebuild must succeed for every active photo before replacing ANY document.
-    // Undo-only photos retain their previous layout until they are restored.
-    releasePreviewDocuments();
-    setSources(updated);
-    setNotice(t.imageApplied);
+    const controller = new AbortController();
+    layoutAbortRef.current = controller;
+    setLayoutCancelling(false);
+    setLayoutProgress({ done: 0, total: sources.length });
+    try {
+      const updated = await reflowImageSources(sources, imageLayout,
+        (done, total) => { if (!controller.signal.aborted) setLayoutProgress({ done, total }); },
+        t.errorCombined, activeImageSources, controller.signal);
+      if (controller.signal.aborted) throw new Error('Photo layout update cancelled.');
+      releasePreviewDocuments();
+      setSources(updated);
+      setNotice(t.imageApplied);
+    } finally {
+      layoutAbortRef.current = null;
+      setLayoutProgress(null);
+      setLayoutCancelling(false);
+    }
   });
 
   // Long PDF exports now share the split tool's cancellation behavior.
@@ -459,7 +473,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     const largeExport = chosen.length >= 24;
     if (largeExport) setExportProgress({ done: 0, total: chosen.length });
     try {
-      const bytes = await composePdf(sources, chosen, {
+      const allPages = chosen.length === pages.length &&
+        chosen.every((page, index) => page === pages[index]);
+      const pristine = allPages ? pristinePdfBytes(sources, chosen, watermark) : null;
+      const bytes = pristine ?? await composePdf(sources, chosen, {
         watermark, signal: controller.signal, cancelMessage: 'PDF export cancelled.',
         onProgress: (done, total) => { if (largeExport && !controller.signal.aborted) setExportProgress({ done, total }); },
       });
@@ -497,6 +514,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setSplitCancelling(false);
     setSplitProgress({ phase: 'parts', done: 0, total: pieces.length });
     let size = 0;
+    const sourceDocuments = new Map();
     try {
       // A single selected section should be a PDF download, not a ZIP that
       // forces the user to extract the only file. Keep the same output budget.
@@ -504,7 +522,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       for (let index = 0; index < pieces.length; index++) {
         if (controller.signal.aborted) throw new Error('Split cancelled.');
         const range = pieces[index];
-        const contents = await composePdf(sources, getRangePages(pages, range), { watermark, signal: controller.signal });
+        const contents = await composePdf(sources, getRangePages(pages, range), { watermark, signal: controller.signal, sourceDocuments });
         if (controller.signal.aborted) throw new Error('Split cancelled.');
         size = enforceSplitZipBudget(size, contents.length);
         if (!zip) {
@@ -753,9 +771,22 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         <span className="workspace-status"><span className="status-dot" aria-hidden="true" />{t.local}</span>
       </div>
       <div className="workspace-controls">
-        <div className="tool-switch" role="tablist" aria-label={t.app}>
-          <button type="button" role="tab" aria-selected={tab === 'organize'} className={tab === 'organize' ? 'active' : ''} onClick={() => setTab('organize')} disabled={busy}>{t.organize}</button>
-          <button type="button" role="tab" aria-selected={tab === 'split'} className={tab === 'split' ? 'active' : ''} onClick={() => setTab('split')} disabled={busy}>{t.split}</button>
+        <div className="tool-switch" role="tablist" aria-label={t.app}
+          onKeyDown={event => {
+            if (busy || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+            event.preventDefault();
+            const next = event.key === 'ArrowLeft' || event.key === 'Home' ? 'organize' : 'split';
+            setTab(next);
+            event.currentTarget.querySelector('[data-workspace-tab="' + next + '"]')?.focus();
+          }}>
+          <button type="button" id="workspace-tab-organize" data-workspace-tab="organize"
+            role="tab" aria-selected={tab === 'organize'} aria-controls="workspace-panel-organize"
+            tabIndex={tab === 'organize' ? 0 : -1} className={tab === 'organize' ? 'active' : ''}
+            onClick={() => setTab('organize')} disabled={busy}>{t.organize}</button>
+          <button type="button" id="workspace-tab-split" data-workspace-tab="split"
+            role="tab" aria-selected={tab === 'split'} aria-controls="workspace-panel-split"
+            tabIndex={tab === 'split' ? 0 : -1} className={tab === 'split' ? 'active' : ''}
+            onClick={() => setTab('split')} disabled={busy}>{t.split}</button>
         </div>
         <div className="workspace-primary-buttons">
           <input ref={inputRef} data-testid="file-input" aria-label={t.add} className="hidden-input" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.bmp,.avif,application/pdf,image/jpeg,image/png,image/webp,image/bmp,image/avif" disabled={busy || pendingReimportCount > 0} onChange={(event) => { void addFiles(event.target.files); event.target.value = ''; }} />
@@ -842,6 +873,15 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           {imageLayoutDirty && <p className="utility-note" data-testid="image-layout-dirty">{t.imageLayoutDirty}</p>}
           {imageLayoutDirty && <button type="button" className="button button-secondary" data-testid="image-layout-apply"
             disabled={busy} onClick={applyImageLayout}>{busy ? t.working : t.imageApply}</button>}
+          {busy && layoutProgress && <div className="layout-progress-row" role="status" aria-live="polite"
+            data-testid="image-layout-progress">
+            <span>{interpolate(t.imageApplyProgress, layoutProgress)}</span>
+            <button type="button" className="button button-secondary button-small"
+              data-testid="image-layout-cancel" disabled={layoutCancelling}
+              onClick={() => { layoutAbortRef.current?.abort(); setLayoutCancelling(true); }}>
+              {layoutCancelling ? t.imageApplyCancelling : t.imageApplyCancel}
+            </button>
+          </div>}
         </section>
       )}
       {pages.length > 0 && exportSettingsOpen && (
@@ -854,7 +894,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           {watermarkEnabled && (
             <div className="watermark-fields">
               <label className="input-label" htmlFor="watermark-text">{t.watermarkTextLabel}</label>
-              <input id="watermark-text" data-testid="watermark-text" type="text" maxLength={MAX_WATERMARK_CHARS} value={watermarkText} disabled={busy} onChange={(event) => { setWatermarkText(event.target.value); setError(''); }} placeholder={t.watermarkPlaceholder} />
+              <input id="watermark-text" data-testid="watermark-text" type="text" spellCheck={false} autoComplete="off" maxLength={MAX_WATERMARK_CHARS} value={watermarkText} disabled={busy} onChange={(event) => { setWatermarkText(event.target.value); setError(''); }} placeholder={t.watermarkPlaceholder} />
               <p className="input-note" aria-live="polite">{watermarkText.trim() ? t.watermarkHelp : t.watermarkNeedsText}</p>
             </div>
           )}
@@ -865,7 +905,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           <summary>{t.renameDownload}</summary>
           <div className="download-name-controls">
             <label htmlFor="download-name-input">{t.outputName}</label>
-            <input type="text" id="download-name-input" data-testid="download-name-input"
+            <input type="text" id="download-name-input" data-testid="download-name-input" spellCheck={false} autoComplete="off"
               maxLength={120} value={downloadNameInput} disabled={busy}
               placeholder={defaultFilename}
               onChange={event => setDownloadNameInput(event.target.value)} />
@@ -890,7 +930,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         </p>}
         {largeWorkspace && <p className="utility-note" data-testid="workspace-large-warning">{t.bigDocWarning}</p>}
         {!pages.length ? (
-          <div className="dropzone" data-testid="dropzone" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); void addFiles(event.dataTransfer.files); }}>
+          <div className="dropzone" role="tabpanel" id={`workspace-panel-${tab}`} aria-labelledby={`workspace-tab-${tab}`} data-testid="dropzone" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); void addFiles(event.dataTransfer.files); }}>
             <div className="drop-icon" aria-hidden="true">＋</div>
             <h2>{t.dropTitle}</h2><p>{t.dropSub}</p>
             <button type="button" className="button button-primary" disabled={busy || pendingReimportCount > 0} onClick={() => inputRef.current?.click()}>{busy ? t.opening : t.choose}</button>
@@ -910,7 +950,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
               </div>
             </div>
             {tab === 'organize' ? (
-              <section aria-label={t.organize} className="pages-work-area">
+              <section aria-label={t.organize} className="pages-work-area" role="tabpanel" id="workspace-panel-organize" aria-labelledby="workspace-tab-organize">
                 <div className="selection-toolbar">
                   <div className="selection-info"><strong>{selectedText}</strong><button type="button" disabled={busy} onClick={() => { setSelected(new Set(pages.map((page) => page.id))); lastSelectedIndex.current = null; lastGroupedSelection.current = null; }}>{t.all}</button><button type="button" onClick={resetSelection} disabled={busy || !selectedCount}>{t.none}</button></div>
                   <div className="page-action-buttons" data-testid="page-actions">
@@ -1125,7 +1165,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                 <p className="page-grid-help">{pageView === 'grouped' ? t.groupHint : t.dragHint}</p>
               </section>
             ) : (
-              <section className="split-panel" aria-label={t.splitTitle}>
+              <section className="split-panel" aria-label={t.splitTitle} role="tabpanel" id="workspace-panel-split" aria-labelledby="workspace-tab-split">
                 <div className="split-intro"><div className="split-graphic" aria-hidden="true">1–3 <span>→</span> 4–6</div><h3>{t.splitTitle}</h3><p>{t.splitHint}</p></div>
                 <div className="split-fields">
                   <label className="option-radio"><input type="radio" name="split-method" checked={splitMode === 'ranges'} disabled={busy} onChange={() => setSplitMode('ranges')} />{t.byRanges}</label>
