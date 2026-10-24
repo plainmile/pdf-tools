@@ -138,6 +138,24 @@ test('unclosed emphasis markers parse quickly without losing scientific notation
     'Bold and removed then literal *x*');
 });
 
+test('malformed HTML comments parse near-linearly, without losing literal source text', () => {
+  const malformed = '<!--'.repeat(12000);
+  const source = malformed + '\nFooter: **visible** and <strong>safe</strong> and `literal *text*`';
+  const start = performance.now();
+  const converted = stripMarkdownInline(source);
+  const elapsed = performance.now() - start;
+  assert.equal(converted, malformed + '\nFooter: visible and safe and literal *text*');
+  // Previously the global lazy HTML-comment regex repeatedly scanned each
+  // remaining opener (quadratic). 48 KB of pasted text took multiple seconds.
+  assert.ok(elapsed < 1800, 'Malformed HTML comments took ' + Math.round(elapsed) + ' ms');
+  assert.equal(stripMarkdownInline('Before <!-- hidden\non another line --> after <b>ok</b>'),
+    'Before  after ok');
+  assert.equal(stripMarkdownInline('Before <!-- unfinished <b>keep</b>'),
+    'Before <!-- unfinished keep');
+  assert.equal(stripMarkdownInline('alpha <!-- one --> beta <!-- two --> gamma'),
+    'alpha  beta  gamma');
+});
+
 test('Markdown code fences preserve trailing spaces and whitespace-only lines before PDF wrapping', () => {
   const input = [
     '```js',
