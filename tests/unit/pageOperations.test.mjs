@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, parsePageRanges,
-  chunkPageRanges, getRangePages, commitHistory, makeHistoryState, undoHistory, redoHistory,
+  chunkPageRanges, getRangePages, splitCoversAllPagesExactlyOnce, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
   reversePages, sortPagesByFilename, interleaveDuplexPages, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges, pageIdsForParity, invertPageIdSelection,
 } from '../../src/lib/pageOperations.mjs';
@@ -120,6 +120,21 @@ test('split explicit ranges and preserve workspace page order', () => {
 
 test('split into fixed-size chunks', () => {
   assert.deepEqual(chunkPageRanges(7, 3), [{start:1,end:3},{start:4,end:6},{start:7,end:7}]);
+});
+
+test('split downloads count as saved only when all current pages are covered exactly once', () => {
+  assert.equal(splitCoversAllPagesExactlyOnce(parsePageRanges('1-2,3-4', 4), 4), true);
+  assert.equal(splitCoversAllPagesExactlyOnce(parsePageRanges('3-4,1-2', 4), 4), true);
+  assert.equal(splitCoversAllPagesExactlyOnce(chunkPageRanges(7, 3), 7), true);
+  assert.equal(splitCoversAllPagesExactlyOnce([{ start: 1, end: 4 }], 4), true);
+  assert.equal(splitCoversAllPagesExactlyOnce(parsePageRanges('1-2,4', 4), 4), false);
+  assert.equal(splitCoversAllPagesExactlyOnce(parsePageRanges('1-3,3-4', 4), 4), false);
+  assert.equal(splitCoversAllPagesExactlyOnce([{ start: 0, end: 4 }], 4), false);
+  assert.equal(splitCoversAllPagesExactlyOnce([{ start: 1, end: 5 }], 4), false);
+  assert.equal(splitCoversAllPagesExactlyOnce([{ start: 3, end: 2 }], 4), false);
+  assert.equal(splitCoversAllPagesExactlyOnce([null], 4), false);
+  assert.equal(splitCoversAllPagesExactlyOnce([], 4), false);
+  assert.equal(splitCoversAllPagesExactlyOnce([{ start: 1, end: 1 }], 0), false);
 });
 
 test('localized page range punctuation is normalized but still validates bounds', () => {
