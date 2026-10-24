@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import { pageNumberPlacement } from './pageNumberGeometry.mjs';
 import {
   UTILITY_LIMITS, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, requestedPages, imageExportFilenames, parseTextBlocks, wrapTextLines, textContentToLines,
-  linesToReadableText, summarizeTextCoverage, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
+  linesToReadableText, textContentToReadingOrderLines, summarizeTextCoverage, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
   enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled,
 } from './utilityCore.mjs';
 
@@ -144,15 +144,18 @@ export async function compressPdfRaster(pdf, options = {}, reportProgress = () =
   } finally { await source.destroy(); }
 }
 
-export async function extractPdfText(pdf, markdown = false, reportProgress = () => {}, signal, onAudit = () => {}) {
+export async function extractPdfText(pdf, markdown = false, reportProgress = () => {}, signal, onAudit = () => {}, readingOrder = 'rows') {
   const document = await openPdfJs(pdf.bytes);
   const pages = [];
   try {
     for (let i = 1; i <= pdf.count; i++) {
       checkCancelled(signal);
       const page = await document.getPage(i);
-      try { pages.push(textContentToLines(await page.getTextContent())); }
-      finally { page.cleanup(); }
+      try {
+        const content = await page.getTextContent();
+        const viewport = readingOrder === 'rows' ? null : page.getViewport({ scale: 1 });
+        pages.push(textContentToReadingOrderLines(content, readingOrder, viewport));
+      } finally { page.cleanup(); }
       reportProgress(i, pdf.count);
     }
   } finally { await document.destroy(); }
