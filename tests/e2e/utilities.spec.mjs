@@ -592,6 +592,33 @@ test('English Markdown quotes, rules and numbered steps produce searchable PDF t
   expect(text).toContain('2. Second step');
 });
 
+test('Markdown links and nested code fences survive real PDF download and text extraction', async ({ page }) => {
+  await page.goto('/markdown-to-pdf/');
+  await page.getByTestId('utility-text').fill([
+    'Read [Docs](https://example.com/a_(b)).',
+    'Open [Manual](./guide.md "Read me").',
+    '![Diagram](https://example.com/chart.png)',
+    '````js',
+    '```',
+    'const answer = 42;',
+    '````',
+    'Body after code fence',
+  ].join('\n'));
+  const generated = await generateTextPdfAndDownload(page);
+  expect((await PDFDocument.load(generated.bytes)).getPageCount()).toBe(1);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, generated.bytes);
+  const output = await getDownload(page, () => page.getByTestId('utility-run').click());
+  const text = output.bytes.toString('utf8');
+  for (const snippet of [
+    'Docs (https://example.com/a_(b))',
+    'Manual (./guide.md)',
+    'Diagram (https://example.com/chart.png)',
+    'const answer = 42;',
+    'Body after code fence',
+  ]) expect(text).toContain(snippet);
+});
+
 test('Markdown technical comparisons survive an actual PDF download and TXT round-trip', async ({ page }) => {
   await page.goto('/markdown-to-pdf/');
   await page.getByTestId('utility-text').fill('Logic: a < 3 && b > 2\nBounds: x <= 40 && y >= 8\n**Safe** <strong>HTML</strong> text');
