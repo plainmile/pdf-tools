@@ -595,6 +595,29 @@ test('dragging multiple PDFs into a single-file converter explains rejection, pr
   expect(output.bytes.toString('utf8')).toContain('Original document');
 });
 
+test('English prose wraps at whole-word boundaries in actual selectable TXT and Markdown PDFs', async ({ page }) => {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const available = 595.28 - 46 * 2 - 4;
+  let prefix = 'W';
+  // Force a final word that fits alone but cannot fit on the current line.
+  while (font.widthOfTextAtSize(`${prefix} Verification`, 11) < available + 8) prefix += 'W';
+  expect(font.widthOfTextAtSize(prefix, 11)).toBeLessThan(available);
+  for (const inputRoute of ['/txt-to-pdf/', '/markdown-to-pdf/']) {
+    await page.goto(inputRoute);
+    await page.getByTestId('utility-text').fill(`${prefix} Verification follows`);
+    const generated = await generateTextPdfAndDownload(page);
+    expect((await PDFDocument.load(generated.bytes)).getPageCount()).toBe(1);
+    await page.goto('/pdf-to-txt/');
+    await upload(page, generated.bytes);
+    const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
+    const text = extracted.bytes.toString('utf8');
+    expect(text).toContain(prefix);
+    expect(text).toContain('Verification follows');
+    expect(text).not.toMatch(/Verifi\n|Ver\nification|Verificat\nion/);
+  }
+});
+
 test('English Markdown quotes, rules and numbered steps produce searchable PDF text', async ({ page }) => {
   await page.goto('/markdown-to-pdf/');
   await page.getByTestId('utility-text').fill('# Weekly report\n\n> Important notice\n\n---\n\n1. First step\n2) Second step');
