@@ -249,6 +249,18 @@ test('bulk reflow refuses an oversized retained workspace before committing any 
   assert.equal(unchanged[0].bytes.byteLength, 120 * MiB);
   const small = [{ isImage: false, bytes: new Uint8Array([1, 2, 3]) }];
   assert.deepEqual(await reflowImageSources(small, {}), small);
+  // A progress label that says "Updating photo X of Y" must not count PDF
+  // sources or photos whose layout is already current.
+  const layout = { paper: 'a4', orientation: 'portrait', margin: 30, imageSizing: 'contain' };
+  const noOpSources = [
+    { id: 'pdf', isImage: false, bytes: new Uint8Array([1]) },
+    { id: 'photo', isImage: true, bytes: new Uint8Array([2]),
+      originalImageBytes: new Uint8Array([3]), imageLayout: layout },
+  ];
+  const progress = [];
+  assert.deepEqual(await reflowImageSources(noOpSources, layout,
+    (done, total) => progress.push([done, total])), noOpSources);
+  assert.deepEqual(progress, []);
 });
 
 const SMALL_STATIC_AVIF_BASE64 = 'AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAADrbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAAAAAAAOcGl0bQAAAAAAAQAAAB5pbG9jAAAAAEQAAAEAAQAAAAEAAAETAAAANQAAAChpaW5mAAAAAAABAAAAGmluZmUCAAAAAAEAAGF2MDFDb2xvcgAAAABqaXBycAAAAEtpcGNvAAAAFGlzcGUAAAAAAAAACQAAAAcAAAAQcGl4aQAAAAADCAgIAAAADGF2MUOBAAwAAAAAE2NvbHJuY2x4AAEADQAGgAAAABdpcG1hAAAAAAAAAAEAAQQBAoMEAAAAPW1kYXQSAAoIGAyjNEBDQaEyJxTHh4ZlAgggnlVAAADLqtUprV8YScAKQg6O4/UNdK4pmP7BYE7WQA==';

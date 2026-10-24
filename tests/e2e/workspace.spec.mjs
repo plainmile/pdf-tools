@@ -1393,6 +1393,36 @@ test('one split range downloads a real PDF directly, not a ZIP', async ({ page }
   await expect(page.getByRole('button', { name: 'Download split PDFs (ZIP)' })).toBeEnabled();
 });
 
+test('full one-range split preserves the exact source bytes, but modified pages create a new PDF', async ({ page }) => {
+  const original = await PDFDocument.create();
+  original.setTitle('Original form and metadata');
+  const sheet = original.addPage([320, 425]);
+  const field = original.getForm().createTextField('recipient');
+  field.setText('Alice');
+  field.addToPage(sheet);
+  original.addPage([330, 425]);
+  const bytes = Buffer.from(await original.save());
+
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({ name: 'book.pdf', mimeType: 'application/pdf', buffer: bytes });
+  await expect(page.locator('.file-count')).toContainText('2 pages');
+  await page.getByRole('textbox', { name: 'Page ranges', exact: true }).fill('1-2');
+  const firstDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download PDF' }).click();
+  expect(Buffer.from(await readFile(await (await firstDownload).path())).equals(bytes)).toBe(true);
+
+  await page.getByRole('tab', { name: 'Organize' }).click();
+  await page.getByRole('button', { name: 'Select all' }).click();
+  await page.getByRole('button', { name: 'Rotate left' }).click();
+  await page.getByRole('tab', { name: 'Split' }).click();
+  const changedDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download PDF' }).click();
+  const changed = Buffer.from(await readFile(await (await changedDownload).path()));
+  expect(changed.equals(bytes)).toBe(false);
+  const changedPdf = await PDFDocument.load(changed);
+  expect(changedPdf.getPages().map(p => p.getRotation().angle)).toEqual([270, 270]);
+});
+
 test('Chinese single-result split by pages per PDF is a direct full PDF export', async ({ page }) => {
   await page.goto('/zh/split-pdf/');
   await page.getByTestId('file-input').setInputFiles({ name: 'three.pdf', mimeType: 'application/pdf', buffer: await makePdf([301, 302, 303]) });
