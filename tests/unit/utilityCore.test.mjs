@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline, wrapTextLines,
-  textContentToLines, textContentToReadingOrderLines, linesToReadableText, summarizeTextCoverage, textFitsUtf8Budget, sanitizeFilename, workspaceFilenameStem,
+  textContentToLines, textContentToReadingOrderLines, linesToReadableText, hasMinimalSelectableText, summarizeTextCoverage, textFitsUtf8Budget, sanitizeFilename, workspaceFilenameStem,
   UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageFilename, imageExportFilenames, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
 
@@ -313,17 +313,25 @@ test('PDF positioned text is approximately sorted by vertical position then X', 
   assert.equal(linesToReadableText([lines], false), 'left right\nlast');
   assert.match(linesToReadableText([[{text: 'Large title', fontSize: 24},{text: 'Body',fontSize: 12}]], true), /## Large title/);
 });
-test('partial PDF text extraction reports exactly the pages without selectable text', () => {
-  const allText = [{ text: 'A', fontSize: 12 }];
-  assert.deepEqual(summarizeTextCoverage([allText, [], allText, []]), {
-    total: 4, withText: 2, missingPages: [2, 4],
+test('coverage distinguishes truly empty pages from image-backed pages with only a number', () => {
+  const pageNumber = [{ text: '  Page 1 ', fontSize: 12 }];
+  const realText = [{ text: 'Readable body text on this PDF page', fontSize: 12 }];
+  assert.deepEqual(summarizeTextCoverage([pageNumber, [], realText, []], [1, 3]), {
+    total: 4, withText: 2, missingPages: [2, 4], suspectPages: [1],
   });
-  assert.deepEqual(summarizeTextCoverage([allText, allText]), {
-    total: 2, withText: 2, missingPages: [],
+  assert.deepEqual(summarizeTextCoverage([pageNumber, pageNumber]), {
+    total: 2, withText: 2, missingPages: [], suspectPages: [],
   });
   assert.deepEqual(summarizeTextCoverage([[], []]), {
-    total: 2, withText: 0, missingPages: [1, 2],
+    total: 2, withText: 0, missingPages: [1, 2], suspectPages: [],
   });
+  assert.deepEqual(summarizeTextCoverage([realText], [1]), {
+    total: 1, withText: 1, missingPages: [], suspectPages: [],
+  });
+  assert.equal(hasMinimalSelectableText([{ text: '1' }]), true);
+  assert.equal(hasMinimalSelectableText([{ text: '第 2 页' }]), true);
+  assert.equal(hasMinimalSelectableText([{ text: 'Text '.repeat(30) }]), false);
+  assert.equal(hasMinimalSelectableText([]), false);
 });
 
 test('generated download filename removes unsafe path characters and Windows device names', () => {
