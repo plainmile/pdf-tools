@@ -665,12 +665,13 @@ test('split output count over 50 is explained before download', async ({ page })
 
 test('105-page book downloads three separate, correctly numbered per-page ZIP batches', async ({ page }) => {
   test.setTimeout(120000);
-  await page.goto('/split-pdf/');
+  await page.goto('/workspace/');
   await page.getByTestId('file-input').setInputFiles({
     name: 'book-105.pdf', mimeType: 'application/pdf',
     buffer: await makePdf(Array.from({ length: 105 }, (_, i) => 300 + i)),
   });
   await expect(page.getByTestId('page-tile')).toHaveCount(105);
+  await page.getByRole('tab', { name: 'Split' }).click();
   await page.getByTestId('split-each-page').click();
   await expect(page.getByTestId('split-batch-prev')).toBeDisabled();
   for (const [batch, start, end] of [[1, 1, 50], [2, 51, 100], [3, 101, 105]]) {
