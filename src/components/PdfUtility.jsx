@@ -101,7 +101,7 @@ function PdfFirstPagePreview({ bytes, pageCount, t, locale, pageNumber = 1 }) {
   return <div className="utility-preview" data-testid="utility-pdf-preview">
     <strong>{t.previewTitle}</strong>
     <p className="utility-note">{pageNumber === 1 ? t.previewFirst.replace('{pages}', pageCount) : (locale === 'zh' ? `预览第 ${pageNumber} / ${pageCount} 页` : `Preview page ${pageNumber} of ${pageCount}`)}</p>
-    <canvas ref={canvasRef} role="img" aria-label={locale === 'zh' ? 'PDF 首页预览' : 'PDF first page preview'}
+    <canvas ref={canvasRef} role="img" aria-label={locale === 'zh' ? (pageNumber === 1 ? 'PDF 首页预览' : `PDF 第 ${pageNumber} 页预览`) : (pageNumber === 1 ? 'PDF first page preview' : `PDF page ${pageNumber} preview`)}
       style={{ maxWidth: '100%', height: 'auto', display: failed ? 'none' : 'block' }} />
     {failed && <p className="utility-note">{t.previewFailed}</p>}
   </div>;
@@ -555,7 +555,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         <p className="utility-note">{description}</p>
         {mode === 'add-page-numbers' && <p className="input-note" data-testid="number-first-page-hint">{t.firstPageHint}</p>}
         {mode === 'add-page-numbers' && <p className="utility-note" data-testid="page-overlap-warning">{t.overlap}</p>}
-        <div className="utility-actions"><button type="button" className="button button-primary" data-testid="utility-run" onClick={processFile} disabled={inputLocked || (isTextInput ? !sourceText.trim() : !pdf)}>{busy ? t.busy : isCompress ? t.start : isTextInput ? t.previewAction : t.run}{isTextInput || isCompress ? '' : ' ↓'}</button><span>{limitHint}</span></div>
+        <div className="utility-actions"><button type="button" className="button button-primary" data-testid="utility-run" onClick={processFile} disabled={inputLocked || (isTextInput ? !sourceText.trim() : !pdf)}>{busy ? t.busy : isCompress ? t.start : (isTextInput || mode === 'add-page-numbers') ? t.previewAction : t.run}{isTextInput || isCompress || mode === 'add-page-numbers' ? '' : ' ↓'}</button><span>{limitHint}</span></div>
         {busy && processing && <button type="button" className="button button-secondary" data-testid="utility-cancel" disabled={cancelling} onClick={() => { setCancelling(true); taskRef.current?.abort(); }}>{cancelling ? t.cancelling : t.cancel}</button>}
         {progress && (busy || notice) && <p className="utility-note" data-testid="utility-progress" aria-live="polite">{'packaging' in progress ? t.packaging.replace('{percent}', progress.packaging) : t.progressLabel.replace('{done}', progress.done).replace('{total}', progress.total)}</p>}
         {isCompress && output && <div className="utility-result" data-testid="compression-result">
@@ -574,12 +574,12 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         </div>}
         {mode === 'add-page-numbers' && output?.bytes && <div className="utility-result" data-testid="numbered-pdf-result">
           <p className="utility-note">{locale === 'zh' ? '预览的是生成后的 PDF，请核对页码与原有页脚是否重叠。' : 'This previews the generated PDF. Check that printed numbers do not overlap footers.'}</p>
-          <label>{locale === 'zh' ? '预览页面' : 'Preview page'}
+          <div className="utility-options"><label><span>{locale === 'zh' ? '预览页面' : 'Preview page'}</span>
             <select data-testid="number-preview-page" value={numberPreviewPage} onChange={event => setNumberPreviewPage(event.target.value)}>
               <option value="first">{locale === 'zh' ? '第一张编号页' : 'First numbered page'}</option>
               <option value="last">{locale === 'zh' ? '最后一页' : 'Last page'}</option>
             </select>
-          </label>
+          </label></div>
           <PdfFirstPagePreview bytes={output.bytes} pageCount={pdf.count} pageNumber={numberPreviewPage === 'last' ? pdf.count : Number(firstPage)} t={t} locale={locale} />
           <button type="button" className="button button-primary" data-testid="numbered-pdf-download" onClick={() => save(output)}>{t.downloadPdf} ↓</button>
         </div>}
