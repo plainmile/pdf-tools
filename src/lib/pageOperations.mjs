@@ -225,6 +225,48 @@ export function parsePageRanges(input, pageCount, maxRanges = 50) {
   });
 }
 
+/** Convert a visual set of cuts (AFTER each output page) to complete, ordered
+ * ranges. Nothing is omitted or duplicated, including on reordered workspaces.
+ * The existing 50-PDF safety ceiling also applies to visual split choices.
+ */
+export function splitRangesFromCuts(cutPages, pageCount, maxParts = 50) {
+  if (!Array.isArray(cutPages) || !Number.isSafeInteger(pageCount) ||
+      pageCount < 1 || pageCount > 600) throw new Error('Invalid split page count.');
+  const sorted = [...cutPages].sort((a, b) => a - b);
+  if (sorted.length + 1 > maxParts) throw new Error(`A maximum of ${maxParts} ranges is supported.`);
+  if (sorted.some((page, index) => !Number.isSafeInteger(page) ||
+      page < 1 || page >= pageCount || (index > 0 && page === sorted[index - 1]))) {
+    throw new Error('Invalid visual split position.');
+  }
+  let start = 1;
+  return [...sorted, pageCount].map(end => {
+    const part = start === end ? String(start) : `${start}-${end}`;
+    start = end + 1;
+    return part;
+  }).join(', ');
+}
+
+/** Visual cuts are meaningful only for a complete, consecutive partition.
+ * An intentionally partial, overlapping or out-of-order typed range is NOT
+ * silently rewritten by the visual editor; require explicit consent instead.
+ * null = custom/invalid input, [] = blank or full-document single range.
+ */
+export function splitCutsFromRanges(input, pageCount) {
+  if (typeof input !== 'string' || !Number.isSafeInteger(pageCount) || pageCount < 1) return null;
+  if (!input.trim()) return [];
+  let parts;
+  try { parts = parsePageRanges(input, pageCount); }
+  catch { return null; }
+  const cuts = [];
+  let next = 1;
+  for (const part of parts) {
+    if (part.start !== next) return null;
+    if (part.end < pageCount) cuts.push(part.end);
+    next = part.end + 1;
+  }
+  return next === pageCount + 1 ? cuts : null;
+}
+
 /** Select by the current EXPORT order rather than the source PDF page number.
  * Repeated/overlapping ranges are deduplicated, and validation is atomic.
  */
