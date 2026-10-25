@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline, wrapTextLines,
-  textContentToLines, textContentToReadingOrderLines, linesToReadableText, hasMinimalSelectableText, textLinesFromFormAnnotations, summarizeTextCoverage, textFitsUtf8Budget, sanitizeFilename, workspaceFilenameStem,
+  textContentToLines, textContentToReadingOrderLines, linesToReadableText, hasMinimalSelectableText, hasSparseTextScanRisk, textLinesFromFormAnnotations, summarizeTextCoverage, textFitsUtf8Budget, sanitizeFilename, workspaceFilenameStem,
   UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageFilename, imageExportFilenames, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
 
@@ -352,6 +352,24 @@ test('coverage distinguishes truly empty pages from image-backed pages with only
   assert.equal(hasMinimalSelectableText([{ text: '第 2 页' }]), true);
   assert.equal(hasMinimalSelectableText([{ text: 'Text '.repeat(30) }]), false);
   assert.equal(hasMinimalSelectableText([]), false);
+});
+
+test('scan risk considers short headers and longer page-labelled footers without flagging real body text', () => {
+  const footer = [{ text: 'Confidential archive / Page 21 of 240', fontSize: 9 }];
+  const short = [{ text: 'Private report 2026-10-25', fontSize: 9 }];
+  const actual = [{ text: 'A complete searchable paragraph of document text, rather than only a small footer.', fontSize: 12 }];
+  assert.equal(hasMinimalSelectableText(footer), false);
+  assert.equal(hasSparseTextScanRisk(footer), true);
+  assert.equal(hasSparseTextScanRisk(short), true);
+  assert.equal(hasSparseTextScanRisk(actual), false);
+  assert.equal(hasSparseTextScanRisk([]), false);
+  assert.equal(hasSparseTextScanRisk(Array.from({length: 4}, () => ({ text:'2026' }))), false);
+  assert.deepEqual(summarizeTextCoverage([footer, short, actual], [1,2,3]), {
+    total: 3, withText: 3, missingPages: [], suspectPages: [1,2],
+  });
+  assert.deepEqual(summarizeTextCoverage([footer], []), {
+    total: 1, withText: 1, missingPages: [], suspectPages: [],
+  });
 });
 
 test('generated download filename removes unsafe path characters and Windows device names', () => {

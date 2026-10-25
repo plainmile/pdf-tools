@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import { pageNumberPlacement } from './pageNumberGeometry.mjs';
 import {
   UTILITY_LIMITS, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, requestedPages, imageExportFilenames, parseTextBlocks, wrapTextLines, textContentToLines,
-  linesToReadableText, textContentToReadingOrderLines, hasMinimalSelectableText, textLinesFromFormAnnotations, summarizeTextCoverage, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
+  linesToReadableText, textContentToReadingOrderLines, hasSparseTextScanRisk, textLinesFromFormAnnotations, summarizeTextCoverage, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
   enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled,
 } from './utilityCore.mjs';
 
@@ -277,7 +277,7 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
         // PDF.js text layers can contain only a page number while an image
         // holds the real document body. Only inspect drawing operators on
         // sparse pages; avoid this extra work on ordinary searchable books.
-        if (hasMinimalSelectableText(lines)) {
+        if (hasSparseTextScanRisk(lines)) {
           if (!imagePaintOps) {
             const { OPS } = await import('pdfjs-dist/legacy/build/pdf.mjs');
             imagePaintOps = new Set([
