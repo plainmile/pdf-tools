@@ -36,6 +36,26 @@ export function readFileArrayBuffer(file, signal = null) {
   });
 }
 
+/** Release the UI on Cancel even if a third-party PDF worker does not settle
+ * its promise promptly. The caller also destroys the underlying loading task.
+ */
+export function abortableWait(promise, signal = null) {
+  checkCancelled(signal);
+  if (!signal) return Promise.resolve(promise);
+  return new Promise((resolve, reject) => {
+    const cleanup = () => signal.removeEventListener('abort', abort);
+    const abort = () => {
+      cleanup();
+      reject(new Error('Processing cancelled.'));
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    Promise.resolve(promise).then(
+      value => { cleanup(); if (signal.aborted) reject(new Error('Processing cancelled.')); else resolve(value); },
+      error => { cleanup(); reject(error); },
+    );
+  });
+}
+
 export async function loadPdf(file, mode = 'pdf-to-txt', locale = 'en', signal = null) {
   if (!file || (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf')) {
     throw new Error(locale === 'zh' ? '请选择 PDF 文件。' : 'Choose a PDF file.');
@@ -75,7 +95,7 @@ async function openPdfJs(bytes, signal = null) {
   signal?.addEventListener('abort', abort, { once: true });
   if (signal?.aborted) abort();
   try {
-    const proxy = await loadingTask.promise;
+    const proxy = await abortableWait(loadingTask.promise, signal);
     checkCancelled(signal);
     return {
       count: proxy.numPages,
@@ -88,8 +108,12 @@ async function openPdfJs(bytes, signal = null) {
     };
   } catch (error) {
     signal?.removeEventListener('abort', abort);
+    if (signal?.aborted) {
+      // Do not await an already-stalled worker during cancellation. A destroy
+      // was scheduled by the abort handler; the UI can recover immediately.
+      checkCancelled(signal);
+    }
     await loadingTask.destroy().catch(() => {});
-    checkCancelled(signal);
     throw error;
   }
 }
