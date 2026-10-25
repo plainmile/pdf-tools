@@ -1442,6 +1442,24 @@ test('visual cut indices use CURRENT reordered output pages, not source page num
   expect(part2.getPages().map(p => p.getWidth())).toEqual([300,320]);
 });
 
+test('Chinese mobile visual split uses accessible buttons without horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: '中文拆分.pdf', mimeType: 'application/pdf', buffer: await makePdf([300,310,320,330]),
+  });
+  await page.getByTestId('visual-split-panel').locator('summary').click();
+  const button = page.getByRole('button', { name: '切换输出第 2 页后的拆分点' });
+  await button.click();
+  await expect(button).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('textbox', { name: '页码范围' })).toHaveValue('1-2, 3-4');
+  const size = await page.evaluate(() => ({
+    content: document.documentElement.scrollWidth,
+    visible: document.documentElement.clientWidth,
+  }));
+  expect(size.content).toBeLessThanOrEqual(size.visible + 2);
+});
+
 test('one split range downloads a real PDF directly, not a ZIP', async ({ page }) => {
   await loadInput(page);
   await page.getByRole('tab', { name: 'Split' }).click();
