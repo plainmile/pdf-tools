@@ -8,7 +8,7 @@ test('cancellation releases a hung PDF worker promise without waiting for it', a
   const operation = abortableWait(neverResolves, controller.signal);
   controller.abort();
   await assert.rejects(operation, /Processing cancelled/);
-  await assert.rejects(abortableWait(neverResolves, controller.signal), /Processing cancelled/);
+  assert.throws(() => abortableWait(neverResolves, controller.signal), /Processing cancelled/);
 });
 
 test('abortable worker wait still returns real results and errors normally', async () => {
