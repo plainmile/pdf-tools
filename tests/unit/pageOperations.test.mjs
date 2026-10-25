@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, parsePageRanges,
-  chunkPageRanges, splitSinglePageBatch, getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, commitHistory, makeHistoryState, undoHistory, redoHistory,
+  chunkPageRanges, splitChunkBatch, splitSinglePageBatch, getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
   reversePages, sortPagesByFilename, interleaveDuplexPages, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges, pageIdsForParity, invertPageIdSelection,
 } from '../../src/lib/pageOperations.mjs';
@@ -146,6 +146,43 @@ test('per-page batches partition up to 600 current output pages without overlap 
   for (const [count, index] of [[0, 0], [601, 0], [NaN, 0], [51, -1], [51, 2], [51, 0.5]]) {
     assert.throws(() => splitSinglePageBatch(count, index));
   }
+});
+
+test('every-N split batches cover all current pages without overlaps, including incomplete final PDFs', () => {
+  for (const count of [1, 50, 51, 101, 105, 200, 201, 319, 600]) {
+    for (const size of [1, 2, 3, 4, 7, 12, 50, 99, 600].filter(n => n <= count)) {
+      const outputCount = Math.ceil(count / size);
+      const batchCount = Math.ceil(outputCount / 50);
+      const batches = Array.from({ length: batchCount },
+        (_, index) => splitChunkBatch(count, size, index));
+      const parts = batches.flatMap(batch => batch.parts);
+      assert.equal(parts.length, outputCount, count + '/' + size + ' output count');
+      assert.ok(batches.every(batch => batch.total === batchCount && batch.parts.length <= 50));
+      assert.deepEqual(parts.map(part => part.start), parts.map((_, i) => i * size + 1));
+      assert.deepEqual(parts.map(part => part.end), parts.map((part, i) => Math.min(count, (i + 1) * size)));
+      assert.ok(parts.every(part => part.end - part.start + 1 <= size));
+      assert.equal(batches[0].start, 1);
+      assert.equal(batches.at(-1).end, count);
+      assert.equal(splitCoversAllPagesExactlyOnce(parts, count), true);
+      if (batchCount > 1) {
+        assert.ok(batches.every(batch => !splitCoversAllPagesExactlyOnce(batch.parts, count)));
+      }
+    }
+  }
+  assert.deepEqual(splitChunkBatch(105, 2, 1), {
+    index: 1, total: 2, start: 101, end: 105,
+    parts: [{ start: 101, end: 102 }, { start: 103, end: 104 }, { start: 105, end: 105 }],
+  });
+  assert.deepEqual(splitChunkBatch(201, 4, 1), {
+    index: 1, total: 2, start: 201, end: 201,
+    parts: [{ start: 201, end: 201 }],
+  });
+  assert.equal(splitChunkBatch(600, 2, 5).parts.length, 50);
+  for (const [count, size, index] of [
+    [0, 1, 0], [601, 1, 0], [105, 0, 0], [105, -2, 0],
+    [105, 106, 0], [105, 2.5, 0], [105, 2, -1],
+    [105, 2, 2], [105, 2, 0.5], [NaN, 2, 0],
+  ]) assert.throws(() => splitChunkBatch(count, size, index));
 });
 
 test('split downloads count as saved only when all current pages are covered exactly once', () => {

@@ -8,7 +8,7 @@ import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLay
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
-  movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges, splitSinglePageBatch,
+  movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges, splitChunkBatch,
   getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
@@ -224,21 +224,26 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const navigationWouldLoseWork = recoverableDeletedPages ||
     Boolean(pages.length && documentRevision !== lastDownloadedRevision);
   const splitNeedsInput = splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim();
-  // Long PDFs export at most 50 single-page PDFs per explicit download.
-  // Recalculate valid bounds if a delete/undo/import changes page count.
-  const safeSplitBatchIndex = Math.min(splitBatchIndex, Math.max(0, Math.ceil(pages.length / 50) - 1));
+  // Every-N splitting behaves consistently whether N=1 or N=2, 3, etc.
+  // Above 50 output PDFs, page-aligned batches keep each download bounded.
+  const chunkSizeNumber = Number(chunkSize);
+  const chunkOutputCount = splitMode === 'chunks' &&
+    Number.isSafeInteger(chunkSizeNumber) && chunkSizeNumber >= 1 && chunkSizeNumber <= pages.length
+    ? Math.ceil(pages.length / chunkSizeNumber) : 0;
+  const chunkBatchCount = chunkOutputCount > 50 ? Math.ceil(chunkOutputCount / 50) : 1;
+  const safeSplitBatchIndex = Math.min(splitBatchIndex, chunkBatchCount - 1);
   const splitPlan = useMemo(() => {
     if (!pages.length || splitNeedsInput) return null;
     try {
-      const batch = splitMode === 'chunks' && Number(chunkSize) === 1 && pages.length > 50
-        ? splitSinglePageBatch(pages.length, safeSplitBatchIndex) : null;
+      const batch = splitMode === 'chunks' && chunkOutputCount > 50
+        ? splitChunkBatch(pages.length, chunkSizeNumber, safeSplitBatchIndex) : null;
       const parts = splitMode === 'ranges'
         ? parsePageRanges(ranges, pages.length)
-        : batch ? batch.parts : chunkPageRanges(pages.length, Number(chunkSize));
+        : batch ? batch.parts : chunkPageRanges(pages.length, chunkSizeNumber);
       const coverage = splitCoverageDetails(parts, pages.length);
       return coverage ? { parts, coverage, batch } : null;
     } catch (_error) { return null; }
-  }, [pages.length, splitMode, ranges, chunkSize, safeSplitBatchIndex, splitNeedsInput]);
+  }, [pages.length, splitMode, ranges, chunkSizeNumber, chunkOutputCount, safeSplitBatchIndex, splitNeedsInput]);
   const splitEstimate = splitPlan?.parts.length ?? null;
   // Preserve custom, partial or overlapping manual ranges until user explicitly
   // approves replacing them. Visual cuts always cover current export order.
@@ -506,6 +511,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     const newRef = { id: temporaryWorkspaceId(), sourceId: blank.id, pageIndex: 0, rotation: 0 };
     setSources(previous => [...previous, blank]);
     setHistory(previous => commitHistory(previous, insertPageAfter(previous.present, afterIndex, newRef)));
+    setSplitBatchIndex(0); // Appending or inserting changes every-N output boundaries.
     resetSelection();
     setNotice(t.blankInserted);
   });
@@ -1029,7 +1035,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
             <button type="button" className="button button-primary" disabled={busy || pendingReimportCount > 0} onClick={() => inputRef.current?.click()}>{busy ? t.opening : t.choose}</button>
             <p className="drop-limits">{t.limits}</p><div className="empty-privacy">✓ {t.private}</div>
             {sources.length > 0 && <p className="utility-note" data-testid="empty-history-hint">{t.emptyHistoryHint}</p>}
-            {history.past.length > 0 && <button type="button" className="button button-secondary button-small" data-testid="undo-all-deleted" disabled={busy || pendingReimportCount > 0} onClick={() => { setHistory(undoHistory); resetSelection(); setError(''); setNotice(''); }}>{t.undo}</button>}
+            {history.past.length > 0 && <button type="button" className="button button-secondary button-small" data-testid="undo-all-deleted" disabled={busy || pendingReimportCount > 0} onClick={() => { setHistory(undoHistory); setSplitBatchIndex(0); resetSelection(); setError(''); setNotice(''); }}>{t.undo}</button>}
             {sources.length > 0 && <button type="button" className="button button-secondary button-small" onClick={() => setClearConfirm(true)} disabled={busy || pendingReimportCount > 0}>{t.reset}</button>}
           </div>
         ) : (
@@ -1037,8 +1043,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
             <div className="workspace-subbar">
               <div className="file-count" data-retained-bytes={bytesInMemory}><strong>{locale === 'zh' ? `${pages.length} 页` : `${pages.length} ${pages.length === 1 ? 'page' : 'pages'}`}</strong><span>{locale === 'zh' ? ` · 来自 ${activeSourceCount} 个文件` : ` from ${activeSourceCount} ${activeSourceCount === 1 ? 'file' : 'files'}`}</span></div>
               <div className="history-buttons">
-                <button type="button" disabled={!history.past.length || busy} onClick={() => { setHistory(undoHistory); resetSelection(); }} aria-label={t.undo} title={t.undo}>↶ {t.undo}</button>
-                <button type="button" disabled={!history.future.length || busy} onClick={() => { setHistory(redoHistory); resetSelection(); }} aria-label={t.redo} title={t.redo}>↷ {t.redo}</button>
+                <button type="button" disabled={!history.past.length || busy} onClick={() => { setHistory(undoHistory); setSplitBatchIndex(0); resetSelection(); }} aria-label={t.undo} title={t.undo}>↶ {t.undo}</button>
+                <button type="button" disabled={!history.future.length || busy} onClick={() => { setHistory(redoHistory); setSplitBatchIndex(0); resetSelection(); }} aria-label={t.redo} title={t.redo}>↷ {t.redo}</button>
                 <button type="button" disabled={busy} className="muted-danger" onClick={() => setClearConfirm(true)}>{t.clear}</button>
               </div>
             </div>
