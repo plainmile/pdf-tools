@@ -106,6 +106,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   // synchronously carries the whole selected page group across that turn.
   const draggedPageIdsRef = useRef(null);
   const pageGridRef = useRef(null);
+  const splitVisualGridRef = useRef(null);
   const previewDocuments = useRef(new Map());
   const splitAbortRef = useRef(null);
   const exportAbortRef = useRef(null);
@@ -150,6 +151,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [ranges, setRanges] = useState('');
   const [chunkSize, setChunkSize] = useState('');
   const [splitBatchIndex, setSplitBatchIndex] = useState(0);
+  const [splitBatchDownloads, setSplitBatchDownloads] = useState({ key: null, indices: [] });
+  const [splitVisualJumpInput, setSplitVisualJumpInput] = useState('');
   const [pendingVisualCut, setPendingVisualCut] = useState(null);
   const [visualSplitOpen, setVisualSplitOpen] = useState(false);
   // A cut can be clicked deep inside a long scrollable preview grid. If the
@@ -231,6 +234,14 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     Number.isSafeInteger(chunkSizeNumber) && chunkSizeNumber >= 1 && chunkSizeNumber <= pages.length
     ? Math.ceil(pages.length / chunkSizeNumber) : 0;
   const chunkBatchCount = chunkOutputCount > 50 ? Math.ceil(chunkOutputCount / 50) : 1;
+  // A download request is not proof that the browser saved the file. Keep
+  // progress scoped to an exact page revision and split plan, in memory only.
+  // Never clear the unsaved-work guard merely because some/all batches ran.
+  const splitBatchKey = splitMode === 'chunks' && chunkOutputCount > 50
+    ? JSON.stringify([documentRevision, chunkSizeNumber, chunkOutputCount, outputBase]) : null;
+  useEffect(() => {
+    setSplitBatchDownloads({ key: null, indices: [] });
+  }, [splitBatchKey]);
   const safeSplitBatchIndex = Math.min(splitBatchIndex, chunkBatchCount - 1);
   const splitPlan = useMemo(() => {
     if (!pages.length || splitNeedsInput) return null;
@@ -245,6 +256,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     } catch (_error) { return null; }
   }, [pages.length, splitMode, ranges, chunkSizeNumber, chunkOutputCount, safeSplitBatchIndex, splitNeedsInput]);
   const splitEstimate = splitPlan?.parts.length ?? null;
+  const requestedSplitBatchIndices = splitBatchKey && splitBatchDownloads.key === splitBatchKey
+    ? new Set(splitBatchDownloads.indices) : new Set();
+  const nextUnrequestedSplitBatch = splitPlan?.batch
+    ? Array.from({ length: splitPlan.batch.total }, (_, index) => index)
+      .find(index => !requestedSplitBatchIndices.has(index))
+    : undefined;
   // Preserve custom, partial or overlapping manual ranges until user explicitly
   // approves replacing them. Visual cuts always cover current export order.
   const visualCuts = splitMode === 'ranges' && pages.length
@@ -256,8 +273,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       setSplitMode('ranges');
       setPendingVisualCut(null);
       setError(''); setNotice('');
-    } catch {
-      setError(t.invalidRange);
+    } catch (reason) {
+      setError(/maximum of 50 ranges/i.test(String(reason?.message))
+        ? t.visualSplitMaxCuts : t.invalidRange);
       setNotice('');
     }
   };
@@ -354,6 +372,24 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     if (pageView !== 'order') setPageView('order');
   };
 
+  const jumpToVisualSplitPage = (event) => {
+    event.preventDefault();
+    if (busy || !visualSplitOpen || !pages.length) return;
+    const value = splitVisualJumpInput.trim().normalize('NFKC');
+    const number = Number(value);
+    if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(number) || number > pages.length) {
+      setError(interpolate(t.jumpInvalid, { pages: pages.length }));
+      setNotice('');
+      return;
+    }
+    const tile = splitVisualGridRef.current?.querySelector('[data-export-position="' + number + '"]');
+    if (!tile) return;
+    tile.scrollIntoView({ behavior: 'auto', block: 'center' });
+    tile.focus({ preventScroll: true });
+    setError('');
+    setNotice(interpolate(t.jumpFound, { n: number }));
+  };
+
   const resetSelection = () => { setSelected(new Set()); lastSelectedIndex.current = null; lastGroupedSelection.current = null; };
   const commit = (operation, preserveSelection = false) => {
     setHistory((previous) => commitHistory(previous, operation(previous.present)));
@@ -437,6 +473,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         setRanges('');
         setChunkSize('');
         setSplitBatchIndex(0);
+        setSplitVisualJumpInput('');
         setPendingVisualCut(null);
         setSplitMode('ranges');
         setDownloadNameInput('');
@@ -583,6 +620,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     if (!splitPlan?.parts.length) throw new Error(t.invalidRange);
     const pieces = splitPlan.parts;
     const batch = splitPlan.batch;
+    const markBatchRequested = () => {
+      if (!batch || !splitBatchKey) return;
+      setSplitBatchDownloads(previous => ({
+        key: splitBatchKey,
+        indices: [...new Set([...(previous.key === splitBatchKey ? previous.indices : []), batch.index])],
+      }));
+    };
     // A single per-page ZIP batch intentionally covers only its displayed
     // page range. It must NEVER mark the full edited workspace as downloaded.
     const completeSplit = !batch && splitCoversAllPagesExactlyOnce(pieces, pages.length);
@@ -611,6 +655,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         size = enforceSplitZipBudget(size, contents.length);
         if (!zip) {
           saveDownload(contents, `${outputBase}-pages-${range.start}-${range.end}.pdf`);
+          markBatchRequested();
           // A one-piece export covering the entire edited workspace is
           // equivalent to Export PDF; don't warn about work already saved.
           if (completeSplit) setLastDownloadedRevision(documentRevision);
@@ -638,6 +683,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       if (controller.signal.aborted) throw new Error('Split cancelled.');
       saveDownload(archive, batch
         ? `${outputBase}-pages-${batch.start}-${batch.end}-split.zip` : `${outputBase}-split.zip`, 'application/zip');
+      markBatchRequested();
       if (completeSplit) setLastDownloadedRevision(documentRevision);
       setNotice(batch
         ? interpolate(batch.index + 1 === batch.total ? t.splitFinalBatchDownloaded : t.splitBatchDownloaded,
@@ -764,7 +810,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
     setPageView('order'); setCollapsedSources(new Set());
     setLastDownloadedRevision(null);
-    setRanges(''); setChunkSize(''); setSplitBatchIndex(0); setSplitMode('ranges'); setPendingVisualCut(null);
+    setRanges(''); setChunkSize(''); setSplitBatchIndex(0); setSplitMode('ranges'); setSplitVisualJumpInput(''); setPendingVisualCut(null);
     setSelectionRanges(''); setMoveTargetInput(''); setMovePlacement('before'); setDownloadNameInput(''); setJumpInput(''); setPendingJump(null);
     // A fresh image-to-PDF workspace must not inherit a previous crop choice.
     setImageLayout({ ...IMAGE_PDF_LAYOUT_DEFAULT });
@@ -1305,12 +1351,37 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                         {t.splitBatchNext}
                       </button>
                     </div>
+                    <p className="input-note" data-testid="split-batch-progress" role="status">{interpolate(t.splitBatchProgress, {
+                      done: requestedSplitBatchIndices.size, total: splitPlan.batch.total,
+                    })}</p>
+                    {requestedSplitBatchIndices.has(safeSplitBatchIndex) &&
+                      <p className="input-note" data-testid="split-batch-current-requested">{t.splitBatchCurrentRequested}</p>}
+                    {nextUnrequestedSplitBatch === undefined &&
+                      <p className="input-note" data-testid="split-batch-all-requested">{t.splitBatchAllRequested}</p>}
+                    {nextUnrequestedSplitBatch !== undefined && nextUnrequestedSplitBatch !== safeSplitBatchIndex &&
+                      <button type="button" className="button button-secondary button-small"
+                        data-testid="split-batch-go-pending" disabled={busy}
+                        onClick={() => { setSplitBatchIndex(nextUnrequestedSplitBatch); setError(''); setNotice(''); }}>
+                        {t.splitBatchGoPending}
+                      </button>}
                     <p className="input-note">{t.splitBatchWarning}</p>
                   </div>}
                   {pages.length > 1 && <details className="split-visual-panel" data-testid="visual-split-panel"
                     open={visualSplitOpen} onToggle={event => setVisualSplitOpen(event.currentTarget.open)}>
                     <summary>{t.visualSplitToggle}</summary>
                     <p className="input-note">{t.visualSplitHint}</p>
+                    {visualSplitOpen && <form className="page-jump-form split-visual-jump-form"
+                      data-testid="split-visual-jump-form" onSubmit={jumpToVisualSplitPage}>
+                      <label htmlFor="visual-split-jump">{interpolate(t.jumpLabel, { pages: pages.length })}
+                        <input id="visual-split-jump" type="text" inputMode="numeric" maxLength={8}
+                          data-testid="split-visual-jump-input" value={splitVisualJumpInput}
+                          disabled={busy} placeholder="137"
+                          onChange={event => setSplitVisualJumpInput(event.target.value)} />
+                      </label>
+                      <button type="submit" className="button button-secondary button-small"
+                        data-testid="split-visual-jump-submit" disabled={busy || !splitVisualJumpInput.trim()}>{t.jumpAction}</button>
+                      <p className="input-note">{t.visualSplitJumpHint}</p>
+                    </form>}
                     {visualCuts?.length > 0 && splitMode === 'ranges' &&
                       <button type="button" className="button button-secondary button-small"
                         data-testid="visual-split-clear" disabled={busy}
@@ -1333,13 +1404,14 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                           }}>{t.visualSplitReplace}</button>
                       </div>
                     </div>}
-                    {visualSplitOpen && <div className="split-visual-grid" data-testid="visual-split-grid">
+                    {visualSplitOpen && <div className="split-visual-grid" data-testid="visual-split-grid" ref={splitVisualGridRef}>
                       {pages.map((pageRef, index) => {
                         const afterPage = index + 1;
                         const isCut = Boolean(visualCuts?.includes(afterPage) && splitMode === 'ranges');
                         const source = sourceLookup.get(pageRef.sourceId);
                         return <div className={'split-visual-tile' + (isCut ? ' is-cut' : '')}
-                          key={pageRef.id} data-testid="visual-split-page"
+                          key={pageRef.id} data-testid="visual-split-page" tabIndex={-1}
+                           role="group" aria-label={interpolate(t.visualSplitPage, { n: afterPage })}
                           data-export-position={afterPage}>
                           <span className="split-visual-number">
                             {interpolate(t.visualSplitPage, { n: afterPage })}
