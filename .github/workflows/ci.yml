@@ -89,10 +89,12 @@ jobs:
               cd /tmp/pdf-e2e
               npm init -y >/dev/null
               npm install --no-audit --no-fund @playwright/test@1.55.0 pdf-lib@1.17.1 jszip@3.10.1
+              # Fail fast on Safari/Firefox incompatibility before running the
+              # longer full Chromium suite; both remain mandatory for merge.
+              echo "=== Firefox and WebKit PDF workflow regression ==="
+              PDF_BASE_URL=http://127.0.0.1:18081 npx playwright test --config=playwright.cross-browser.config.mjs
               echo "=== Full Chromium E2E ==="
               PDF_BASE_URL=http://127.0.0.1:18081 npx playwright test
-              echo "=== Firefox and WebKit PDF workflow smoke ==="
-              PDF_BASE_URL=http://127.0.0.1:18081 npx playwright test --config=playwright.cross-browser.config.mjs
             '
       - name: Cleanup
         if: always()
