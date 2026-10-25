@@ -94,8 +94,10 @@ test('page number margins visibly move printed numbers on rotated and cropped pa
 });
 
 test('wide numbering margin fails safely on tiny PDFs and retains the prior generated result', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/zh/add-page-numbers/');
-  await upload(page, await fixture(1, [100, 100]));
+  // A 90pt crop fits a narrow 12pt inset but cannot fit 40pt either side.
+  await upload(page, await fixture(1, [90, 100]));
   await page.getByRole('combobox', { name: '页码位置' }).selectOption('bottom-right');
   await page.getByTestId('number-margin').selectOption('12');
   await page.getByTestId('utility-run').click();
@@ -110,4 +112,6 @@ test('wide numbering margin fails safely on tiny PDFs and retains the prior gene
   expect((await PDFDocument.load(retained)).getPageCount()).toBe(1);
   await page.getByTestId('number-margin').selectOption('12');
   await expect(page.getByTestId('numbered-result-stale')).toHaveCount(0);
+  const widths = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+  expect(widths.scroll).toBeLessThanOrEqual(widths.client + 2);
 });
