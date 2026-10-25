@@ -1252,6 +1252,17 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); }} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
                   <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} placeholder="5" onChange={(event) => setChunkSize(event.target.value)} disabled={splitMode !== 'chunks' || busy} />
+                  <div className="split-quick-action">
+                    <button type="button" className="button button-secondary button-small"
+                      data-testid="split-each-page" aria-pressed={splitMode === 'chunks' && chunkSize === '1'}
+                      disabled={busy || pages.length > 50}
+                      onClick={() => { setSplitMode('chunks'); setChunkSize('1'); setPendingVisualCut(null); setError(''); setNotice(''); }}>
+                      {t.eachPagePreset}
+                    </button>
+                    {pages.length > 50 && <p className="input-note" data-testid="split-each-page-limit">
+                      {interpolate(t.eachPageLimit, { pages: pages.length, minimum: Math.ceil(pages.length / 50) })}
+                    </p>}
+                  </div>
                   {pages.length > 1 && <details className="split-visual-panel" data-testid="visual-split-panel"
                     open={visualSplitOpen} onToggle={event => setVisualSplitOpen(event.currentTarget.open)}>
                     <summary>{t.visualSplitToggle}</summary>

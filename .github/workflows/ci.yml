@@ -2,7 +2,6 @@ name: PDF Tools CI
 on:
   push:
     branches:
-      - 'feature/**'
       - main
   pull_request:
     branches:
@@ -10,7 +9,10 @@ on:
 permissions:
   contents: read
 
-# Feature push and PR events may coincide. Keep only the latest run per branch.
+# A feature branch with an open PR gets its CI from pull_request, not a
+# simultaneous push run. Two same-named checks on one SHA (one cancelled) can
+# make GitHub Rulesets reject merges even when the PR E2E check succeeds.
+# Keep only the latest PR run for each feature branch.
 concurrency:
   group: pdf-tools-ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true

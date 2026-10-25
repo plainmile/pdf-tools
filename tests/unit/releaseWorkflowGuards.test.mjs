@@ -34,6 +34,15 @@ test('production and CI must install a real committed npm v3 lockfile, not float
   assert.doesNotMatch(ci, /else npm install/);
 });
 
+test('PR CI has exactly one required check per feature SHA; main push still runs release gate', () => {
+  const yaml = readWorkflow('ci.yml');
+  const trigger = yaml.split(/^permissions:/m)[0];
+  assert.match(trigger, /on:\s*\n  push:\s*\n    branches:\s*\n      - main\s*\n  pull_request:\s*\n    branches:\s*\n      - main/);
+  assert.doesNotMatch(trigger, /feature\/\*\*/);
+  assert.match(yaml, /test-build-e2e:/);
+  assert.match(yaml, /cancel-in-progress: true/);
+});
+
 test('only main-branch CI can trigger an image publish workflow run', () => {
   const yaml = readWorkflow('publish.yml');
   const trigger = yaml.split(/^permissions:/m)[0];
@@ -44,6 +53,18 @@ test('only main-branch CI can trigger an image publish workflow run', () => {
   assert.match(yaml, /workflow_run\.event == 'push'/);
   assert.match(yaml, /workflow_run\.head_branch == 'main'/);
   assert.match(yaml, /github\.sha == github\.event\.workflow_run\.head_sha/);
+});
+
+test('image publication serializes the mutable latest tag and rechecks main after queuing', () => {
+  const yaml = readWorkflow('publish.yml');
+  assert.match(yaml, /concurrency:\s*\n(?:\s*#.*\n)*\s+group: pdf-tools-publish-main\s*\n\s+cancel-in-progress: false/);
+  assert.match(yaml, /id: main-head/);
+  assert.match(yaml, /repos\/plainmile\/pdf-tools\/branches\/main/);
+  assert.match(yaml, /jq -er '\.commit\.sha'/);
+  assert.match(yaml, /if \[ "\$current_sha" = "\$EXPECTED_SHA" \]/);
+  assert.match(yaml, /current=false/);
+  assert.match(yaml, /- name: Docker login\n\s+if: steps\.main-head\.outputs\.current == 'true'/);
+  assert.match(yaml, /- name: Publish commit-pinned image\n\s+if: steps\.main-head\.outputs\.current == 'true'/);
 });
 
 test('only main-branch Publish Image completion can trigger deployment', () => {
