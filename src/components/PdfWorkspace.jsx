@@ -110,6 +110,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const splitAbortRef = useRef(null);
   const exportAbortRef = useRef(null);
   const layoutAbortRef = useRef(null);
+  const importAbortRef = useRef(null);
   const visualConfirmRef = useRef(null);
   const [sources, setSources] = useState([]);
   const [history, setHistory] = useState(() => makeHistoryState());
@@ -122,6 +123,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [previewPageId, setPreviewPageId] = useState(null);
   const [downloadNameInput, setDownloadNameInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importCancelling, setImportCancelling] = useState(false);
   // `setBusy` is a UI update, not a lock. Same-tick file drops can both read
   // stale busy=false and individually pass limits before either import finishes.
   const busyRef = useRef(false);
@@ -291,7 +294,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     }
     previewDocuments.current.clear();
   }, []);
-  useEffect(() => () => { splitAbortRef.current?.abort(); exportAbortRef.current?.abort(); layoutAbortRef.current?.abort(); releasePreviewDocuments(); }, [releasePreviewDocuments]);
+  useEffect(() => () => { splitAbortRef.current?.abort(); exportAbortRef.current?.abort(); layoutAbortRef.current?.abort(); importAbortRef.current?.abort(); releasePreviewDocuments(); }, [releasePreviewDocuments]);
 
   // The 20-step history cap must also cap retained source bytes. Otherwise a
   // deleted PDF or photo that can no longer be restored remains in sources and
@@ -369,6 +372,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     const items = [...(incoming ?? [])];
     if (!items.length || busyRef.current || pendingReimportRef.current) return;
     busyRef.current = true; // Reserve synchronously before awaiting file bytes.
+    const controller = new AbortController();
+    importAbortRef.current = controller;
+    setImporting(true); setImportCancelling(false);
     setError(''); setNotice(''); setClearConfirm(false); setBusy(true);
     // Once every page has been deleted, a successful new import starts a fresh
     // workspace. Keep the old undo history intact until that import succeeds.
@@ -388,7 +394,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       // the true retained size (PDF + original photo for undo/reflow).
       let additionalRetainedBytes = 0;
       for (const file of items) {
-        const source = await readSourceFile(file, { imageLayout });
+        if (controller.signal.aborted) throw new Error('Processing cancelled.');
+        const source = await readSourceFile(file, { imageLayout, signal: controller.signal });
+        if (controller.signal.aborted) throw new Error('Processing cancelled.');
         if (pages.length + nextPages.length + source.pageCount > LIMITS.maxPages) throw new Error(interpolate(t.errorPages, { n: LIMITS.maxPages }));
         additionalRetainedBytes += retainedSourceBytes(source);
         if ((replacingDeletedPages ? 0 : bytesInMemory) + additionalRetainedBytes > LIMITS.maxCombinedBytes) {
@@ -403,6 +411,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       // Undo. An invalid replacement should fail immediately and leave the old
       // recovery state intact. Store only File handles (not another 200 MiB of
       // parsed PDFs) while the decision is open; revalidate on confirmation.
+      if (controller.signal.aborted) throw new Error('Processing cancelled.');
       if (replacingDeletedPages && recoverableDeletedPages && !confirmedReimport) {
         pendingReimportRef.current = items;
         setPendingReimportCount(items.length);
@@ -435,8 +444,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         ? `Added ${nextSources.length} ${nextSources.length === 1 ? 'file' : 'files'} and ${nextPages.length} ${nextPages.length === 1 ? 'page' : 'pages'}.`
         : interpolate(t.loaded, { files: nextSources.length, pages: nextPages.length }));
     } catch (reason) {
-      setError(translateProcessingError(reason instanceof Error ? reason.message : t.errorGeneric, locale));
-    } finally { busyRef.current = false; setBusy(false); }
+      if (controller.signal.aborted) setNotice(locale === 'zh' ? '已取消导入，当前页面和撤销历史均已保留。' : 'Import cancelled. Current pages and Undo history were kept.');
+      else setError(translateProcessingError(reason instanceof Error ? reason.message : t.errorGeneric, locale));
+    } finally {
+      if (importAbortRef.current === controller) importAbortRef.current = null;
+      setImporting(false); setImportCancelling(false);
+      busyRef.current = false; setBusy(false);
+    }
   };
 
   const cancelReimport = () => {
@@ -969,6 +983,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         </details>
         <p className="utility-note" data-testid="workspace-export-filename">{t.outputName}: <strong>{filename}</strong> · {pages.length} {t.pages}</p>
       </section>}
+      {importing && <div className="utility-load-controls" role="status" data-testid="workspace-import-progress">
+        <span>{locale === 'zh' ? '正在本地读取文件…' : 'Opening files on this device…'}</span>
+        <button type="button" className="button button-secondary button-small" data-testid="workspace-import-cancel"
+          disabled={importCancelling} onClick={() => { setImportCancelling(true); importAbortRef.current?.abort(); }}>
+          {importCancelling ? (locale === 'zh' ? '正在取消…' : 'Cancelling…') : (locale === 'zh' ? '取消导入' : 'Cancel import')}
+        </button>
+      </div>}
       <div className="workspace-content" onDragOver={(event) => { if (Array.from(event.dataTransfer.types ?? []).includes('Files')) event.preventDefault(); }} onDrop={(event) => { if (event.dataTransfer.files?.length) { event.preventDefault(); void addFiles(event.dataTransfer.files); } }}>
         {error && <div className="notice notice-error" role="alert">{error}<button type="button" aria-label={t.dismiss} onClick={() => setError('')}>×</button></div>}
         {notice && <div className="notice notice-success" role="status">{notice}<button type="button" aria-label={t.dismiss} onClick={() => setNotice('')}>×</button></div>}
