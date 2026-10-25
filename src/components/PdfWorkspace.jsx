@@ -9,7 +9,7 @@ import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges,
-  getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
+  getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
 function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview, onOpen, outputPosition, busy }) {
@@ -145,6 +145,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [splitMode, setSplitMode] = useState('ranges');
   const [ranges, setRanges] = useState('');
   const [chunkSize, setChunkSize] = useState('');
+  const [pendingVisualCut, setPendingVisualCut] = useState(null);
   const [exportSettingsOpen, setExportSettingsOpen] = useState(mode === 'watermark-pdf');
   const [watermarkEnabled, setWatermarkEnabled] = useState(false);
   const [watermarkText, setWatermarkText] = useState('');
@@ -221,6 +222,32 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     } catch (_error) { return null; }
   }, [pages.length, splitMode, ranges, chunkSize]);
   const splitEstimate = splitPlan?.parts.length ?? null;
+  // Preserve custom, partial or overlapping manual ranges until user explicitly
+  // approves replacing them. Visual cuts always cover current export order.
+  const visualCuts = splitMode === 'ranges' && pages.length
+    ? splitCutsFromRanges(ranges, pages.length) : [];
+
+  const applyVisualCuts = (cutPositions) => {
+    try {
+      setRanges(cutPositions.length ? splitRangesFromCuts(cutPositions, pages.length) : '');
+      setSplitMode('ranges');
+      setPendingVisualCut(null);
+      setError(''); setNotice('');
+    } catch {
+      setError(t.invalidRange);
+      setNotice('');
+    }
+  };
+  const toggleVisualCut = (afterPage) => {
+    if (busy || afterPage < 1 || afterPage >= pages.length) return;
+    if (splitMode === 'ranges' && ranges.trim() && visualCuts === null) {
+      setPendingVisualCut(afterPage);
+      return;
+    }
+    const cuts = splitMode === 'ranges' ? visualCuts ?? [] : [];
+    applyVisualCuts(cuts.includes(afterPage)
+      ? cuts.filter(n => n !== afterPage) : [...cuts, afterPage]);
+  };
 
   // Retain PDF.js loading tasks so the worker and its memory are truly released on reset/unmount.
   const getPreviewDoc = useCallback((source) => {
@@ -371,6 +398,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         // an explicit range or pages-per-file choice before ZIP download.
         setRanges('');
         setChunkSize('');
+        setPendingVisualCut(null);
         setSplitMode('ranges');
         setDownloadNameInput('');
         setMoveTargetInput('');
@@ -682,7 +710,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
     setPageView('order'); setCollapsedSources(new Set());
     setLastDownloadedRevision(null);
-    setRanges(''); setChunkSize(''); setSplitMode('ranges');
+    setRanges(''); setChunkSize(''); setSplitMode('ranges'); setPendingVisualCut(null);
     setSelectionRanges(''); setMoveTargetInput(''); setMovePlacement('before'); setDownloadNameInput(''); setJumpInput(''); setPendingJump(null);
     // A fresh image-to-PDF workspace must not inherit a previous crop choice.
     setImageLayout({ ...IMAGE_PDF_LAYOUT_DEFAULT });
@@ -1177,11 +1205,11 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
               <section className="split-panel" aria-label={t.splitTitle} role="tabpanel" id="workspace-panel-split" aria-labelledby="workspace-tab-split">
                 <div className="split-intro"><div className="split-graphic" aria-hidden="true">1–3 <span>→</span> 4–6</div><h3>{t.splitTitle}</h3><p>{t.splitHint}</p></div>
                 <div className="split-fields">
-                  <label className="option-radio"><input type="radio" name="split-method" checked={splitMode === 'ranges'} disabled={busy} onChange={() => setSplitMode('ranges')} />{t.byRanges}</label>
+                  <label className="option-radio"><input type="radio" name="split-method" checked={splitMode === 'ranges'} disabled={busy} onChange={() => { setSplitMode('ranges'); setPendingVisualCut(null); }} />{t.byRanges}</label>
                   <label className="input-label" htmlFor="ranges-input">{t.pageRanges}</label>
-                  <input id="ranges-input" value={ranges} onChange={(event) => setRanges(event.target.value)} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7" />
+                  <input id="ranges-input" value={ranges} onChange={(event) => { setRanges(event.target.value); setPendingVisualCut(null); }} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7" />
                   <p className="input-note">{t.rangeHint}</p>
-                  <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => setSplitMode('chunks')} />{t.every}</label>
+                  <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); }} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
                   <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} placeholder="5" onChange={(event) => setChunkSize(event.target.value)} disabled={splitMode !== 'chunks' || busy} />
                   <div className="split-estimate" aria-live="polite">{splitEstimate === null ? (splitNeedsInput ? (splitMode === 'ranges' ? t.enterSplitRanges : t.enterSplitSize) : t.invalidRange) : interpolate(t.estimate, { files: splitEstimate })}</div>
