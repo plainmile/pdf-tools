@@ -34,6 +34,15 @@ test('production and CI must install a real committed npm v3 lockfile, not float
   assert.doesNotMatch(ci, /else npm install/);
 });
 
+test('PR CI has exactly one required check per feature SHA; main push still runs release gate', () => {
+  const yaml = readWorkflow('ci.yml');
+  const trigger = yaml.split(/^permissions:/m)[0];
+  assert.match(trigger, /on:\s*\n  push:\s*\n    branches:\s*\n      - main\s*\n  pull_request:\s*\n    branches:\s*\n      - main/);
+  assert.doesNotMatch(trigger, /feature\/\*\*/);
+  assert.match(yaml, /test-build-e2e:/);
+  assert.match(yaml, /cancel-in-progress: true/);
+});
+
 test('only main-branch CI can trigger an image publish workflow run', () => {
   const yaml = readWorkflow('publish.yml');
   const trigger = yaml.split(/^permissions:/m)[0];
