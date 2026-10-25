@@ -5,6 +5,8 @@ import {
 import { renderWatermarkPng, watermarkTextFromOptions, watermarkPagePlacement, WATERMARK_OPACITY } from './watermark.mjs';
 import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement, stripJpegPrivateMetadata } from './jpegExif.mjs';
 import { imagePdfPageLayout, IMAGE_PDF_LAYOUT_DEFAULT, shouldReflowImageSource } from './imagePdfLayout.mjs';
+import { readFileArrayBuffer } from './pdfUtilities.mjs';
+import { checkCancelled } from './utilityCore.mjs';
 
 /**
  * Generate temporary IDs without depending on crypto.randomUUID(), which is
@@ -279,25 +281,32 @@ export function hasPdfBookmarks(doc) {
 }
 
 export async function readSourceFile(file, options = {}) {
+  const signal = options.signal ?? null;
+  checkCancelled(signal);
   if (!isSupportedFile(file)) throw new Error(`${file.name}: choose PDF, JPG, PNG, WebP, BMP or static AVIF files.`);
   if (!file.size || file.size > LIMITS.maxFileBytes) {
     throw new Error(`${file.name}: files must be between 1 byte and 100 MB.`);
   }
   const imageType = imageTypeFor(file);
   const isImage = Boolean(imageType);
-  const originalBytes = new Uint8Array(await file.arrayBuffer());
-  const bytes = isImage ? await imageToPdfBytes(file, originalBytes, imageType, options.imageLayout) : originalBytes;
+  const originalBytes = new Uint8Array(await readFileArrayBuffer(file, signal));
+  checkCancelled(signal);
+  const bytes = isImage ? await imageToPdfBytes(file, originalBytes, imageType, options.imageLayout, signal) : originalBytes;
+  checkCancelled(signal);
 
   let doc;
   try {
     doc = await PDFDocument.load(bytes, { updateMetadata: false });
+    checkCancelled(signal);
   } catch (error) {
+    checkCancelled(signal);
     if (/encrypted|password/i.test(String(error?.message ?? ''))) {
       throw new Error(`${file.name}: password-protected PDFs are not supported.`);
     }
     throw new Error(`${file.name}: the file could not be opened as a PDF.`);
   }
   const pageCount = doc.getPageCount();
+  checkCancelled(signal);
   if (!pageCount) throw new Error(`${file.name}: this document has no pages.`);
   return { id: temporaryWorkspaceId(), name: file.name, bytes, pageCount, isImage, inputSize: file.size,
     hasInteractiveForms: !isImage && hasInteractivePdfForm(doc),
@@ -363,7 +372,7 @@ export async function reflowImageSources(sources, layout, report = () => {}, bud
         throw new Error('Photo source bytes are missing. Reimport the original images.');
       }
       const bytes = await imageToPdfBytes({ name: source.name },
-        source.originalImageBytes, source.originalImageType, layout);
+        source.originalImageBytes, source.originalImageType, layout, signal);
       updated.push({ ...source, bytes, imageLayout: { ...IMAGE_PDF_LAYOUT_DEFAULT, ...layout } });
     }
     // Validate the entire prospective image reflow BEFORE updating React state.
@@ -378,7 +387,8 @@ export async function reflowImageSources(sources, layout, report = () => {}, bud
   return updated;
 }
 
-async function imageToPdfBytes(file, originalBytes, imageType, options = {}) {
+async function imageToPdfBytes(file, originalBytes, imageType, options = {}, signal = null) {
+  checkCancelled(signal);
   const doc = await PDFDocument.create();
   let embedded;
   let bitmap;
@@ -392,6 +402,7 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}) {
     else if (imageType === 'image/png') embedded = await doc.embedPng(originalBytes);
     else {
       bitmap = await createImageBitmap(new Blob([originalBytes], { type: imageType }));
+      checkCancelled(signal);
       if (bitmap.width * bitmap.height > LIMITS.maxImagePixels) throw new Error('Image dimensions are too large.');
       const canvas = document.createElement('canvas');
       canvas.width = bitmap.width;
@@ -400,10 +411,13 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}) {
       if (!context) throw new Error('Image canvas is unavailable.');
       context.drawImage(bitmap, 0, 0);
       const blob = await new Promise((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Could not convert image to PNG.')), 'image/png'));
+      checkCancelled(signal);
       embedded = await doc.embedPng(await blob.arrayBuffer());
+      checkCancelled(signal);
       canvas.width = 1;
       canvas.height = 1;
     }
+    checkCancelled(signal);
     if (embedded.width * embedded.height > LIMITS.maxImagePixels) throw new Error('Image dimensions are too large.');
     const oriented = orientedJpegSize(embedded.width, embedded.height, exifOrientation);
     const layout = imagePdfPageLayout(oriented.width, oriented.height, options);
@@ -424,8 +438,11 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}) {
       rotate: degrees(placement.angle),
     });
     if (layout.clip) page.pushOperators(popGraphicsState());
-    return new Uint8Array(await doc.save({ useObjectStreams: true }));
+    const output = new Uint8Array(await doc.save({ useObjectStreams: true }));
+    checkCancelled(signal);
+    return output;
   } catch (error) {
+    checkCancelled(signal);
     if (imageType === 'image/avif' && error?.name === 'InvalidStateError') {
       throw new Error('This AVIF could not be decoded in your browser. Try PNG or WebP.');
     }
