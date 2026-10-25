@@ -99,6 +99,12 @@ test('tool landing page contains contextual related links and indexable FAQ when
   }
 });
 
+test('Chinese split copy explains per-download limits and 50-file batches for long books', async ({ page }) => {
+  await page.goto('/zh/split-pdf/');
+  await expect(page.locator('.split-intro')).toContainText('每批下载最多 50 份');
+  await expect(page.locator('.split-intro')).not.toContainText('最多生成 50 份');
+});
+
 test('both languages visibly credit the original website, including when JavaScript is off', async ({ browser }) => {
   const context = await browser.newContext({ javaScriptEnabled: false });
   const page = await context.newPage();
