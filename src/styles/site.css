@@ -352,6 +352,10 @@ main { flex: 1; }
 .split-intro h3 { font-size: 21px; margin-bottom: 10px; }
 .split-intro p { color: var(--muted); font-size: 12px; line-height: 1.8; }
 .split-fields { display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
+.split-batch-nav { display: grid; gap: 9px; margin: 12px 0 1px; padding: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 12px; }
+.split-batch-nav strong { color: var(--text); font-size: 13px; }
+.split-batch-nav .input-note { margin: 0; }
+.split-batch-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .option-radio { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 650; margin-bottom: 12px; }
 .option-radio input { accent-color: var(--accent); }
 .option-divider { margin-top: 19px; padding-top: 19px; border-top: 1px solid var(--border); }

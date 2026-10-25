@@ -547,14 +547,51 @@ export function textContentToLines(content) {
   // PDF is positioned text, not a logical document. Sort approximately by baseline and X.
   const items = content.items.filter(item => typeof item.str === 'string' && item.str.trim());
   const lines = [];
+  // PDF.js can emit thousands of positioned fragments. Scanning ALL existing
+  // rows for every fragment is quadratic on book-length/dense-text PDFs.
+  // Index each row by its initial Y coordinate in narrow vertical bands.
+  // Exact original tolerance, first-created row tie-breaking and text order
+  // remain unchanged; unusual huge fonts/non-finite coordinates fall back to
+  // the original full scan rather than silently losing or reordering text.
+  const BAND_HEIGHT = 8;
+  const rowsByBand = new Map();
+  let largestRowFont = 0;
   for (const item of items) {
     const x = Number(item.transform?.[4] ?? 0);
     const y = Number(item.transform?.[5] ?? 0);
     const fontSize = Math.max(6, Number(item.height) || Math.abs(Number(item.transform?.[3])) || 11);
-    let found = lines.find(line => Math.abs(line.y - y) <= Math.max(2, Math.min(line.fontSize, fontSize) * .25));
-    if (!found) { found = { y, fontSize, items: [] }; lines.push(found); }
+    const searchRadius = Math.max(2, Math.min(largestRowFont, fontSize) * .25);
+    const firstBand = Math.floor((y - searchRadius) / BAND_HEIGHT);
+    const lastBand = Math.floor((y + searchRadius) / BAND_HEIGHT);
+    let found = null;
+    if (Number.isFinite(y) && Number.isFinite(searchRadius) &&
+        Number.isSafeInteger(firstBand) && Number.isSafeInteger(lastBand) &&
+        lastBand - firstBand + 1 <= lines.length) {
+      for (let band = firstBand; band <= lastBand; band++) {
+        for (const row of rowsByBand.get(band) ?? []) {
+          if ((!found || row.order < found.order) &&
+              Math.abs(row.y - y) <= Math.max(2, Math.min(row.fontSize, fontSize) * .25)) {
+            found = row;
+          }
+        }
+      }
+    } else {
+      found = lines.find(row =>
+        Math.abs(row.y - y) <= Math.max(2, Math.min(row.fontSize, fontSize) * .25)) ?? null;
+    }
+    if (!found) {
+      found = { y, fontSize, items: [], order: lines.length };
+      lines.push(found);
+      const band = Math.floor(y / BAND_HEIGHT);
+      if (Number.isSafeInteger(band)) {
+        const rows = rowsByBand.get(band);
+        if (rows) rows.push(found);
+        else rowsByBand.set(band, [found]);
+      }
+    }
     found.items.push({ x, width: Number(item.width) || 0, str: item.str, fontSize });
     found.fontSize = Math.max(found.fontSize, fontSize);
+    largestRowFont = Math.max(largestRowFont, found.fontSize);
   }
   return lines.sort((a, b) => b.y - a.y).map(line => {
     const sorted = line.items.sort((a, b) => a.x - b.x);

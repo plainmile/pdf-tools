@@ -15,6 +15,7 @@ export const toolHelp = {
       ['Can I split a PDF into custom page ranges?', 'Yes. Enter ranges such as 1-3, 4-6, or choose a fixed number of pages per output file.'],
       ['Can I choose split points by looking at the pages?', 'Yes. Expand Choose split points by clicking pages, then click Cut after this page under a preview. Click again to remove a cut. It uses your current page order; manually entered custom ranges are protected from accidental replacement.'],
       ['How are the split files downloaded?', 'A single section downloads directly as PDF. Two or more sections are bundled into ZIP, with up to 50 parts per operation.'],
+      ['How do I split a 200-page book into one PDF per page?', 'Choose One PDF per page. Download each 50-page ZIP batch, then use Next batch. Each batch is a separate download with the current output page range in its filename.'],
     ],
     'organize-pdf': [
       ['How do I move several pages together?', 'Select pages using their checkboxes, then drag the selection to its new position. Keyboard-accessible move controls are also provided.'],
@@ -89,6 +90,7 @@ export const toolHelp = {
       ['可以按自定义范围拆分吗？', '可以。输入 1-3、4-6 这样的页码范围，或者指定每份文件包含几页。'],
       ['可以看着页面缩略图选择拆分位置吗？', '可以。展开「按页面预览设置拆分点」，在缩略图下选择「在此页后拆分」，再次点击可取消。拆分按当前页面顺序进行；手工指定的特殊范围不会被意外覆盖。'],
       ['拆分结果怎么保存？', '拆出一份时直接下载 PDF；拆出多份时打包成 ZIP。单次最多生成 50 份。'],
+      ['一本 200 页的书怎样逐页拆成独立 PDF？', '点击“每页生成一份 PDF”，先下载前 50 页组成的 ZIP，再点击“下一批”逐批下载；每批的页码范围会写入 ZIP 文件名。'],
     ],
     'organize-pdf': [
       ['如何一次移动多页？', '通过复选框选择多页，再拖动整组页面。也支持使用移动按钮调整顺序。'],

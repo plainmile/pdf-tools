@@ -341,6 +341,68 @@ test('PDF positioned text is approximately sorted by vertical position then X', 
   assert.equal(linesToReadableText([lines], false), 'left right\nlast');
   assert.match(linesToReadableText([[{text: 'Large title', fontSize: 24},{text: 'Body',fontSize: 12}]], true), /## Large title/);
 });
+test('indexed PDF row grouping preserves first-match baseline tolerance and original text exactly', () => {
+  // Reference behavior before spatial indexing; comparisons include row font
+  // growth, ambiguous first-match ties, sparse coordinates and malformed items.
+  function reference(items) {
+    const rows = [];
+    for (const item of items.filter(part => typeof part.str === 'string' && part.str.trim())) {
+      const x = Number(item.transform?.[4] ?? 0);
+      const y = Number(item.transform?.[5] ?? 0);
+      const fontSize = Math.max(6, Number(item.height) || Math.abs(Number(item.transform?.[3])) || 11);
+      let row = rows.find(part => Math.abs(part.y - y) <= Math.max(2, Math.min(part.fontSize, fontSize) * .25));
+      if (!row) { row = { y, fontSize, items: [] }; rows.push(row); }
+      row.items.push({ x, width: Number(item.width) || 0, str: item.str, fontSize });
+      row.fontSize = Math.max(row.fontSize, fontSize);
+    }
+    return rows.sort((a, b) => b.y - a.y).map(row => {
+      let text = '', previousEnd = null;
+      for (const part of row.items.sort((a, b) => a.x - b.x)) {
+        if (previousEnd !== null && part.x - previousEnd > Math.max(2, part.fontSize * .2) && !/\s$/.test(text)) text += ' ';
+        text += part.str;
+        previousEnd = Math.max(previousEnd ?? part.x, part.x + part.width);
+      }
+      return { text: text.trim(), fontSize: row.fontSize };
+    }).filter(row => row.text);
+  }
+  let state = 20261025;
+  const random = () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+  for (let run = 0; run < 18; run++) {
+    const items = Array.from({ length: 720 }, (_, index) => {
+      const y = Math.floor(random() * 125) * 7 + (random() - .5) * 7;
+      const x = Math.floor(random() * 20) * 19;
+      const height = 6 + Math.floor(random() * 9) * 4;
+      return { str: 'token-' + index, transform: [1, 0, 0, height, x, y], width: index % 17 + 6, height };
+    });
+    items.push(
+      { str: 'nonnumeric', transform: [0, 0, 0, 11, 20, NaN], width: 5, height: 11 },
+      { str: 'very-large-y', transform: [0, 0, 0, 11, 20, 1e30], width: 5, height: 11 },
+      { str: 'very-large-font', transform: [0, 0, 0, 11, 20, 400], width: 5, height: 1e9 },
+    );
+    assert.deepEqual(textContentToLines({ items }), reference(items), 'row grouping run ' + run);
+  }
+});
+
+test('dense positioned PDF text groups quickly without dropping lines', () => {
+  // Formerly each new vertical row rescanned all previous rows. Make enough
+  // distinct baselines for the pathological O(n^2) behavior to be observable.
+  const items = [];
+  for (let row = 11000; row >= 1; row--) {
+    items.push({ str: 'A', transform: [1, 0, 0, 11, 10, row * 16], width: 8, height: 11 });
+    items.push({ str: 'B', transform: [1, 0, 0, 11, 42, row * 16], width: 8, height: 11 });
+  }
+  const start = performance.now();
+  const result = textContentToLines({ items });
+  const elapsed = performance.now() - start;
+  assert.equal(result.length, 11000);
+  assert.equal(result[0].text, 'A B');
+  assert.equal(result.at(-1).text, 'A B');
+  assert.ok(elapsed < 1800, 'Dense text row grouping took ' + Math.round(elapsed) + ' ms');
+});
+
 test('visible PDF form annotation text/choices append meaningful values, not checkbox guesses', () => {
   const values = [
     { fieldType: 'Tx', fieldName: 'applicant.name', fieldValue: 'Alice' },
