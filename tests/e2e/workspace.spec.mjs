@@ -724,6 +724,10 @@ test('105-page book downloads three separate, correctly numbered per-page ZIP ba
   await page.getByTestId('split-batch-prev').click();
   await expect(page.getByTestId('split-batch-status')).toContainText('Batch 2 of 3');
   await expect(page.getByTestId('split-batch-current-requested')).toBeVisible();
+  // Renaming between batches creates a new delivery plan; do not reuse old markers.
+  await page.getByTestId('download-name-panel').locator('summary').click();
+  await page.getByTestId('download-name-input').fill('renamed-book');
+  await expect(page.getByTestId('split-batch-progress')).toContainText('0 of 3');
   await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('2');
   await expect(page.getByTestId('split-batch-progress')).toContainText('0 of 2');
   await expect(page.getByTestId('split-batch-all-requested')).toHaveCount(0);
