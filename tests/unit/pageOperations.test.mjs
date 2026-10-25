@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, parsePageRanges,
-  chunkPageRanges, splitChunkBatch, splitSinglePageBatch, getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, commitHistory, makeHistoryState, undoHistory, redoHistory,
+  chunkPageRanges, splitChunkBatch, splitSinglePageBatch, oddEvenSplitParts, getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
   reversePages, sortPagesByFilename, interleaveDuplexPages, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges, pageIdsForParity, invertPageIdSelection,
 } from '../../src/lib/pageOperations.mjs';
@@ -120,6 +120,46 @@ test('split explicit ranges and preserve workspace page order', () => {
 
 test('split into fixed-size chunks', () => {
   assert.deepEqual(chunkPageRanges(7, 3), [{start:1,end:3},{start:4,end:6},{start:7,end:7}]);
+});
+
+test('odd/even split creates two complete disjoint PDFs in CURRENT output order', () => {
+  for (const count of [2, 3, 4, 7, 51, 105, 600]) {
+    const parts = oddEvenSplitParts(count);
+    assert.equal(parts.length, 2);
+    assert.deepEqual(parts.map(part => part.kind), ['odd', 'even']);
+    assert.equal(parts[0].positions.length, Math.ceil(count / 2));
+    assert.equal(parts[1].positions.length, Math.floor(count / 2));
+    assert.equal(splitCoversAllPagesExactlyOnce(parts, count), true);
+    const reordered = Array.from({ length: count }, (_, index) => ({ id: String(count - index), pageIndex: count - index - 1 }));
+    assert.deepEqual(getRangePages(reordered, parts[0]).map(item => item.id),
+      parts[0].positions.map(position => String(count - position + 1)));
+    assert.deepEqual(getRangePages(reordered, parts[1]).map(item => item.id),
+      parts[1].positions.map(position => String(count - position + 1)));
+  }
+  assert.deepEqual(oddEvenSplitParts(5), [
+    { kind: 'odd', positions: [1, 3, 5] },
+    { kind: 'even', positions: [2, 4] },
+  ]);
+});
+
+test('odd/even split rejects empty, overflow, repeated and missing page positions', () => {
+  for (const count of [0, 1, 601, NaN, 3.5, -1]) {
+    assert.throws(() => oddEvenSplitParts(count));
+  }
+  assert.equal(splitCoversAllPagesExactlyOnce([
+    { kind: 'odd', positions: [1, 3] },
+    { kind: 'even', positions: [2] },
+  ], 3), true);
+  assert.equal(splitCoversAllPagesExactlyOnce([
+    { kind: 'odd', positions: [1, 3] },
+    { kind: 'even', positions: [3] },
+  ], 3), false);
+  assert.equal(splitCoverageDetails([{ positions: [] }], 3), null);
+  assert.equal(splitCoverageDetails([{ positions: [1, 0] }], 3), null);
+  assert.equal(splitCoverageDetails([{ positions: [1.5] }], 3), null);
+  assert.equal(splitCoverageDetails([{ positions: [1, 4] }], 3), null);
+  assert.throws(() => getRangePages(pages, { positions: [1, 4] }));
+  assert.deepEqual(ids(pages), ['a', 'b', 'c']);
 });
 
 test('per-page batches partition up to 600 current output pages without overlap or omission', () => {
