@@ -1452,6 +1452,41 @@ test('image-backed scanned pages with only a selectable page number do not auto-
   }
 });
 
+test('filled PDF form annotations survive real TXT and Chinese Markdown extraction without a silent auto-download', async ({ page }) => {
+  const original = await PDFDocument.create();
+  original.addPage([480, 660]).drawText('Application form heading', { x: 30, y: 610 });
+  const fieldsPage = original.addPage([480, 660]);
+  const form = original.getForm();
+  const name = form.createTextField('applicant.name');
+  name.setText('ALICE-FORM-ONLY-2026');
+  name.addToPage(fieldsPage, { x: 35, y: 480, width: 270, height: 26 });
+  const agree = form.createCheckBox('accepted.terms');
+  agree.check();
+  agree.addToPage(fieldsPage, { x: 35, y: 420, width: 20, height: 20 });
+  const bytes = Buffer.from(await original.save());
+
+  for (const [route, warning] of [
+    ['/pdf-to-txt/', 'interactive form fields'],
+    ['/zh/pdf-to-markdown/', '交互 PDF 表单'],
+  ]) {
+    await page.goto(route);
+    await upload(page, bytes);
+    const automatic = [];
+    const onDownload = item => automatic.push(item.suggestedFilename());
+    page.on('download', onDownload);
+    await page.getByTestId('utility-run').click();
+    await expect(page.getByTestId('form-text-result')).toBeVisible({ timeout: 25000 });
+    await expect(page.getByTestId('text-extraction-warning')).toContainText(warning);
+    expect(automatic).toEqual([]);
+    const result = await getDownload(page, () => page.getByTestId('form-text-download').click());
+    page.off('download', onDownload);
+    const extracted = result.bytes.toString('utf8');
+    expect(extracted).toContain('Application form heading');
+    expect(extracted).toContain('applicant.name: ALICE-FORM-ONLY-2026');
+    await expect(page.getByTestId('partial-text-result')).toHaveCount(0);
+  }
+});
+
 test('a genuinely short PDF without images still auto-downloads its complete selectable text', async ({ page }) => {
   const doc = await PDFDocument.create();
   doc.addPage([480, 620]).drawText('OK', { x: 40, y: 550, size: 12 });

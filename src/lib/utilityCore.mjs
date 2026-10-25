@@ -617,6 +617,29 @@ export function hasMinimalSelectableText(lines, maxCharacters = 10) {
   return text.replace(/\s/gu, '').length <= maxCharacters;
 }
 
+/** Filled text and dropdown widget values live in PDF annotations, not
+ * necessarily in the page text stream. Include only visible form values that
+ * PDF.js exposes; do not invent values for checkbox, radio or signature widgets.
+ */
+export function textLinesFromFormAnnotations(annotations) {
+  const lines = [];
+  const seen = new Set();
+  for (const annotation of Array.isArray(annotations) ? annotations : []) {
+    if (!annotation || !['Tx', 'Ch'].includes(annotation.fieldType)) continue;
+    const raw = Array.isArray(annotation.fieldValue)
+      ? annotation.fieldValue : [annotation.fieldValue];
+    const value = raw.filter(part => typeof part === 'string' && part.trim()).join(', ');
+    if (!value) continue;
+    const label = String(annotation.fieldName || annotation.alternativeText || 'Form field').trim() || 'Form field';
+    const text = `${label}: ${value}`;
+    if (!seen.has(text)) {
+      lines.push({ text, fontSize: 12 });
+      seen.add(text);
+    }
+  }
+  return lines;
+}
+
 /** Surface empty pages and image-backed pages with almost no selectable text.
  * An image may be a photograph rather than a scan; callers must describe
  * suspicious pages as "review required", not claim OCR detection certainty.
