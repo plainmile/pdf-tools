@@ -12,7 +12,8 @@ export const toolHelp = {
       ['Will merging upload private documents?', 'No. Files are processed locally in the browser and are not sent to a PDF conversion server.'],
     ],
     'split-pdf': [
-      ['Can I split a PDF into custom page ranges?', 'Yes. Enter ranges such as 1-3, 4-6, or choose a fixed number of pages per output file.'],
+      ['Can I split a PDF into custom page ranges?', 'Yes. Enter ranges such as 1-3, 4-6; each range generates a separate PDF. For one combined PDF, use Extract PDF Pages and select the pages to keep.'],
+      ['Can I split odd and even pages into two PDFs?', 'Yes. Choose Split into odd-page and even-page PDFs to get two PDFs in one ZIP. Odd and even refer to the current export page order, not the original scanned page numbers.'],
       ['Can I choose split points by looking at the pages?', 'Yes. Expand Choose split points by clicking pages, then click Cut after this page under a preview. Click again to remove a cut. It uses your current page order; manually entered custom ranges are protected from accidental replacement.'],
       ['How are the split files downloaded?', 'A single result downloads as PDF; multiple results download as ZIP. When splitting every N pages would create over 50 PDFs, use the Next batch and Previous batch buttons. Each download contains up to 50 PDFs.'],
       ['How do I split a 200-page book into one PDF per page?', 'Choose One PDF per page. Download each 50-page ZIP batch, then use Next batch. Each batch is a separate download with the current output page range in its filename.'],
@@ -87,7 +88,8 @@ export const toolHelp = {
       ['合并时会上传合同等隐私文件吗？', '不会。文件直接在您的浏览器中处理，不上传到转换服务器。'],
     ],
     'split-pdf': [
-      ['可以按自定义范围拆分吗？', '可以。输入 1-3、4-6 这样的页码范围，或者指定每份文件包含几页。'],
+      ['可以按自定义范围拆分吗？', '可以。输入 1-3、4-6 这样的页码范围，每个范围单独生成一份 PDF；若要把选中页合并成一份 PDF，请使用「提取 PDF 页面」。'],
+      ['能把奇数页、偶数页分别保存吗？', '可以。选择「按奇偶页分别生成 PDF」，会把当前页序的奇数位、偶数位页面分别生成两份 PDF，并打包为一个 ZIP；不是依据原文件印刷页码。'],
       ['可以看着页面缩略图选择拆分位置吗？', '可以。展开「按页面预览设置拆分点」，在缩略图下选择「在此页后拆分」，再次点击可取消。拆分按当前页面顺序进行；手工指定的特殊范围不会被意外覆盖。'],
       ['拆分结果怎么保存？', '单份结果直接下载 PDF，多份打包 ZIP。按每 N 页拆分超过 50 份时，可以点击“下一批”逐批下载，每批最多 50 份 PDF。自定义范围仍限制 50 份。'],
       ['一本 200 页的书怎样逐页拆成独立 PDF？', '点击“每页生成一份 PDF”，先下载前 50 页组成的 ZIP，再点击“下一批”逐批下载；每批的页码范围会写入 ZIP 文件名。'],
