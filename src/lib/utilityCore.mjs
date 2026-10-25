@@ -627,7 +627,7 @@ export function hasSparseTextScanRisk(lines) {
   const text = lines.map(line => String(line.text ?? '')).join(' ').replace(/\s+/gu, ' ').trim();
   if (!text) return false;
   const length = text.replace(/\s/gu, '').length;
-  if (length <= 32) return true;
+  if (length <= 26) return true;
   // Longer running headers still often include an explicit page label.
   // Never scan a page containing an ordinary full paragraph just because
   // the body mentions "Page 12".
