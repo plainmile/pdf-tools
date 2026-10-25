@@ -1375,6 +1375,96 @@ test('expired 20-step Undo history frees deleted PDF bytes without affecting act
 });
 
 
+test('visual split previews create correct ZIP partitions and protect custom typed ranges', async ({ page }) => {
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'six.pdf', mimeType: 'application/pdf', buffer: await makePdf([301,302,303,304,305,306]),
+  });
+  await expect(page.locator('.file-count')).toContainText('6 pages');
+  const panel = page.getByTestId('visual-split-panel');
+  // Even a 600-page book must not mount 600 extra thumbnails before opening.
+  await expect(page.getByTestId('visual-split-page')).toHaveCount(0);
+  await panel.locator('summary').click();
+  await expect(page.getByTestId('visual-split-page')).toHaveCount(6);
+  const cut2 = page.locator('[data-testid="visual-split-cut"][data-after-page="2"]');
+  const cut4 = page.locator('[data-testid="visual-split-cut"][data-after-page="4"]');
+  await cut4.click();
+  await cut2.click();
+  const ranges = page.getByRole('textbox', { name: 'Page ranges', exact: true });
+  await expect(ranges).toHaveValue('1-2, 3-4, 5-6');
+  await expect(cut2).toHaveAttribute('aria-pressed', 'true');
+  await expect(cut4).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('split-coverage-complete')).toContainText('6');
+  const pending = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download split PDFs (ZIP)' }).click();
+  const zip = await JSZip.loadAsync(await readFile(await (await pending).path()));
+  expect(Object.keys(zip.files).sort()).toEqual([
+    'part-01-pages-1-2.pdf', 'part-02-pages-3-4.pdf', 'part-03-pages-5-6.pdf',
+  ]);
+  for (const [name, widths] of [
+    ['part-01-pages-1-2.pdf', [301,302]],
+    ['part-02-pages-3-4.pdf', [303,304]],
+    ['part-03-pages-5-6.pdf', [305,306]],
+  ]) {
+    const doc = await PDFDocument.load(await zip.file(name).async('uint8array'));
+    expect(doc.getPages().map(p => p.getWidth())).toEqual(widths);
+  }
+  await cut4.click();
+  await expect(ranges).toHaveValue('1-2, 3-6');
+  await page.getByTestId('visual-split-clear').click();
+  await expect(ranges).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Download split PDFs (ZIP)' })).toBeDisabled();
+
+  // Manual partial / overlapping ranges must not be discarded by one click.
+  await ranges.fill('2-4, 6');
+  await cut2.click();
+  await expect(page.getByTestId('visual-split-confirm')).toBeVisible();
+  await expect(page.getByTestId('visual-split-confirm')).toBeFocused();
+  await expect(ranges).toHaveValue('2-4, 6');
+  await page.getByTestId('visual-split-keep').click();
+  await expect(cut2).toBeFocused();
+  await expect(ranges).toHaveValue('2-4, 6');
+  await cut2.click();
+  await page.getByTestId('visual-split-replace').click();
+  await expect(cut2).toBeFocused();
+  await expect(ranges).toHaveValue('1-2, 3-6');
+  await expect(page.getByTestId('split-coverage-complete')).toBeVisible();
+});
+
+test('visual cut indices use CURRENT reordered output pages, not source page numbers', async ({ page }) => {
+  await loadInput(page);
+  await page.getByTestId('page-tile').first().getByRole('button', { name: 'Move page 1 right' }).click();
+  await page.getByRole('tab', { name: 'Split' }).click();
+  await page.getByTestId('visual-split-panel').locator('summary').click();
+  await page.locator('[data-testid="visual-split-cut"][data-after-page="1"]').click();
+  await expect(page.getByRole('textbox', { name: 'Page ranges', exact: true })).toHaveValue('1, 2-3');
+  const pending = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download split PDFs (ZIP)' }).click();
+  const zip = await JSZip.loadAsync(await readFile(await (await pending).path()));
+  const part1 = await PDFDocument.load(await zip.file('part-01-pages-1-1.pdf').async('uint8array'));
+  const part2 = await PDFDocument.load(await zip.file('part-02-pages-2-3.pdf').async('uint8array'));
+  expect(part1.getPages().map(p => p.getWidth())).toEqual([310]);
+  expect(part2.getPages().map(p => p.getWidth())).toEqual([300,320]);
+});
+
+test('Chinese mobile visual split uses accessible buttons without horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: '中文拆分.pdf', mimeType: 'application/pdf', buffer: await makePdf([300,310,320,330]),
+  });
+  await page.getByTestId('visual-split-panel').locator('summary').click();
+  const button = page.getByRole('button', { name: '切换输出第 2 页后的拆分点' });
+  await button.click();
+  await expect(button).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('textbox', { name: '页码范围' })).toHaveValue('1-2, 3-4');
+  const size = await page.evaluate(() => ({
+    content: document.documentElement.scrollWidth,
+    visible: document.documentElement.clientWidth,
+  }));
+  expect(size.content).toBeLessThanOrEqual(size.visible + 2);
+});
+
 test('one split range downloads a real PDF directly, not a ZIP', async ({ page }) => {
   await loadInput(page);
   await page.getByRole('tab', { name: 'Split' }).click();

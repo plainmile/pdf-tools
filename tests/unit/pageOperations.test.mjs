@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, parsePageRanges,
-  chunkPageRanges, getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, commitHistory, makeHistoryState, undoHistory, redoHistory,
+  chunkPageRanges, getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
   reversePages, sortPagesByFilename, interleaveDuplexPages, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges, pageIdsForParity, invertPageIdSelection,
 } from '../../src/lib/pageOperations.mjs';
@@ -160,6 +160,27 @@ test('localized page range punctuation is normalized but still validates bounds'
   assert.throws(() => parsePageRanges('３－１，２', 10), /reversed/);
   assert.throws(() => parsePageRanges('１，１１', 10), /outside/);
   assert.throws(() => parsePageRanges('１，，２', 10));
+});
+
+test('visual split positions create full, ordered PDF ranges from CURRENT page positions', () => {
+  assert.equal(splitRangesFromCuts([4, 2], 6), '1-2, 3-4, 5-6');
+  assert.deepEqual(splitCutsFromRanges('1-2, 3-4, 5-6', 6), [2, 4]);
+  assert.deepEqual(splitCutsFromRanges('１－２，３－４，５－６', 6), [2, 4]);
+  assert.equal(splitRangesFromCuts([], 6), '1-6');
+  assert.deepEqual(splitCutsFromRanges('1-6', 6), []);
+  assert.deepEqual(splitCutsFromRanges('', 6), []);
+  assert.deepEqual(splitCutsFromRanges('1', 1), []);
+  for (const custom of ['2-6', '1-3, 3-6', '4-6, 1-3', '1-3', '1-9', 'invalid']) {
+    assert.equal(splitCutsFromRanges(custom, 6), null, custom);
+  }
+  assert.throws(() => splitRangesFromCuts([1, 1], 6), /position/);
+  assert.throws(() => splitRangesFromCuts([0], 6), /position/);
+  assert.throws(() => splitRangesFromCuts([6], 6), /position/);
+  assert.throws(() => splitRangesFromCuts([1.5], 6), /position/);
+  assert.throws(() => splitRangesFromCuts([1], 0), /count/);
+  const fiftyParts = splitRangesFromCuts(Array.from({ length: 49 }, (_, i) => i + 1), 100);
+  assert.equal(parsePageRanges(fiftyParts, 100).length, 50);
+  assert.throws(() => splitRangesFromCuts(Array.from({ length: 50 }, (_, i) => i + 1), 100), /50 ranges/);
 });
 
 test('reject unsafe or inverted ranges', () => {

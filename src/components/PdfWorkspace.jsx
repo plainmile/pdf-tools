@@ -9,7 +9,7 @@ import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges,
-  getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
+  getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
 function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview, onOpen, outputPosition, busy }) {
@@ -110,6 +110,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const splitAbortRef = useRef(null);
   const exportAbortRef = useRef(null);
   const layoutAbortRef = useRef(null);
+  const visualConfirmRef = useRef(null);
   const [sources, setSources] = useState([]);
   const [history, setHistory] = useState(() => makeHistoryState());
   const [selected, setSelected] = useState(() => new Set());
@@ -145,6 +146,14 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [splitMode, setSplitMode] = useState('ranges');
   const [ranges, setRanges] = useState('');
   const [chunkSize, setChunkSize] = useState('');
+  const [pendingVisualCut, setPendingVisualCut] = useState(null);
+  const [visualSplitOpen, setVisualSplitOpen] = useState(false);
+  // A cut can be clicked deep inside a long scrollable preview grid. If the
+  // current manual ranges need confirmation, move focus (and scroll) to the
+  // explanation instead of leaving a newly disabled cut button out of context.
+  useEffect(() => {
+    if (pendingVisualCut !== null) visualConfirmRef.current?.focus();
+  }, [pendingVisualCut]);
   const [exportSettingsOpen, setExportSettingsOpen] = useState(mode === 'watermark-pdf');
   const [watermarkEnabled, setWatermarkEnabled] = useState(false);
   const [watermarkText, setWatermarkText] = useState('');
@@ -221,6 +230,40 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     } catch (_error) { return null; }
   }, [pages.length, splitMode, ranges, chunkSize]);
   const splitEstimate = splitPlan?.parts.length ?? null;
+  // Preserve custom, partial or overlapping manual ranges until user explicitly
+  // approves replacing them. Visual cuts always cover current export order.
+  const visualCuts = splitMode === 'ranges' && pages.length
+    ? splitCutsFromRanges(ranges, pages.length) : [];
+
+  const applyVisualCuts = (cutPositions) => {
+    try {
+      setRanges(cutPositions.length ? splitRangesFromCuts(cutPositions, pages.length) : '');
+      setSplitMode('ranges');
+      setPendingVisualCut(null);
+      setError(''); setNotice('');
+    } catch {
+      setError(t.invalidRange);
+      setNotice('');
+    }
+  };
+  const restoreVisualCutFocus = (afterPage) => {
+    setPendingVisualCut(null);
+    // Restore the previous position on Cancel or Replace so keyboard users
+    // do not lose their place in a book-length page grid.
+    requestAnimationFrame(() => {
+      document.querySelector('[data-testid="visual-split-cut"][data-after-page="' + afterPage + '"]')?.focus();
+    });
+  };
+  const toggleVisualCut = (afterPage) => {
+    if (busy || afterPage < 1 || afterPage >= pages.length) return;
+    if (splitMode === 'ranges' && ranges.trim() && visualCuts === null) {
+      setPendingVisualCut(afterPage);
+      return;
+    }
+    const cuts = splitMode === 'ranges' ? visualCuts ?? [] : [];
+    applyVisualCuts(cuts.includes(afterPage)
+      ? cuts.filter(n => n !== afterPage) : [...cuts, afterPage]);
+  };
 
   // Retain PDF.js loading tasks so the worker and its memory are truly released on reset/unmount.
   const getPreviewDoc = useCallback((source) => {
@@ -371,6 +414,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         // an explicit range or pages-per-file choice before ZIP download.
         setRanges('');
         setChunkSize('');
+        setPendingVisualCut(null);
         setSplitMode('ranges');
         setDownloadNameInput('');
         setMoveTargetInput('');
@@ -682,7 +726,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
     setPageView('order'); setCollapsedSources(new Set());
     setLastDownloadedRevision(null);
-    setRanges(''); setChunkSize(''); setSplitMode('ranges');
+    setRanges(''); setChunkSize(''); setSplitMode('ranges'); setPendingVisualCut(null);
     setSelectionRanges(''); setMoveTargetInput(''); setMovePlacement('before'); setDownloadNameInput(''); setJumpInput(''); setPendingJump(null);
     // A fresh image-to-PDF workspace must not inherit a previous crop choice.
     setImageLayout({ ...IMAGE_PDF_LAYOUT_DEFAULT });
@@ -1177,13 +1221,66 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
               <section className="split-panel" aria-label={t.splitTitle} role="tabpanel" id="workspace-panel-split" aria-labelledby="workspace-tab-split">
                 <div className="split-intro"><div className="split-graphic" aria-hidden="true">1–3 <span>→</span> 4–6</div><h3>{t.splitTitle}</h3><p>{t.splitHint}</p></div>
                 <div className="split-fields">
-                  <label className="option-radio"><input type="radio" name="split-method" checked={splitMode === 'ranges'} disabled={busy} onChange={() => setSplitMode('ranges')} />{t.byRanges}</label>
+                  <label className="option-radio"><input type="radio" name="split-method" checked={splitMode === 'ranges'} disabled={busy} onChange={() => { setSplitMode('ranges'); setPendingVisualCut(null); }} />{t.byRanges}</label>
                   <label className="input-label" htmlFor="ranges-input">{t.pageRanges}</label>
-                  <input id="ranges-input" value={ranges} onChange={(event) => setRanges(event.target.value)} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7" />
+                  <input id="ranges-input" value={ranges} onChange={(event) => { setRanges(event.target.value); setPendingVisualCut(null); }} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7" />
                   <p className="input-note">{t.rangeHint}</p>
-                  <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => setSplitMode('chunks')} />{t.every}</label>
+                  <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); }} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
                   <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} placeholder="5" onChange={(event) => setChunkSize(event.target.value)} disabled={splitMode !== 'chunks' || busy} />
+                  {pages.length > 1 && <details className="split-visual-panel" data-testid="visual-split-panel"
+                    open={visualSplitOpen} onToggle={event => setVisualSplitOpen(event.currentTarget.open)}>
+                    <summary>{t.visualSplitToggle}</summary>
+                    <p className="input-note">{t.visualSplitHint}</p>
+                    {visualCuts?.length > 0 && splitMode === 'ranges' &&
+                      <button type="button" className="button button-secondary button-small"
+                        data-testid="visual-split-clear" disabled={busy}
+                        onClick={() => applyVisualCuts([])}>{t.visualSplitClear}</button>}
+                    {pendingVisualCut !== null && <div className="workspace-clear-confirm"
+                      ref={visualConfirmRef} tabIndex={-1}
+                      role="group" aria-label={t.visualSplitConfirmTitle}
+                      data-testid="visual-split-confirm">
+                      <p>{t.visualSplitConfirmText}</p>
+                      <div className="workspace-clear-buttons">
+                        <button type="button" className="button button-secondary button-small"
+                          data-testid="visual-split-keep"
+                          onClick={() => restoreVisualCutFocus(pendingVisualCut)}>{t.visualSplitKeep}</button>
+                        <button type="button" className="button button-secondary button-small"
+                          data-testid="visual-split-replace"
+                          onClick={() => {
+                            const afterPage = pendingVisualCut;
+                            applyVisualCuts([afterPage]);
+                            restoreVisualCutFocus(afterPage);
+                          }}>{t.visualSplitReplace}</button>
+                      </div>
+                    </div>}
+                    {visualSplitOpen && <div className="split-visual-grid" data-testid="visual-split-grid">
+                      {pages.map((pageRef, index) => {
+                        const afterPage = index + 1;
+                        const isCut = Boolean(visualCuts?.includes(afterPage) && splitMode === 'ranges');
+                        const source = sourceLookup.get(pageRef.sourceId);
+                        return <div className={'split-visual-tile' + (isCut ? ' is-cut' : '')}
+                          key={pageRef.id} data-testid="visual-split-page"
+                          data-export-position={afterPage}>
+                          <span className="split-visual-number">
+                            {interpolate(t.visualSplitPage, { n: afterPage })}
+                          </span>
+                          <PageThumbnail source={source} pageRef={pageRef} getPreviewDoc={getPreviewDoc}
+                            locale={locale} t={t} watermarkPreview={watermarkPreview}
+                            onOpen={setPreviewPageId} outputPosition={afterPage} busy={busy} />
+                          {afterPage < pages.length
+                            ? <button type="button" className="button button-secondary button-small"
+                                data-testid="visual-split-cut" data-after-page={afterPage}
+                                aria-pressed={isCut} disabled={busy || pendingVisualCut !== null}
+                                aria-label={interpolate(t.visualSplitCutAfter, { n: afterPage })}
+                                onClick={() => toggleVisualCut(afterPage)}>
+                                {isCut ? t.visualSplitUndoCut : t.visualSplitCut}
+                              </button>
+                            : <span className="split-visual-last">{t.visualSplitLast}</span>}
+                        </div>;
+                      })}
+                    </div>}
+                  </details>}
                   <div className="split-estimate" aria-live="polite">{splitEstimate === null ? (splitNeedsInput ? (splitMode === 'ranges' ? t.enterSplitRanges : t.enterSplitSize) : t.invalidRange) : interpolate(t.estimate, { files: splitEstimate })}</div>
                   {splitPlan && <div className="split-coverage-review" aria-live="polite" data-testid="split-coverage-review">
                     {splitPlan.coverage.complete && <p className="input-note" data-testid="split-coverage-complete">{interpolate(t.splitCoverageComplete, { total: splitPlan.coverage.total })}</p>}
