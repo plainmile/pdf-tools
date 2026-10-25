@@ -18,7 +18,7 @@ export const tools = [
     slug: 'split-pdf', title: 'Split PDF', short: 'Separate into smaller files',
     headline: 'Split a PDF into just the sections you need.',
     description: 'Split PDF pages by ranges, every N pages, or into separate odd/even PDF files. Single results download as PDF; multiple results as ZIP, without uploads.',
-    details: 'Enter ranges such as 1-3, 4-6 (one output PDF per range), choose a fixed number of pages per PDF, or split odd/even page positions into two PDFs. All modes follow the current page order.',
+    details: 'Enter ranges such as 1-3, 4-6 (one output PDF per range), choose a fixed number of pages per PDF, or split odd/even page positions into two PDFs. All modes follow the current page order. For long PDFs, a page counter shows copied output pages before the separate ZIP packaging step; cancellation leaves no partial download.',
     steps: ['Add your PDF', 'Choose ranges, every N pages, or odd/even splitting', 'Download a PDF or ZIP'],
   },
   {
