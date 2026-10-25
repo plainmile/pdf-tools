@@ -79,13 +79,14 @@ export async function loadPdf(file, mode = 'pdf-to-txt', locale = 'en', signal =
     enforceUtilityPdfLimits({ size: file.size, count: document.count }, mode, locale);
     return { bytes, count: document.count, size: file.size, name: file.name };
   } finally {
-    await document.destroy();
+    // A stalled PDF.js shutdown must not prevent Cancel from restoring controls.
+    await abortableWait(document.destroy(), signal);
   }
 }
 
 async function openPdfJs(bytes, signal = null) {
   checkCancelled(signal);
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const pdfjs = await abortableWait(import('pdfjs-dist/legacy/build/pdf.mjs'), signal);
   checkCancelled(signal);
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs';
   // Pass a copy: PDF.js transfers its buffer to its worker.
