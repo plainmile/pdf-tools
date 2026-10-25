@@ -101,9 +101,9 @@ export const tools = [
   {
     slug: 'add-page-numbers', title: 'Add PDF Page Numbers', short: 'Skip covers or number every page',
     headline: 'Add clear page numbers to your PDF.',
-    description: 'Add selectable page numbers starting on any chosen PDF page, with a custom first number, position and font size. Skip cover pages locally.',
-    details: 'Choose the first PDF page to number and the number printed on it. Earlier cover or contents pages remain unnumbered. Place numbers at the bottom center, bottom right or top right.',
-    steps: ['Choose a PDF', 'Choose which page starts numbering', 'Download the numbered document'],
+    description: 'Add selectable PDF page numbers with six positions, adjustable edge spacing, a custom starting number and page-by-page preview. Skip covers locally without uploads.',
+    details: 'Choose the first PDF page to number and the number printed there. Earlier cover or contents pages remain unnumbered. Pick any of six top/bottom positions and a safe 12, 24 or 40 pt edge inset. Inspect the first numbered, last or any chosen page of the generated PDF before downloading. Very small pages reject margins that would clip the number.',
+    steps: ['Choose a PDF and numbering settings', 'Inspect any page of the generated PDF', 'Download after checking number placement'],
   },
   {
     slug: 'image-to-pdf', title: 'Images to PDF', short: 'Custom pages and margins',
