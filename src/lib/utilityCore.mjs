@@ -604,16 +604,34 @@ export function textContentToReadingOrderLines(content, order = 'rows', viewport
   const ordered = order === 'left-first' ? columns : [columns[1], columns[0]];
   return ordered.flatMap(items => textContentToLines({ items }));
 }
-/** Surface incomplete PDF text extraction instead of implying success.
- * A blank page and an image-only/scanned page are indistinguishable by their
- * text layer alone, so report "no selectable text", not "scanned".
+/** A small selectable page number is not evidence that the body of a
+ * scanned page was extracted. Check only non-whitespace text, not line count.
  */
-export function summarizeTextCoverage(pages) {
+export function hasMinimalSelectableText(lines, maxCharacters = 24) {
+  if (!Array.isArray(lines) || !lines.length) return false;
+  let count = 0;
+  for (const line of lines) {
+    count += String(line.text ?? '').replace(/\s/gu, '').length;
+    if (count > maxCharacters) return false;
+  }
+  return count > 0;
+}
+
+/** Surface empty pages and image-backed pages with almost no selectable text.
+ * An image may be a photograph rather than a scan; callers must describe
+ * suspicious pages as "review required", not claim OCR detection certainty.
+ */
+export function summarizeTextCoverage(pages, sparseImagePageNumbers = []) {
   const missingPages = [];
+  const suspectPages = [];
+  const imagePages = new Set(sparseImagePageNumbers);
   for (let index = 0; index < pages.length; index++) {
     if (!pages[index].length) missingPages.push(index + 1);
+    else if (imagePages.has(index + 1) && hasMinimalSelectableText(pages[index])) {
+      suspectPages.push(index + 1);
+    }
   }
-  return { total: pages.length, withText: pages.length - missingPages.length, missingPages };
+  return { total: pages.length, withText: pages.length - missingPages.length, missingPages, suspectPages };
 }
 
 export function linesToReadableText(pages, markdown = false) {
