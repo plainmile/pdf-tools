@@ -302,6 +302,34 @@ test('explicit multi-column text order keeps each column together and handles ro
   assert.throws(()=>textContentToReadingOrderLines(content,'left-first',null),/viewport/);
 });
 
+test('rows follow visible lines for PDF pages rotated 90 and 180 degrees', () => {
+  // In /Rotate 90 the raw PDF Y axis becomes visible X, while raw X
+  // becomes the vertical reading order. A raw PDF Y sort mistakenly merges
+  // both visible rows by column.
+  const rotated90 = { items: [
+    { str: 'BOTTOM_RIGHT', transform: [0,12,-12,0,140,520], width: 100, height: 12 },
+    { str: 'TOP_LEFT', transform: [0,12,-12,0,100,100], width: 75, height: 12 },
+    { str: 'BOTTOM_LEFT', transform: [0,12,-12,0,140,100], width: 100, height: 12 },
+    { str: 'TOP_RIGHT', transform: [0,12,-12,0,100,520], width: 90, height: 12 },
+  ] };
+  const viewport90 = { width: 800, convertToViewportPoint: (x,y) => [y,x] };
+  assert.deepEqual(textContentToReadingOrderLines(rotated90, 'rows', viewport90).map(line => line.text),
+    ['TOP_LEFT TOP_RIGHT', 'BOTTOM_LEFT BOTTOM_RIGHT']);
+  assert.notDeepEqual(textContentToReadingOrderLines(rotated90, 'rows').map(line => line.text),
+    ['TOP_LEFT TOP_RIGHT', 'BOTTOM_LEFT BOTTOM_RIGHT']);
+  // 180-degree PDFs invert the original X/Y axes: visible top/left
+  // are no longer at the highest raw Y and lowest raw X.
+  const rotated180 = { items: [
+    { str: 'BOTTOM_RIGHT', transform: [-12,0,0,-12,80,500], width: 100, height: 12 },
+    { str: 'TOP_LEFT', transform: [-12,0,0,-12,500,100], width: 80, height: 12 },
+    { str: 'BOTTOM_LEFT', transform: [-12,0,0,-12,500,500], width: 100, height: 12 },
+    { str: 'TOP_RIGHT', transform: [-12,0,0,-12,80,100], width: 90, height: 12 },
+  ] };
+  const viewport180 = { width: 600, convertToViewportPoint: (x,y) => [600-x,y] };
+  assert.deepEqual(textContentToReadingOrderLines(rotated180, 'rows', viewport180).map(line => line.text),
+    ['TOP_LEFT TOP_RIGHT', 'BOTTOM_LEFT BOTTOM_RIGHT']);
+});
+
 test('PDF positioned text is approximately sorted by vertical position then X', () => {
   const items = [
     { str: 'right', transform: [1,0,0,12, 100, 300], height: 12, width: 25 },

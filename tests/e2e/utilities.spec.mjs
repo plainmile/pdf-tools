@@ -1174,27 +1174,33 @@ test('numbering rejects too-small pages and page labels over 99999 in Chinese', 
   await expect(page.getByRole('alert')).toContainText('不能超过 99999');
 });
 
-test('changing any page numbering setting removes stale finished-result messaging', async ({ page }) => {
+test('changing page numbering settings marks the preserved preview stale and clears the old success toast', async ({ page }) => {
   await page.goto('/add-page-numbers/');
   await upload(page, await fixturePdf('New page number workflow', 2));
   const run = async () => { await page.getByTestId('utility-run').click(); await page.getByTestId('numbered-pdf-download').click(); };
   await getDownload(page, run);
+  await expect(page.getByTestId('numbered-result-stale')).toHaveCount(0);
   await expect(page.getByRole('status')).toContainText('Numbered PDF generated');
   await expect(page.getByTestId('utility-next-step')).toBeVisible();
 
   await page.getByTestId('number-start').fill('41');
-  await expect(page.getByRole('status')).toHaveCount(0);
+  await expect(page.getByTestId('numbered-result-stale')).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('previous page-number settings');
   await expect(page.getByTestId('utility-next-step')).toHaveCount(0);
 
   await getDownload(page, run);
+  await expect(page.getByTestId('numbered-result-stale')).toHaveCount(0);
   await expect(page.getByRole('status')).toContainText('Numbered PDF generated');
   await page.getByRole('combobox', { name: 'Position' }).selectOption('top-right');
-  await expect(page.getByRole('status')).toHaveCount(0);
+  await expect(page.getByTestId('numbered-result-stale')).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('previous page-number settings');
 
   await getDownload(page, run);
+  await expect(page.getByTestId('numbered-result-stale')).toHaveCount(0);
   await expect(page.getByRole('status')).toContainText('Numbered PDF generated');
   await page.getByRole('combobox', { name: 'Font size' }).selectOption('16');
-  await expect(page.getByRole('status')).toHaveCount(0);
+  await expect(page.getByTestId('numbered-result-stale')).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('previous page-number settings');
 
   const numbered = await getDownload(page, run);
   await page.goto('/pdf-to-txt/');
