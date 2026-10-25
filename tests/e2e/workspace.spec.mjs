@@ -1382,6 +1382,8 @@ test('visual split previews create correct ZIP partitions and protect custom typ
   });
   await expect(page.locator('.file-count')).toContainText('6 pages');
   const panel = page.getByTestId('visual-split-panel');
+  // Even a 600-page book must not mount 600 extra thumbnails before opening.
+  await expect(page.getByTestId('visual-split-page')).toHaveCount(0);
   await panel.locator('summary').click();
   await expect(page.getByTestId('visual-split-page')).toHaveCount(6);
   const cut2 = page.locator('[data-testid="visual-split-cut"][data-after-page="2"]');
