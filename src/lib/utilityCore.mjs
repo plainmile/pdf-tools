@@ -569,28 +569,28 @@ export function textContentToLines(content) {
   }).filter(line => line.text);
 }
 
-/** Explicit two-column reading order. PDF text streams are positioned, not
- * semantically ordered: a baseline-first scan interleaves two newspaper
- * columns. Keep the existing row-major algorithm as the default for tables.
- * The supplied PDF.js viewport maps CropBox origin / page rotation into the
- * visible page coordinate system before dividing the page vertically.
- * Full-width headings and complex tables are still approximate.
+/** PDF text is positioned, not semantically ordered. On /Rotate 90/180/270
+ * pages raw user-space Y/X do not match visible rows/columns. The optional
+ * PDF.js viewport maps text origins into visible page coordinates first.
+ * Row reading order remains the default for tables; explicit two-column modes
+ * handle left/right article layout. Complex layouts remain approximate.
  */
 export function textContentToReadingOrderLines(content, order = 'rows', viewport = null) {
-  if (order === 'rows') return textContentToLines(content);
-  if (!['left-first', 'right-first'].includes(order)) throw new Error('Unsupported PDF text reading order.');
+  if (!['rows', 'left-first', 'right-first'].includes(order)) throw new Error('Unsupported PDF text reading order.');
+  // Preserve the existing fast path for unrotated PDF pages.
+  if (order === 'rows' && !viewport) return textContentToLines(content);
   if (!viewport || !Number.isFinite(viewport.width) || viewport.width <= 0 ||
       typeof viewport.convertToViewportPoint !== 'function') {
-    throw new Error('PDF page viewport is required for column reading order.');
+    throw new Error('PDF page viewport is required for visual reading order.');
   }
+  const rows = [];
   const columns = [[], []];
   for (const item of content.items) {
     if (typeof item.str !== 'string' || !item.str.trim()) continue;
     const x = Number(item.transform?.[4]);
     const y = Number(item.transform?.[5]);
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
-      // A malformed item cannot be safely allocated to a column; returning
-      // original row order is less damaging than silently dropping its text.
+      // Return original approximate order rather than silently dropping text.
       return textContentToLines(content);
     }
     const [visibleX, visibleY] = viewport.convertToViewportPoint(x, y);
@@ -599,8 +599,10 @@ export function textContentToReadingOrderLines(content, order = 'rows', viewport
       ...item,
       transform: [0, 0, 0, 0, visibleX, -visibleY],
     };
-    columns[visibleX < viewport.width / 2 ? 0 : 1].push(normalized);
+    if (order === 'rows') rows.push(normalized);
+    else columns[visibleX < viewport.width / 2 ? 0 : 1].push(normalized);
   }
+  if (order === 'rows') return textContentToLines({ items: rows });
   const ordered = order === 'left-first' ? columns : [columns[1], columns[0]];
   return ordered.flatMap(items => textContentToLines({ items }));
 }
