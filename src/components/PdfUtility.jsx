@@ -65,19 +65,51 @@ const COPY = {
 function PdfFirstPagePreview({ bytes, pageCount, t, locale, pageNumber = 1 }) {
   const canvasRef = useRef(null);
   const [failed, setFailed] = useState(false);
+  const [pdfState, setPdfState] = useState(null);
+  const [renderedPage, setRenderedPage] = useState(null);
+
+  // One generated PDF = one PDF.js loading task. Merely browsing page 2,
+  // page 300, or the last page must NOT copy/parse the entire 100 MB PDF
+  // again or create a new worker for each navigation. A new output byte
+  // array or unmount disposes of the previous task and its worker.
   useEffect(() => {
-    let closed = false, task, loadingTask, pdfPage;
-    const canvas = canvasRef.current;
+    let disposed = false, loadingTask;
+    setPdfState(null);
+    setRenderedPage(null);
     setFailed(false);
     (async () => {
       const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-      if (closed) return;
+      if (disposed) return;
       pdfjs.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs';
+      // PDF.js transfers its input buffer to the worker; never transfer the
+      // React-owned result bytes that are still needed for Download.
       loadingTask = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true });
-      const doc = await loadingTask.promise;
-      if (closed) return;
-      pdfPage = await doc.getPage(pageNumber);
-      if (closed) return;
+      const document = await loadingTask.promise;
+      if (!disposed) setPdfState({ bytes, document });
+    })().catch(error => {
+      if (!disposed && error?.name !== 'RenderingCancelledException') setFailed(true);
+    });
+    return () => {
+      disposed = true;
+      if (loadingTask) void loadingTask.destroy().catch(() => {});
+    };
+  }, [bytes]);
+
+  // Each page render is short-lived, even though the document is reused.
+  // Fast page switches cancel the previous render; a late getPage response
+  // is cleaned up rather than rendered into the new page's canvas.
+  useEffect(() => {
+    let closed = false, task, pdfPage;
+    const canvas = canvasRef.current;
+    if (!pdfState || pdfState.bytes !== bytes) {
+      if (canvas) { canvas.width = 0; canvas.height = 0; }
+      return undefined;
+    }
+    setFailed(false);
+    setRenderedPage(null);
+    (async () => {
+      pdfPage = await pdfState.document.getPage(pageNumber);
+      if (closed) { pdfPage.cleanup(); return; }
       const base = pdfPage.getViewport({ scale: 1 });
       const viewport = pdfPage.getViewport({ scale: Math.min(1, 550 / base.width) });
       const density = Math.min(window.devicePixelRatio || 1, 2);
@@ -89,6 +121,7 @@ function PdfFirstPagePreview({ bytes, pageCount, t, locale, pageNumber = 1 }) {
       ctx.setTransform(density, 0, 0, density, 0, 0);
       task = pdfPage.render({ canvasContext: ctx, canvas, viewport });
       await task.promise;
+      if (!closed) setRenderedPage(pageNumber);
     })().catch(error => {
       if (!closed && error?.name !== 'RenderingCancelledException') setFailed(true);
     });
@@ -96,11 +129,12 @@ function PdfFirstPagePreview({ bytes, pageCount, t, locale, pageNumber = 1 }) {
       closed = true;
       task?.cancel();
       pdfPage?.cleanup();
-      loadingTask?.destroy().catch(() => {});
-      if (canvas) { canvas.width = 0; canvas.height = 0; }
+      if (canvas) { canvas.width = 0; canvas.height = 0; canvas.style.width = ''; }
     };
-  }, [bytes, pageNumber]);
-  return <div className="utility-preview" data-testid="utility-pdf-preview">
+  }, [pdfState, bytes, pageNumber]);
+
+  return <div className="utility-preview" data-testid="utility-pdf-preview"
+    data-rendered-page={renderedPage === pageNumber ? String(pageNumber) : undefined}>
     <strong>{t.previewTitle}</strong>
     <p className="utility-note">{pageNumber === 1 ? t.previewFirst.replace('{pages}', pageCount) : (locale === 'zh' ? `预览第 ${pageNumber} / ${pageCount} 页` : `Preview page ${pageNumber} of ${pageCount}`)}</p>
     <canvas ref={canvasRef} role="img" aria-label={locale === 'zh' ? (pageNumber === 1 ? 'PDF 首页预览' : `PDF 第 ${pageNumber} 页预览`) : (pageNumber === 1 ? 'PDF first page preview' : `PDF page ${pageNumber} preview`)}
