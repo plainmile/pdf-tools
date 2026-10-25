@@ -82,7 +82,8 @@ test('mobile PDF forms use readable 16px input text without causing horizontal o
   await page.getByTestId('file-input').setInputFiles({
     name: 'phone.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await pdf.save()),
   });
-  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  await expect(page.locator('.file-count')).toContainText('1 页');
+  await expect(page.locator('.split-intro')).toBeVisible();
   await inspect(['#ranges-input', '#chunk-input', '#download-name-input']);
 
   const meta = await page.locator('meta[name="viewport"]').getAttribute('content');
