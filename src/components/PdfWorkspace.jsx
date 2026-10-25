@@ -608,7 +608,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           // A one-piece export covering the entire edited workspace is
           // equivalent to Export PDF; don't warn about work already saved.
           if (completeSplit) setLastDownloadedRevision(documentRevision);
-          setNotice(t.splitSingleSaved);
+          setNotice(batch ? interpolate(
+            batch.index + 1 === batch.total ? t.splitFinalBatchDownloaded : t.splitBatchDownloaded,
+            { index: batch.index + 1, total: batch.total },
+          ) : t.splitSingleSaved);
           return;
         }
         zip.file(`part-${String(index + 1).padStart(2, '0')}-pages-${range.start}-${range.end}.pdf`, contents);
@@ -631,7 +634,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         ? `${outputBase}-pages-${batch.start}-${batch.end}-split.zip` : `${outputBase}-split.zip`, 'application/zip');
       if (completeSplit) setLastDownloadedRevision(documentRevision);
       setNotice(batch
-        ? interpolate(t.splitBatchDownloaded, { index: batch.index + 1, total: batch.total })
+        ? interpolate(batch.index + 1 === batch.total ? t.splitFinalBatchDownloaded : t.splitBatchDownloaded,
+          { index: batch.index + 1, total: batch.total })
         : interpolate(t.zipped, { files: pieces.length }));
     } finally {
       splitAbortRef.current = null;

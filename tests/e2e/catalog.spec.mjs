@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { PDFDocument } from 'pdf-lib';
 
 test('English tool catalog presents grouped static links and four popular shortcuts', async ({ page }) => {
   await page.goto('/');
@@ -97,6 +98,17 @@ test('tool landing page contains contextual related links and indexable FAQ when
   } finally {
     await ctx.close();
   }
+});
+
+test('Chinese split copy explains per-download limits and 50-file batches for long books', async ({ page }) => {
+  await page.goto('/zh/split-pdf/');
+  const pdf = await PDFDocument.create();
+  pdf.addPage([300, 300]);
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'sample.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await pdf.save()),
+  });
+  await expect(page.locator('.split-intro')).toContainText('每批下载最多 50 份');
+  await expect(page.locator('.split-intro')).not.toContainText('最多生成 50 份');
 });
 
 test('both languages visibly credit the original website, including when JavaScript is off', async ({ browser }) => {

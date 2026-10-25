@@ -184,7 +184,8 @@ export async function compressPdfRaster(pdf, options = {}, reportProgress = () =
   const quality = options.quality === .8 ? .8 : options.quality === .55 ? .55 : .7;
   enforceUtilityPdfLimits(pdf, 'compress-pdf', options.locale);
   const source = await openPdfJs(pdf.bytes, options.signal);
-  const output = await PDFDocument.create();
+  // New rasterized PDFs must not insert implicit library metadata.
+  const output = await PDFDocument.create({ updateMetadata: false });
   let jpegBytes = 0;
   try {
     for (let i = 1; i <= pdf.count; i++) {
@@ -379,7 +380,8 @@ export async function textToPdf(text, markdown = false, options = {}) {
   // Keep interior blank lines: those can separate real paragraphs.
   while (blocks.at(-1)?.kind === 'gap') blocks.pop();
   if (!blocks.some(b => b.text.trim())) throw new Error('Enter some text first.');
-  const doc = await PDFDocument.create();
+  // TXT/Markdown output is a new document, not a metadata scrubber.
+  const doc = await PDFDocument.create({ updateMetadata: false });
   const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const mono = await doc.embedFont(StandardFonts.Courier);

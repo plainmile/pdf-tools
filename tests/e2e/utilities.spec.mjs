@@ -42,6 +42,16 @@ async function getDownload(page, action, timeout = 6000) {
   return { name: download.suggestedFilename(), bytes: await readFile(await download.path()) };
 }
 
+async function assertNoDefaultPdfMetadata(bytes) {
+  // Reading with default pdf-lib options would itself add Producer metadata.
+  const pdf = await PDFDocument.load(bytes, { updateMetadata: false });
+  expect(pdf.getProducer()).toBeUndefined();
+  expect(pdf.getCreator()).toBeUndefined();
+  expect(pdf.getTitle()).toBeUndefined();
+  expect(pdf.getCreationDate()).toBeUndefined();
+  expect(pdf.getModificationDate()).toBeUndefined();
+}
+
 test('two-column PDF text extraction has explicit row, left and right orders and preserves old results', async ({ page }) => {
   const source = await PDFDocument.create();
   const pagePdf = source.addPage([600, 800]);
@@ -221,6 +231,7 @@ test('compression never auto-downloads, blocks a larger PDF, and shows actual by
   const compressed = await getDownload(page, () => page.getByTestId('compression-download').click());
   expect(compressed.bytes.byteLength).toBeLessThan(input.byteLength);
   expect((await PDFDocument.load(compressed.bytes)).getPageCount()).toBe(1);
+  await assertNoDefaultPdfMetadata(compressed.bytes);
   // Regenerating with the new setting replaces only after successful work.
   await page.getByTestId('utility-run').click();
   await expect(page.getByTestId('compression-result-stale')).toHaveCount(0, { timeout: 30000 });
@@ -339,6 +350,7 @@ test('UTF-16 LE TXT import preserves text through real PDF and TXT downloads', a
   await expect(page.getByTestId('utility-text')).toHaveValue(value);
   const generated = await generateTextPdfAndDownload(page);
   expect((await PDFDocument.load(generated.bytes)).getPageCount()).toBe(1);
+  await assertNoDefaultPdfMetadata(generated.bytes);
   await page.goto('/pdf-to-txt/');
   await upload(page, generated.bytes);
   const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
@@ -370,6 +382,7 @@ test('UTF-16 BE Markdown imports Chinese correctly; malformed text preserves old
   await expect(page.getByTestId('text-pdf-result')).toBeVisible();
   const downloaded = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
   expect((await PDFDocument.load(downloaded.bytes)).getPageCount()).toBe(1);
+  await assertNoDefaultPdfMetadata(downloaded.bytes);
 });
 
 test('TXT to PDF yields selectable text after real download and re-import', async ({ page }) => {

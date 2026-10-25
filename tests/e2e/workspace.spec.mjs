@@ -459,7 +459,7 @@ test('invalid split ranges disable download until corrected', async ({ page }) =
   await expect(page.locator('.split-estimate')).toContainText('Enter page ranges');
   await page.getByRole('textbox', { name: 'Page ranges', exact: true }).fill('3-1');
   await expect(button).toBeDisabled();
-  await expect(page.locator('.split-estimate')).toContainText('maximum 50 output PDFs');
+  await expect(page.locator('.split-estimate')).toContainText('maximum 50 PDFs per download');
   await page.getByRole('textbox', { name: 'Page ranges', exact: true }).fill('1-2, 3');
   await expect(button).toBeEnabled();
 });
@@ -660,6 +660,15 @@ test('split output count over 50 is explained before download', async ({ page })
   const singleDownload = page.locator('.split-download');
   await expect(singleDownload).toContainText('Download PDF');
   await expect(singleDownload).toBeEnabled();
+  await expect(page.getByTestId('split-batch-nav')).toContainText('one-page batch downloads as PDF');
+  const lastPageDownloading = page.waitForEvent('download');
+  await singleDownload.click();
+  const lastPageDownload = await lastPageDownloading;
+  expect(lastPageDownload.suggestedFilename()).toBe('fifty-one-pages-51-51.pdf');
+  const lastPagePdf = await PDFDocument.load(await readFile(await lastPageDownload.path()));
+  expect(lastPagePdf.getPageCount()).toBe(1);
+  await expect(page.locator('.notice-success')).toContainText('Final batch (2 of 2) downloaded');
+  await expect(page.locator('.notice-success')).not.toContainText('Next batch');
   await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('2');
   await expect(page.getByTestId('split-batch-nav')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Download split PDFs (ZIP)' })).toBeEnabled();
@@ -696,6 +705,10 @@ test('105-page book downloads three separate, correctly numbered per-page ZIP ba
       expect(pdf.getPage(0).getWidth()).toBe(299 + pageNumber);
     }
     await expect(page.getByTestId('split-coverage-omitted')).toHaveCount(0);
+    if (batch === 3) {
+      await expect(page.locator('.notice-success')).toContainText('Final batch (3 of 3) downloaded');
+      await expect(page.locator('.notice-success')).not.toContainText('Next batch');
+    }
     if (batch < 3) await page.getByTestId('split-batch-next').click();
   }
   await expect(page.getByTestId('split-batch-next')).toBeDisabled();
