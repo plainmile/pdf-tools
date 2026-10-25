@@ -1471,6 +1471,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                           ? interpolate(t.splitParityPreviewPart, {
                             name: part.kind === 'odd' ? t.splitOddName : t.splitEvenName,
                             count: part.positions.length,
+                            unit: part.positions.length === 1 ? t.page : t.pages,
                           })
                           : interpolate(t.splitPreviewPart, {
                             index: index + 1, start: part.start, end: part.end, count: part.end - part.start + 1,
