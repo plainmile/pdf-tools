@@ -24,7 +24,7 @@ const COPY = {
     textLabel: 'Text to convert', textPlaceholder: 'Paste text here or import a .txt / .md file…',
     textInputHint: 'Import UTF-8 or BOM-marked UTF-16 text. Pages containing characters unsupported by built-in PDF fonts use local browser fonts as images; other pages keep selectable text.',
     markdownInputHint: 'Import UTF-8 or BOM-marked UTF-16 text. Supports basic headings, lists, quotes and code blocks, not external images, HTML or complex tables. Link addresses appear as text, not clickable links. Pages requiring unsupported glyphs become images; other pages remain searchable.',
-    pageStart: 'First printed number', firstPage: 'Start numbering on PDF page', firstPageReset: 'The new PDF is shorter than the previous starting page. Numbering has been reset to PDF page 1.', firstPageHint: 'Pages before this page (such as a cover or contents) stay unnumbered. The first numbered page displays the number above.', pagePosition: 'Position', pageSize: 'Font size', bottomCenter: 'Bottom center', bottomRight: 'Bottom right', topRight: 'Top right',
+    pageStart: 'First printed number', firstPage: 'Start numbering on PDF page', firstPageReset: 'The new PDF is shorter than the previous starting page. Numbering has been reset to PDF page 1.', firstPageHint: 'Pages before this page (such as a cover or contents) stay unnumbered. The first numbered page displays the number above.', pagePosition: 'Position', pageSize: 'Font size', pageMargin: 'Spacing from edges', marginNarrow: 'Narrow (12 pt)', marginNormal: 'Normal (24 pt)', marginWide: 'Wide (40 pt)', bottomLeft: 'Bottom left', bottomCenter: 'Bottom center', bottomRight: 'Bottom right', topLeft: 'Top left', topCenter: 'Top center', topRight: 'Top right', customPreview: 'Choose a PDF page', customPage: 'PDF page to preview', previewPreparing: 'Preparing the selected page…', invalidPreviewPage: 'Choose a whole page number between 1 and {pages}.',
     numbersHint: 'Adds selectable page numbers starting at the chosen PDF page, leaving earlier pages unnumbered. Preserves page size. Review annotations and digital signatures before using this modified file.',
     numberedResultStale: 'This preview is from your previous page-number settings. Generate again to apply the current settings; you can still download the earlier PDF.', numberedPreviousDownload: 'Download previous PDF',
     ready: 'Ready to download', noPdf: 'Select a PDF first.', noText: 'Enter text to convert.', sizeLimit: 'PDF up to 100 MB / 1,000 pages; TXT / Markdown up to 5 MB.', limitText: 'TXT / Markdown up to 5 MB; PDF output: up to 1,000 pages (300 image-based pages for CJK).', limitImages: 'PDF up to 100 MB / 1,000 pages; up to 60 selected image pages per batch.', limitCompression: 'PDF up to 100 MB / 120 pages; JPEG output safety budget 96 MB.', limitGeneral: 'PDF up to 100 MB / 1,000 pages.', heavyWarning: 'Large document: processing hundreds of pages may take time and require substantial device memory. Close other heavy tabs if necessary.', progressLabel: 'Processed {done} of {total} pages', tooMuchText: 'Text exceeds 5 MB.',
@@ -51,7 +51,7 @@ const COPY = {
     textLabel: '需要转换的文本', textPlaceholder: '粘贴文字，或选择 .txt / .md 文件……',
     textInputHint: '支持 UTF-8 或带 BOM 的 UTF-16 文本。含内置 PDF 字体不支持字符的页面将使用本地字体图片化，其他页面保留可选中、可搜索的文字。',
     markdownInputHint: '导入支持 UTF-8 或带 BOM 的 UTF-16。支持基础标题、列表、引用和代码块；不支持远程图片、HTML、完整表格或复杂 Markdown。链接地址显示为普通文字，不成为可点击的链接。需要特殊字体的页面会图片化，其他页面仍可搜索。',
-    pageStart: '显示的起始数字', firstPage: '从 PDF 第几页开始编号', firstPageReset: '新 PDF 的页数不足以使用之前的起始编号位置，已重置为从 PDF 第 1 页开始。', firstPageHint: '前面的封面、目录等页面不会添加页码；开始编号的那一页使用上方指定的起始数字。', pagePosition: '页码位置', pageSize: '字号', bottomCenter: '底部居中', bottomRight: '右下角', topRight: '右上角',
+    pageStart: '显示的起始数字', firstPage: '从 PDF 第几页开始编号', firstPageReset: '新 PDF 的页数不足以使用之前的起始编号位置，已重置为从 PDF 第 1 页开始。', firstPageHint: '前面的封面、目录等页面不会添加页码；开始编号的那一页使用上方指定的起始数字。', pagePosition: '页码位置', pageSize: '字号', pageMargin: '距离页边', marginNarrow: '较近（12 点）', marginNormal: '标准（24 点）', marginWide: '较远（40 点）', bottomLeft: '左下角', bottomCenter: '底部居中', bottomRight: '右下角', topLeft: '左上角', topCenter: '顶部居中', topRight: '右上角', customPreview: '查看指定 PDF 页', customPage: '要预览的 PDF 页码', previewPreparing: '正在准备指定页面预览……', invalidPreviewPage: '请输入 1 至 {pages} 之间的整数页码。',
     numbersHint: '从指定 PDF 页开始添加可选择的页码，前面的页面不添加页码；保持原有纸张尺寸。重要文件请检查注释和数字签名。',
     numberedResultStale: '当前预览仍使用上一次生成时的页码设置。请重新生成以应用新设置；您也可以下载之前的 PDF。', numberedPreviousDownload: '下载之前生成的 PDF',
     ready: '文件已经生成', noPdf: '请先选择 PDF 文件。', noText: '请输入待转换的文字。', sizeLimit: 'PDF 最多 100 MB / 1000 页；TXT / Markdown 最多 5 MB。', limitText: 'TXT / Markdown 最多 5 MB；输出最多 1000 页（中文等图片化内容最多 300 页）。', limitImages: 'PDF 最多 100 MB / 1000 页；每批最多导出选定的 60 页图片。', limitCompression: 'PDF 最多 100 MB / 120 页；JPEG 数据累计上限 96 MB。', limitGeneral: 'PDF 最多 100 MB / 1000 页。', heavyWarning: '大文档提示：处理数百页时可能占用较多设备内存，并需要更长时间。建议关闭其他高负载标签页。', progressLabel: '已处理 {done} / {total} 页', tooMuchText: '文本内容超过 5 MB。',
@@ -137,9 +137,12 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const [scale, setScale] = useState('1.5');
   const [compressMode, setCompressMode] = useState('balanced');
   const [numberPreviewPage, setNumberPreviewPage] = useState('first');
+  const [numberPreviewCustom, setNumberPreviewCustom] = useState('1');
+  const [numberPreviewSettled, setNumberPreviewSettled] = useState('1');
   const [start, setStart] = useState('1');
   const [firstPage, setFirstPage] = useState('1');
   const [position, setPosition] = useState('bottom-center');
+  const [margin, setMargin] = useState('24');
   const [fontSize, setFontSize] = useState('12');
   const [busy, setBusy] = useState(false);
   const [loadingFile, setLoadingFile] = useState(false);
@@ -164,10 +167,18 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     (isTextInput && sourceText.trim() && (!textFileName || textEdited)));
   const inputLocked = busy || Boolean(pendingReplacementName);
   useEffect(() => () => { fileLoadAbortRef.current?.abort(); taskRef.current?.abort(); }, []);
+  // A book-sized file can be 100 MB. Only create a new PDF.js preview once
+  // typing has settled, rather than loading pages 5, 50 and 500 in sequence.
+  useEffect(() => {
+    if (numberPreviewPage !== 'custom') return undefined;
+    const handle = setTimeout(() => setNumberPreviewSettled(numberPreviewCustom), 300);
+    return () => clearTimeout(handle);
+  }, [numberPreviewPage, numberPreviewCustom]);
   const textResultStale = Boolean(isTextInput && output?.bytes && output.textRevision !== textRevision);
   const numberedResultStale = Boolean(mode === 'add-page-numbers' && output?.bytes && output.numberingSettings &&
     (output.numberingSettings.start !== start || output.numberingSettings.firstPage !== firstPage ||
-     output.numberingSettings.position !== position || output.numberingSettings.fontSize !== fontSize));
+     output.numberingSettings.position !== position || output.numberingSettings.fontSize !== fontSize ||
+     output.numberingSettings.margin !== margin));
 
 
   function clearOutput() {
@@ -177,7 +188,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     setClearConfirm(false); setOutput(null); setNotice(''); setError('');
     setPreview(''); setExtractionWarning(''); setProgress(null);
     setShowCompressionPreview(false); setCompressionRetryKept(false);
-    setNumberPreviewPage('first');
+    setNumberPreviewPage('first'); setNumberPreviewCustom('1'); setNumberPreviewSettled('1');
     setNotDownloaded(false);
   }
   function clearSession() {
@@ -432,10 +443,10 @@ export default function PdfUtility({ mode, locale = 'en' }) {
               .replace('{searchable}', String(created.pageCount - created.rasterPages));
         setNotice(`${t.ready}: ${created.pageCount} ${t.pages} · ${formatBytes(created.bytes.length)} · ${searchNotice}`);
       } else if (mode === 'add-page-numbers') {
-        result = { bytes: await addPageNumbers(pdf, { start: Number(start), firstPage: Number(firstPage), position, fontSize: Number(fontSize), signal: controller.signal }, report), name: `${pdfName}-numbered.pdf` };
+        result = { bytes: await addPageNumbers(pdf, { start: Number(start), firstPage: Number(firstPage), position, margin: Number(margin), fontSize: Number(fontSize), signal: controller.signal }, report), name: `${pdfName}-numbered.pdf` };
         ensureNotCancelled();
-        setOutput({ ...result, pageCount: pdf.count, numberingSettings: { start, firstPage, position, fontSize } });
-        setNumberPreviewPage('first');
+        setOutput({ ...result, pageCount: pdf.count, numberingSettings: { start, firstPage, position, fontSize, margin } });
+        setNumberPreviewPage('first'); setNumberPreviewCustom(firstPage); setNumberPreviewSettled(firstPage);
         setNotDownloaded(true);
         setNotice(locale === 'zh' ? '已生成带页码的 PDF。请检查实际页码位置，再下载。' : 'Numbered PDF generated. Check the actual page number placement before downloading.');
       }
@@ -448,6 +459,14 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     ? imagePageBatch(pdf.count, batchIndex) : null;
   const customImageRange = Boolean(imageBatch && pages !== imageBatch.range);
   const limitHint = isTextInput ? t.limitText : isCompress ? t.limitCompression : isImages ? t.limitImages : t.limitGeneral;
+  const selectedPreviewNumber = Number(numberPreviewCustom);
+  const numberPreviewValid = Boolean(output?.bytes && output.pageCount &&
+    numberPreviewCustom.trim() && Number.isSafeInteger(selectedPreviewNumber) &&
+    selectedPreviewNumber >= 1 && selectedPreviewNumber <= output.pageCount);
+  const numberPreviewReady = numberPreviewValid && numberPreviewSettled === numberPreviewCustom;
+  const numberPreviewActualPage = numberPreviewPage === 'last' ? output?.pageCount
+    : numberPreviewPage === 'custom' ? (numberPreviewReady ? selectedPreviewNumber : null)
+      : Number(output?.numberingSettings?.firstPage ?? 1);
   const description = isCompress ? t.compressionWarning : isTextOutput ? `${t.textWarning} ${mode === 'pdf-to-markdown' ? t.markdownWarning : ''}` : isTextInput ? mode === 'markdown-to-pdf' ? t.markdownInputHint : t.textInputHint : mode === 'add-page-numbers' ? t.numbersHint : t.privacy;
   return (
     <section className="pdf-workspace pdf-utility" data-testid="pdf-utility">
@@ -554,7 +573,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         {mode === 'add-page-numbers' && <div className="utility-options">
           <label><span>{t.pageStart}</span><input data-testid="number-start" type="number" min="1" max="99999" value={start} disabled={inputLocked} onChange={e => { setStart(e.target.value); setNotice(''); setError(''); }} /></label>
           <label><span>{t.firstPage}</span><input data-testid="number-first-pdf-page" type="number" min="1" max={pdf?.count || UTILITY_LIMITS.maxPages} step="1" value={firstPage} disabled={inputLocked} onChange={e => { setFirstPage(e.target.value); setNotice(''); setError(''); }} /></label>
-          <label><span>{t.pagePosition}</span><select aria-label={t.pagePosition} value={position} disabled={inputLocked} onChange={e => { setPosition(e.target.value); setNotice(''); setError(''); }}><option value="bottom-center">{t.bottomCenter}</option><option value="bottom-right">{t.bottomRight}</option><option value="top-right">{t.topRight}</option></select></label>
+          <label><span>{t.pagePosition}</span><select aria-label={t.pagePosition} value={position} disabled={inputLocked} onChange={e => { setPosition(e.target.value); setNotice(''); setError(''); }}><option value="bottom-left">{t.bottomLeft}</option><option value="bottom-center">{t.bottomCenter}</option><option value="bottom-right">{t.bottomRight}</option><option value="top-left">{t.topLeft}</option><option value="top-center">{t.topCenter}</option><option value="top-right">{t.topRight}</option></select></label>
+          <label><span>{t.pageMargin}</span><select aria-label={t.pageMargin} data-testid="number-margin" value={margin} disabled={inputLocked} onChange={e => { setMargin(e.target.value); setNotice(''); setError(''); }}><option value="12">{t.marginNarrow}</option><option value="24">{t.marginNormal}</option><option value="40">{t.marginWide}</option></select></label>
           <label><span>{t.pageSize}</span><select aria-label={t.pageSize} value={fontSize} disabled={inputLocked} onChange={e => { setFontSize(e.target.value); setNotice(''); setError(''); }}><option value="10">10</option><option value="12">12</option><option value="16">16</option></select></label>
         </div>}
         <p className="utility-note">{description}</p>
@@ -580,13 +600,26 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         {mode === 'add-page-numbers' && output?.bytes && <div className="utility-result" data-testid="numbered-pdf-result">
           {numberedResultStale && <p className="utility-note" role="status" data-testid="numbered-result-stale">{t.numberedResultStale}</p>}
           <p className="utility-note">{locale === 'zh' ? '预览的是生成后的 PDF，请核对页码与原有页脚是否重叠。' : 'This previews the generated PDF. Check that printed numbers do not overlap footers.'}</p>
-          <div className="utility-options"><label><span>{locale === 'zh' ? '预览页面' : 'Preview page'}</span>
-            <select data-testid="number-preview-page" value={numberPreviewPage} onChange={event => setNumberPreviewPage(event.target.value)}>
-              <option value="first">{locale === 'zh' ? '第一张编号页' : 'First numbered page'}</option>
-              <option value="last">{locale === 'zh' ? '最后一页' : 'Last page'}</option>
-            </select>
-          </label></div>
-          <PdfFirstPagePreview bytes={output.bytes} pageCount={output.pageCount} pageNumber={numberPreviewPage === 'last' ? output.pageCount : Number(output.numberingSettings.firstPage)} t={t} locale={locale} />
+          <div className="utility-options">
+            <label><span>{locale === 'zh' ? '预览页面' : 'Preview page'}</span>
+              <select data-testid="number-preview-page" value={numberPreviewPage}
+                onChange={event => { setNumberPreviewPage(event.target.value); if (event.target.value === 'custom') { setNumberPreviewCustom(output.numberingSettings.firstPage); setNumberPreviewSettled(output.numberingSettings.firstPage); } }}>
+                <option value="first">{locale === 'zh' ? '第一张编号页' : 'First numbered page'}</option>
+                <option value="last">{locale === 'zh' ? '最后一页' : 'Last page'}</option>
+                <option value="custom">{t.customPreview}</option>
+              </select>
+            </label>
+            {numberPreviewPage === 'custom' && <label><span>{t.customPage}</span>
+              <input data-testid="number-preview-custom" type="number" min="1" max={output.pageCount} step="1"
+                value={numberPreviewCustom} onChange={event => setNumberPreviewCustom(event.target.value)} />
+            </label>}
+          </div>
+          {numberPreviewPage === 'custom' && !numberPreviewValid &&
+            <p className="utility-note" role="status" data-testid="number-preview-invalid">{t.invalidPreviewPage.replace('{pages}', output.pageCount)}</p>}
+          {numberPreviewPage === 'custom' && numberPreviewValid && !numberPreviewReady &&
+            <p className="utility-note" role="status" data-testid="number-preview-preparing">{t.previewPreparing}</p>}
+          {numberPreviewActualPage !== null &&
+            <PdfFirstPagePreview bytes={output.bytes} pageCount={output.pageCount} pageNumber={numberPreviewActualPage} t={t} locale={locale} />}
           <button type="button" className="button button-primary" data-testid="numbered-pdf-download" onClick={() => save(output)}>{numberedResultStale ? t.numberedPreviousDownload : t.downloadPdf} ↓</button>
         </div>}
         {isTextInput && output?.bytes && <div className="utility-result" data-testid="text-pdf-result">

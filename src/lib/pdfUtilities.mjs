@@ -339,7 +339,12 @@ export async function addPageNumbers(pdf, opts = {}, reportProgress = () => {}) 
   // Only pages at/after firstPage get labels. Pages before it (covers, table
   // of contents) are copied unchanged, and firstPage gets printed number start.
   if (start + pageCount - firstPage > 99999) throw new Error('Page numbers cannot exceed 99999. Lower the starting number.');
-  const position = ['bottom-center', 'bottom-right', 'top-right'].includes(opts.position) ? opts.position : 'bottom-center';
+  const position = opts.position ?? 'bottom-center';
+  if (!['bottom-left', 'bottom-center', 'bottom-right', 'top-left', 'top-center', 'top-right'].includes(position)) {
+    throw new Error('Unsupported page number position.');
+  }
+  const margin = Number(opts.margin ?? 24);
+  if (![12, 24, 40].includes(margin)) throw new Error('Page number margin must be 12, 24 or 40 points.');
   for (let i = 0; i < pageCount; i++) {
     // Yield while numbering books: otherwise the browser cannot dispatch
     // the Cancel click until all synchronous page annotations are finished.
@@ -354,7 +359,7 @@ export async function addPageNumbers(pdf, opts = {}, reportProgress = () => {}) 
     const text = String(start + i - (firstPage - 1));
     const textWidth = font.widthOfTextAtSize(text, size);
     // Use visible page coordinates, compensating PDF /Rotate and CropBox origin.
-    const placement = pageNumberPlacement(box, page.getRotation().angle, textWidth, size, position);
+    const placement = pageNumberPlacement(box, page.getRotation().angle, textWidth, size, position, margin);
     page.drawText(text, { x: placement.x, y: placement.y, rotate: degrees(placement.rotation), font, size, color: rgb(.28, .33, .39) });
     reportProgress(i + 1, pageCount);
   }
