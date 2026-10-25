@@ -216,6 +216,41 @@ export async function compressPdfRaster(pdf, options = {}, reportProgress = () =
   } finally { await source.destroy(); }
 }
 
+/** PDF.js 6.x getTextContent() uses for-await over ReadableStream.
+ * Shipping Safari/WebKit versions lack ReadableStream async iteration.
+ * Consume exactly the same PDF.js text chunks via getReader(), a supported
+ * browser API, without global polyfills or changing the PDF.js worker.
+ */
+export async function readPdfTextContent(page, signal = null) {
+  checkCancelled(signal);
+  const reader = page.streamTextContent().getReader();
+  const content = { items: [], styles: Object.create(null), lang: null };
+  let complete = false;
+  const cancelReader = () => {
+    // Never hold the UI waiting for a stalled worker while cancelling.
+    try { void Promise.resolve(reader.cancel('Processing cancelled.')).catch(() => {}); }
+    catch { /* A worker may already be gone. */ }
+  };
+  signal?.addEventListener('abort', cancelReader, { once: true });
+  if (signal?.aborted) cancelReader();
+  try {
+    for (;;) {
+      const { value, done } = await abortableWait(reader.read(), signal);
+      if (done) { complete = true; break; }
+      if (content.lang === null && value.lang != null) content.lang = value.lang;
+      Object.assign(content.styles, value.styles);
+      if (value.items?.length) content.items.push(...value.items);
+      checkCancelled(signal);
+    }
+    checkCancelled(signal);
+    return content;
+  } finally {
+    signal?.removeEventListener('abort', cancelReader);
+    if (!complete) cancelReader();
+    try { reader.releaseLock(); } catch { /* Pending worker read was aborted. */ }
+  }
+}
+
 export async function extractPdfText(pdf, markdown = false, reportProgress = () => {}, signal, onAudit = () => {}, readingOrder = 'rows') {
   const document = await openPdfJs(pdf.bytes, signal);
   const pages = [];
@@ -233,8 +268,8 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
       extractionStage = `page ${i}: getPage`;
       const page = await document.getPage(i);
       try {
-        extractionStage = `page ${i}: getTextContent`;
-        const content = await page.getTextContent();
+        extractionStage = `page ${i}: readPdfTextContent`;
+        const content = await readPdfTextContent(page, signal);
         extractionStage = `page ${i}: textContentToReadingOrderLines`;
         const viewport = readingOrder === 'rows' ? null : page.getViewport({ scale: 1 });
         const lines = textContentToReadingOrderLines(content, readingOrder, viewport);
