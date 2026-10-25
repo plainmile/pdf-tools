@@ -649,15 +649,58 @@ test('split output count over 50 is explained before download', async ({ page })
   });
   await expect(page.getByTestId('page-tile')).toHaveCount(51);
   await page.getByRole('tab', { name: 'Split' }).click();
-  await expect(page.getByTestId('split-each-page')).toBeDisabled();
-  await expect(page.getByTestId('split-each-page-limit')).toContainText('at least 2 pages per PDF');
-  await page.getByRole('radio', { name: 'Split every N pages' }).check();
-  await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('1');
-  const button = page.getByRole('button', { name: 'Download split PDFs (ZIP)' });
-  await expect(button).toBeDisabled();
-  await expect(page.locator('.split-estimate')).toContainText('maximum 50 output PDFs');
+  await expect(page.getByTestId('split-each-page')).toBeEnabled();
+  await expect(page.getByTestId('split-each-page-limit')).toContainText('2 separate batches');
+  await page.getByTestId('split-each-page').click();
+  await expect(page.getByTestId('split-batch-status')).toContainText('Batch 1 of 2');
+  await expect(page.getByRole('button', { name: 'Download this batch (ZIP)' })).toBeEnabled();
+  await expect(page.getByTestId('split-coverage-omitted')).toHaveCount(0);
+  await page.getByTestId('split-batch-next').click();
+  await expect(page.getByTestId('split-batch-status')).toContainText('output pages 51–51');
+  const singleDownload = page.locator('.split-download');
+  await expect(singleDownload).toContainText('Download PDF');
+  await expect(singleDownload).toBeEnabled();
   await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('2');
-  await expect(button).toBeEnabled();
+  await expect(page.getByTestId('split-batch-nav')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Download split PDFs (ZIP)' })).toBeEnabled();
+});
+
+test('105-page book downloads three separate, correctly numbered per-page ZIP batches', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'book-105.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf(Array.from({ length: 105 }, (_, i) => 300 + i)),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(105);
+  await page.getByRole('tab', { name: 'Split' }).click();
+  await page.getByTestId('split-each-page').click();
+  await expect(page.getByTestId('split-batch-prev')).toBeDisabled();
+  for (const [batch, start, end] of [[1, 1, 50], [2, 51, 100], [3, 101, 105]]) {
+    await expect(page.getByTestId('split-batch-status')).toContainText('Batch ' + batch + ' of 3');
+    await expect(page.getByTestId('split-batch-status')).toContainText('output pages ' + start + '–' + end);
+    const waiting = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download this batch (ZIP)' }).click();
+    const download = await waiting;
+    expect(download.suggestedFilename()).toBe('book-105-pages-' + start + '-' + end + '-split.zip');
+    const archive = await JSZip.loadAsync(await readFile(await download.path()));
+    const filenames = Object.keys(archive.files).sort();
+    expect(filenames).toHaveLength(end - start + 1);
+    for (const offset of [0, Math.floor((end - start) / 2), end - start]) {
+      const pageNumber = start + offset;
+      const filename = 'part-' + String(offset + 1).padStart(2, '0') +
+        '-pages-' + pageNumber + '-' + pageNumber + '.pdf';
+      expect(filenames).toContain(filename);
+      const pdf = await PDFDocument.load(await archive.files[filename].async('uint8array'));
+      expect(pdf.getPageCount()).toBe(1);
+      expect(pdf.getPage(0).getWidth()).toBe(299 + pageNumber);
+    }
+    await expect(page.getByTestId('split-coverage-omitted')).toHaveCount(0);
+    if (batch < 3) await page.getByTestId('split-batch-next').click();
+  }
+  await expect(page.getByTestId('split-batch-next')).toBeDisabled();
+  await page.getByTestId('split-batch-prev').click();
+  await expect(page.getByTestId('split-batch-status')).toContainText('Batch 2 of 3');
 });
 
 test('image import uses filename when MIME is generic and blocks oversized PNG before decoding', async ({ page }) => {

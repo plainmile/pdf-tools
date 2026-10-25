@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, parsePageRanges,
-  chunkPageRanges, getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, commitHistory, makeHistoryState, undoHistory, redoHistory,
+  chunkPageRanges, splitSinglePageBatch, getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
   reversePages, sortPagesByFilename, interleaveDuplexPages, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges, pageIdsForParity, invertPageIdSelection,
 } from '../../src/lib/pageOperations.mjs';
@@ -120,6 +120,32 @@ test('split explicit ranges and preserve workspace page order', () => {
 
 test('split into fixed-size chunks', () => {
   assert.deepEqual(chunkPageRanges(7, 3), [{start:1,end:3},{start:4,end:6},{start:7,end:7}]);
+});
+
+test('per-page batches partition up to 600 current output pages without overlap or omission', () => {
+  for (const count of [1, 50, 51, 105, 600]) {
+    const batches = Array.from({ length: Math.ceil(count / 50) },
+      (_, index) => splitSinglePageBatch(count, index));
+    const all = batches.flatMap(batch => batch.parts);
+    assert.equal(all.length, count);
+    assert.deepEqual(all.map(part => part.start), Array.from({ length: count }, (_, i) => i + 1));
+    assert.ok(all.every(part => part.start === part.end));
+    assert.ok(batches.every(batch => batch.parts.length >= 1 && batch.parts.length <= 50));
+    assert.equal(batches[0].start, 1);
+    assert.equal(batches.at(-1).end, count);
+    assert.equal(splitCoversAllPagesExactlyOnce(all, count), true);
+    if (count > 50) {
+      assert.equal(batches.every(batch => !splitCoversAllPagesExactlyOnce(batch.parts, count)), true,
+        'a partial batch must never mark the entire modified workspace saved');
+    }
+  }
+  assert.deepEqual(splitSinglePageBatch(105, 1), {
+    index: 1, total: 3, start: 51, end: 100,
+    parts: Array.from({ length: 50 }, (_, index) => ({ start: 51 + index, end: 51 + index })),
+  });
+  for (const [count, index] of [[0, 0], [601, 0], [NaN, 0], [51, -1], [51, 2], [51, 0.5]]) {
+    assert.throws(() => splitSinglePageBatch(count, index));
+  }
 });
 
 test('split downloads count as saved only when all current pages are covered exactly once', () => {

@@ -294,6 +294,30 @@ export function invertPageIdSelection(pages, selectedIds) {
   return new Set(pages.filter(page => !selected.has(page.id)).map(page => page.id));
 }
 
+/** A long book can produce one PDF per output page without allocating
+ * hundreds of PDF documents in one ZIP or initiating multiple downloads.
+ * A user explicitly downloads each <=50-part batch in turn.
+ * All ranges refer to CURRENT workspace export order, not source page IDs.
+ */
+export function splitSinglePageBatch(pageCount, batchIndex) {
+  if (!Number.isSafeInteger(pageCount) || pageCount < 1 || pageCount > 600) {
+    throw new Error('Choose a document with 1 to 600 pages.');
+  }
+  const total = Math.ceil(pageCount / 50);
+  if (!Number.isSafeInteger(batchIndex) || batchIndex < 0 || batchIndex >= total) {
+    throw new Error('Choose a valid split batch.');
+  }
+  const start = batchIndex * 50 + 1;
+  const end = Math.min(pageCount, start + 49);
+  return {
+    index: batchIndex, total, start, end,
+    parts: Array.from({ length: end - start + 1 }, (_, offset) => {
+      const page = start + offset;
+      return { start: page, end: page };
+    }),
+  };
+}
+
 export function chunkPageRanges(pageCount, chunkSize) {
   const n = Number(chunkSize);
   if (!Number.isSafeInteger(n) || n < 1 || n > pageCount) throw new Error('Choose a valid pages-per-file value.');

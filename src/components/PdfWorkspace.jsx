@@ -8,7 +8,7 @@ import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLay
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
-  movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges,
+  movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges, splitSinglePageBatch,
   getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
@@ -149,6 +149,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [splitMode, setSplitMode] = useState('ranges');
   const [ranges, setRanges] = useState('');
   const [chunkSize, setChunkSize] = useState('');
+  const [splitBatchIndex, setSplitBatchIndex] = useState(0);
   const [pendingVisualCut, setPendingVisualCut] = useState(null);
   const [visualSplitOpen, setVisualSplitOpen] = useState(false);
   // A cut can be clicked deep inside a long scrollable preview grid. If the
@@ -223,16 +224,21 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const navigationWouldLoseWork = recoverableDeletedPages ||
     Boolean(pages.length && documentRevision !== lastDownloadedRevision);
   const splitNeedsInput = splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim();
+  // Long PDFs export at most 50 single-page PDFs per explicit download.
+  // Recalculate valid bounds if a delete/undo/import changes page count.
+  const safeSplitBatchIndex = Math.min(splitBatchIndex, Math.max(0, Math.ceil(pages.length / 50) - 1));
   const splitPlan = useMemo(() => {
-    if (!pages.length || (splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim())) return null;
+    if (!pages.length || splitNeedsInput) return null;
     try {
+      const batch = splitMode === 'chunks' && Number(chunkSize) === 1 && pages.length > 50
+        ? splitSinglePageBatch(pages.length, safeSplitBatchIndex) : null;
       const parts = splitMode === 'ranges'
         ? parsePageRanges(ranges, pages.length)
-        : chunkPageRanges(pages.length, Number(chunkSize));
+        : batch ? batch.parts : chunkPageRanges(pages.length, Number(chunkSize));
       const coverage = splitCoverageDetails(parts, pages.length);
-      return coverage ? { parts, coverage } : null;
+      return coverage ? { parts, coverage, batch } : null;
     } catch (_error) { return null; }
-  }, [pages.length, splitMode, ranges, chunkSize]);
+  }, [pages.length, splitMode, ranges, chunkSize, safeSplitBatchIndex, splitNeedsInput]);
   const splitEstimate = splitPlan?.parts.length ?? null;
   // Preserve custom, partial or overlapping manual ranges until user explicitly
   // approves replacing them. Visual cuts always cover current export order.
@@ -346,6 +352,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const resetSelection = () => { setSelected(new Set()); lastSelectedIndex.current = null; lastGroupedSelection.current = null; };
   const commit = (operation, preserveSelection = false) => {
     setHistory((previous) => commitHistory(previous, operation(previous.present)));
+    setSplitBatchIndex(0); // A new output order invalidates previously chosen batch offsets.
     if (!preserveSelection) resetSelection();
     setNotice('');
     setError('');
@@ -424,6 +431,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         // an explicit range or pages-per-file choice before ZIP download.
         setRanges('');
         setChunkSize('');
+        setSplitBatchIndex(0);
         setPendingVisualCut(null);
         setSplitMode('ranges');
         setDownloadNameInput('');
@@ -440,6 +448,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         setHistory((previous) => commitHistory(previous, [...previous.present, ...nextPages]));
       }
       resetSelection();
+      setSplitBatchIndex(0);
       setSelectionRanges('');
       setNotice(locale === 'en'
         ? `Added ${nextSources.length} ${nextSources.length === 1 ? 'file' : 'files'} and ${nextPages.length} ${nextPages.length === 1 ? 'page' : 'pages'}.`
@@ -565,11 +574,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const downloadSplit = () => withBusy(async () => {
     if (!pages.length) throw new Error(t.noFile);
     if (imageLayoutDirty) throw new Error(t.imageMustApply);
-    const pieces = splitMode === 'ranges'
-      ? parsePageRanges(ranges, pages.length)
-      : chunkPageRanges(pages.length, Number(chunkSize));
-    // Every current output page must be present once in the downloaded set.
-    const completeSplit = splitCoversAllPagesExactlyOnce(pieces, pages.length);
+    if (!splitPlan?.parts.length) throw new Error(t.invalidRange);
+    const pieces = splitPlan.parts;
+    const batch = splitPlan.batch;
+    // A single per-page ZIP batch intentionally covers only its displayed
+    // page range. It must NEVER mark the full edited workspace as downloaded.
+    const completeSplit = !batch && splitCoversAllPagesExactlyOnce(pieces, pages.length);
     const controller = new AbortController();
     splitAbortRef.current = controller;
     setSplitCancelling(false);
@@ -617,9 +627,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         }
       });
       if (controller.signal.aborted) throw new Error('Split cancelled.');
-      saveDownload(archive, `${outputBase}-split.zip`, 'application/zip');
+      saveDownload(archive, batch
+        ? `${outputBase}-pages-${batch.start}-${batch.end}-split.zip` : `${outputBase}-split.zip`, 'application/zip');
       if (completeSplit) setLastDownloadedRevision(documentRevision);
-      setNotice(interpolate(t.zipped, { files: pieces.length }));
+      setNotice(batch
+        ? interpolate(t.splitBatchDownloaded, { index: batch.index + 1, total: batch.total })
+        : interpolate(t.zipped, { files: pieces.length }));
     } finally {
       splitAbortRef.current = null;
       setSplitProgress(null);
@@ -741,7 +754,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
     setPageView('order'); setCollapsedSources(new Set());
     setLastDownloadedRevision(null);
-    setRanges(''); setChunkSize(''); setSplitMode('ranges'); setPendingVisualCut(null);
+    setRanges(''); setChunkSize(''); setSplitBatchIndex(0); setSplitMode('ranges'); setPendingVisualCut(null);
     setSelectionRanges(''); setMoveTargetInput(''); setMovePlacement('before'); setDownloadNameInput(''); setJumpInput(''); setPendingJump(null);
     // A fresh image-to-PDF workspace must not inherit a previous crop choice.
     setImageLayout({ ...IMAGE_PDF_LAYOUT_DEFAULT });
@@ -1251,18 +1264,39 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <p className="input-note">{t.rangeHint}</p>
                   <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); }} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
-                  <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} placeholder="5" onChange={(event) => setChunkSize(event.target.value)} disabled={splitMode !== 'chunks' || busy} />
+                  <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} placeholder="5"
+                    onChange={(event) => { setChunkSize(event.target.value); setSplitBatchIndex(0); }}
+                    disabled={splitMode !== 'chunks' || busy} />
                   <div className="split-quick-action">
                     <button type="button" className="button button-secondary button-small"
-                      data-testid="split-each-page" aria-pressed={splitMode === 'chunks' && chunkSize === '1'}
-                      disabled={busy || pages.length > 50}
-                      onClick={() => { setSplitMode('chunks'); setChunkSize('1'); setPendingVisualCut(null); setError(''); setNotice(''); }}>
+                      data-testid="split-each-page" aria-pressed={splitMode === 'chunks' && Number(chunkSize) === 1}
+                      disabled={busy}
+                      onClick={() => { setSplitMode('chunks'); setChunkSize('1'); setSplitBatchIndex(0); setPendingVisualCut(null); setError(''); setNotice(''); }}>
                       {t.eachPagePreset}
                     </button>
                     {pages.length > 50 && <p className="input-note" data-testid="split-each-page-limit">
-                      {interpolate(t.eachPageLimit, { pages: pages.length, minimum: Math.ceil(pages.length / 50) })}
+                      {interpolate(t.eachPageLimit, { pages: pages.length, batches: Math.ceil(pages.length / 50) })}
                     </p>}
                   </div>
+                  {splitPlan?.batch && <div className="split-batch-nav" data-testid="split-batch-nav" aria-live="polite">
+                    <strong data-testid="split-batch-status">{interpolate(t.splitBatchStatus, {
+                      index: splitPlan.batch.index + 1, total: splitPlan.batch.total,
+                      start: splitPlan.batch.start, end: splitPlan.batch.end,
+                    })}</strong>
+                    <div className="split-batch-buttons">
+                      <button type="button" className="button button-secondary button-small" data-testid="split-batch-prev"
+                        disabled={busy || safeSplitBatchIndex === 0}
+                        onClick={() => { setSplitBatchIndex(Math.max(0, safeSplitBatchIndex - 1)); setError(''); setNotice(''); }}>
+                        {t.splitBatchPrevious}
+                      </button>
+                      <button type="button" className="button button-secondary button-small" data-testid="split-batch-next"
+                        disabled={busy || safeSplitBatchIndex + 1 >= splitPlan.batch.total}
+                        onClick={() => { setSplitBatchIndex(safeSplitBatchIndex + 1); setError(''); setNotice(''); }}>
+                        {t.splitBatchNext}
+                      </button>
+                    </div>
+                    <p className="input-note">{t.splitBatchWarning}</p>
+                  </div>}
                   {pages.length > 1 && <details className="split-visual-panel" data-testid="visual-split-panel"
                     open={visualSplitOpen} onToggle={event => setVisualSplitOpen(event.currentTarget.open)}>
                     <summary>{t.visualSplitToggle}</summary>
@@ -1316,10 +1350,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                       })}
                     </div>}
                   </details>}
-                  <div className="split-estimate" aria-live="polite">{splitEstimate === null ? (splitNeedsInput ? (splitMode === 'ranges' ? t.enterSplitRanges : t.enterSplitSize) : t.invalidRange) : interpolate(t.estimate, { files: splitEstimate })}</div>
+                  <div className="split-estimate" aria-live="polite">{splitEstimate === null ? (splitNeedsInput ? (splitMode === 'ranges' ? t.enterSplitRanges : t.enterSplitSize) : t.invalidRange) : interpolate(splitPlan?.batch ? t.splitBatchEstimate : t.estimate, { files: splitEstimate })}</div>
                   {splitPlan && <div className="split-coverage-review" aria-live="polite" data-testid="split-coverage-review">
                     {splitPlan.coverage.complete && <p className="input-note" data-testid="split-coverage-complete">{interpolate(t.splitCoverageComplete, { total: splitPlan.coverage.total })}</p>}
-                    {splitPlan.coverage.omitted.length > 0 && <p className="utility-note" data-testid="split-coverage-omitted">{interpolate(t.splitCoverageOmitted, {
+                    {!splitPlan.batch && splitPlan.coverage.omitted.length > 0 && <p className="utility-note" data-testid="split-coverage-omitted">{interpolate(t.splitCoverageOmitted, {
                       included: splitPlan.coverage.included,
                       total: splitPlan.coverage.total,
                       count: splitPlan.coverage.omitted.length,
@@ -1343,7 +1377,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                      ? interpolate(t.splitPartsProgress, { done: splitProgress.done, total: splitProgress.total })
                      : interpolate(t.splitZipProgress, { percent: splitProgress.percent })}</p>}
                    {busy && splitProgress && <button type="button" className="button button-secondary button-small" data-testid="split-cancel" disabled={splitCancelling} onClick={() => { splitAbortRef.current?.abort(); setSplitCancelling(true); }}>{splitCancelling ? t.splitCancelling : t.splitCancel}</button>}
-                  <button type="button" className="button button-primary split-download" onClick={downloadSplit} disabled={busy || splitEstimate === null || imageLayoutDirty}>{busy ? t.creating : splitEstimate === 1 ? t.downloadSingle : t.downloadZip} ↓</button>
+                  <button type="button" className="button button-primary split-download" onClick={downloadSplit} disabled={busy || splitEstimate === null || imageLayoutDirty}>{busy ? t.creating : splitEstimate === 1 ? t.downloadSingle : splitPlan?.batch ? t.splitBatchDownload : t.downloadZip} ↓</button>
                 </div>
               </section>
             )}
