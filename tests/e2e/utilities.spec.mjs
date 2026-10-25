@@ -149,7 +149,7 @@ test('PDF to images retains a manual download fallback, then clears stale result
   await upload(page, await fixturePdf('Repeat image download', 2));
   await page.getByRole('combobox', { name: '图片格式' }).selectOption('png');
   const first = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
-  expect(first.name).toMatch(/\\.zip$/);
+  expect(first.name).toMatch(/\.zip$/);
   const repeatButton = page.getByTestId('image-download-again');
   await expect(repeatButton).toBeVisible();
   await expect(page.getByTestId('image-result')).toContainText(first.name);
@@ -162,7 +162,7 @@ test('PDF to images retains a manual download fallback, then clears stale result
   await expect(repeatButton).toHaveCount(0);
   await page.getByTestId('utility-page-ranges').fill('2');
   const single = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
-  expect(single.name).toMatch(/\\.jpg$/);
+  expect(single.name).toMatch(/\.jpg$/);
   expect(Array.from(single.bytes.slice(0, 3))).toEqual([255, 216, 255]);
   const singleRepeat = await getDownload(page, () => repeatButton.click());
   expect(singleRepeat.name).toBe(single.name);
