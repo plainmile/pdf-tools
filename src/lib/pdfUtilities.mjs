@@ -222,6 +222,7 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
   const sparseImagePageNumbers = [];
   let imagePaintOps;
   let hasFormFields = false;
+  let extractionStage = 'opening document';
   try {
     // Read widget values via page annotations rather than the document-level
     // getFieldObjects() method. The latter throws in some WebKit PDF.js builds,
@@ -229,9 +230,12 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
     // Include non-text widgets in the completeness warning.
     for (let i = 1; i <= pdf.count; i++) {
       checkCancelled(signal);
+      extractionStage = `page ${i}: getPage`;
       const page = await document.getPage(i);
       try {
+        extractionStage = `page ${i}: getTextContent`;
         const content = await page.getTextContent();
+        extractionStage = `page ${i}: textContentToReadingOrderLines`;
         const viewport = readingOrder === 'rows' ? null : page.getViewport({ scale: 1 });
         const lines = textContentToReadingOrderLines(content, readingOrder, viewport);
         pages.push(lines);
@@ -248,6 +252,7 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
               OPS.paintImageMaskXObjectGroup, OPS.paintImageMaskXObjectRepeat,
             ].filter(Number.isInteger));
           }
+          extractionStage = `page ${i}: getOperatorList`;
           const operations = await page.getOperatorList();
           checkCancelled(signal);
           if (operations.fnArray.some(operator => imagePaintOps.has(operator))) {
@@ -256,8 +261,10 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
         }
         // Text, choice, checkbox and signature widgets are annotations.
         // Detect form presence on the *actual* page and append visible values.
+        extractionStage = `page ${i}: getAnnotations`;
         const annotations = await page.getAnnotations({ intent: 'display' });
         checkCancelled(signal);
+        extractionStage = `page ${i}: parse annotation fields`;
         if (annotations.some(item => ['Tx', 'Ch', 'Btn', 'Sig'].includes(item?.fieldType))) {
           hasFormFields = true;
           lines.push(...textLinesFromFormAnnotations(annotations));
@@ -265,6 +272,11 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
       } finally { page.cleanup(); }
       reportProgress(i, pdf.count);
     }
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    // Keep failures diagnosable in Safari/WebKit instead of reporting a bare
+    // minified TypeError with no source context.
+    throw new Error(`PDF text extraction [${extractionStage}]: ${error instanceof Error ? error.message : String(error)}`);
   } finally { await document.destroy(); }
   const coverage = summarizeTextCoverage(pages, sparseImagePageNumbers);
   if (!coverage.withText) throw new Error(hasFormFields
