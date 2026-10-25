@@ -1060,7 +1060,7 @@ test('book-length odd-even split reports cumulative copied pages for both PDFs',
   await page.getByRole('radio', { name: 'Split into odd-page and even-page PDFs' }).check();
   await trackSplitProgress(page);
   const out = await captured(page, () => page.locator('.split-download').click(), 60000);
-  expect(out.name).toMatch(/odd-even\\.zip$/);
+  expect(out.name).toMatch(/odd-even\.zip$/);
   const zip = await JSZip.loadAsync(out.bytes);
   expect(Object.keys(zip.files).sort()).toEqual(['even-pages.pdf', 'odd-pages.pdf']);
   const odd = await PDFDocument.load(await zip.file('odd-pages.pdf').async('uint8array'));
