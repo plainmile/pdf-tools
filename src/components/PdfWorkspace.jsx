@@ -110,6 +110,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const splitAbortRef = useRef(null);
   const exportAbortRef = useRef(null);
   const layoutAbortRef = useRef(null);
+  const visualConfirmRef = useRef(null);
   const [sources, setSources] = useState([]);
   const [history, setHistory] = useState(() => makeHistoryState());
   const [selected, setSelected] = useState(() => new Set());
@@ -147,6 +148,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [chunkSize, setChunkSize] = useState('');
   const [pendingVisualCut, setPendingVisualCut] = useState(null);
   const [visualSplitOpen, setVisualSplitOpen] = useState(false);
+  // A cut can be clicked deep inside a long scrollable preview grid. If the
+  // current manual ranges need confirmation, move focus (and scroll) to the
+  // explanation instead of leaving a newly disabled cut button out of context.
+  useEffect(() => {
+    if (pendingVisualCut !== null) visualConfirmRef.current?.focus();
+  }, [pendingVisualCut]);
   const [exportSettingsOpen, setExportSettingsOpen] = useState(mode === 'watermark-pdf');
   const [watermarkEnabled, setWatermarkEnabled] = useState(false);
   const [watermarkText, setWatermarkText] = useState('');
@@ -238,6 +245,14 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       setError(t.invalidRange);
       setNotice('');
     }
+  };
+  const restoreVisualCutFocus = (afterPage) => {
+    setPendingVisualCut(null);
+    // Restore the previous position on Cancel or Replace so keyboard users
+    // do not lose their place in a book-length page grid.
+    requestAnimationFrame(() => {
+      document.querySelector('[data-testid="visual-split-cut"][data-after-page="' + afterPage + '"]')?.focus();
+    });
   };
   const toggleVisualCut = (afterPage) => {
     if (busy || afterPage < 1 || afterPage >= pages.length) return;
@@ -1222,16 +1237,21 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                         data-testid="visual-split-clear" disabled={busy}
                         onClick={() => applyVisualCuts([])}>{t.visualSplitClear}</button>}
                     {pendingVisualCut !== null && <div className="workspace-clear-confirm"
+                      ref={visualConfirmRef} tabIndex={-1}
                       role="group" aria-label={t.visualSplitConfirmTitle}
                       data-testid="visual-split-confirm">
                       <p>{t.visualSplitConfirmText}</p>
                       <div className="workspace-clear-buttons">
                         <button type="button" className="button button-secondary button-small"
                           data-testid="visual-split-keep"
-                          onClick={() => setPendingVisualCut(null)}>{t.visualSplitKeep}</button>
+                          onClick={() => restoreVisualCutFocus(pendingVisualCut)}>{t.visualSplitKeep}</button>
                         <button type="button" className="button button-secondary button-small"
                           data-testid="visual-split-replace"
-                          onClick={() => applyVisualCuts([pendingVisualCut])}>{t.visualSplitReplace}</button>
+                          onClick={() => {
+                            const afterPage = pendingVisualCut;
+                            applyVisualCuts([afterPage]);
+                            restoreVisualCutFocus(afterPage);
+                          }}>{t.visualSplitReplace}</button>
                       </div>
                     </div>}
                     {visualSplitOpen && <div className="split-visual-grid" data-testid="visual-split-grid">
