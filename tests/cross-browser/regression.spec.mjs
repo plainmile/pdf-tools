@@ -76,6 +76,24 @@ test('Firefox/WebKit: interactive form text remains visible in TXT, with an expl
   expect(out.bytes.toString('utf8')).toContain('person.name: FRIENDLY-PRIVATE-FORM');
 });
 
+test('Safari without ReadableStream async iteration still exports real selectable PDF text', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(ReadableStream.prototype, Symbol.asyncIterator, {
+      configurable: true, value: undefined,
+    });
+  });
+  await page.goto('/pdf-to-txt/');
+  const pdf = await source([375, 395]);
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'no-stream-iterator.pdf', mimeType: 'application/pdf', buffer: pdf,
+  });
+  await expect(page.getByTestId('utility-file-summary')).toBeVisible();
+  const result = await take(page, () => page.getByTestId('utility-run').click());
+  const text = result.bytes.toString('utf8');
+  expect(text).toContain('CROSS-BROWSER 1');
+  expect(text).toContain('CROSS-BROWSER 2');
+});
+
 test('Firefox/WebKit: cancelled local file reading releases controls and preserves source PDF', async ({ page }) => {
   await page.goto('/pdf-to-txt/');
   await page.getByTestId('utility-file-input').setInputFiles({name:'original.pdf',mimeType:'application/pdf',buffer:await source([392])});
