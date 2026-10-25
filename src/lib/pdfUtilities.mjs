@@ -7,7 +7,56 @@ import {
   enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled,
 } from './utilityCore.mjs';
 
-export async function loadPdf(file, mode = 'pdf-to-txt', locale = 'en') {
+/** FileReader can abort an in-progress read. File.arrayBuffer() cannot. */
+export function readFileArrayBuffer(file, signal = null) {
+  checkCancelled(signal);
+  if (!signal) return file.arrayBuffer();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    let settled = false;
+    const finish = (result, error = null) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener('abort', abort);
+      reader.onload = reader.onerror = reader.onabort = null;
+      if (error) reject(error);
+      else resolve(result);
+    };
+    const abort = () => {
+      if (reader.readyState === FileReader.LOADING) reader.abort();
+      finish(null, new Error('Processing cancelled.'));
+    };
+    reader.onload = () => finish(reader.result, signal.aborted ? new Error('Processing cancelled.') : null);
+    reader.onerror = () => finish(null, reader.error || new Error('Unable to read input file.'));
+    reader.onabort = () => finish(null, new Error('Processing cancelled.'));
+    signal.addEventListener('abort', abort, { once: true });
+    if (signal.aborted) { abort(); return; }
+    try { reader.readAsArrayBuffer(file); }
+    catch (error) { finish(null, error); }
+  });
+}
+
+/** Release the UI on Cancel even if a third-party PDF worker does not settle
+ * its promise promptly. The caller also destroys the underlying loading task.
+ */
+export function abortableWait(promise, signal = null) {
+  checkCancelled(signal);
+  if (!signal) return Promise.resolve(promise);
+  return new Promise((resolve, reject) => {
+    const cleanup = () => signal.removeEventListener('abort', abort);
+    const abort = () => {
+      cleanup();
+      reject(new Error('Processing cancelled.'));
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    Promise.resolve(promise).then(
+      value => { cleanup(); if (signal.aborted) reject(new Error('Processing cancelled.')); else resolve(value); },
+      error => { cleanup(); reject(error); },
+    );
+  });
+}
+
+export async function loadPdf(file, mode = 'pdf-to-txt', locale = 'en', signal = null) {
   if (!file || (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf')) {
     throw new Error(locale === 'zh' ? '请选择 PDF 文件。' : 'Choose a PDF file.');
   }
@@ -15,33 +64,56 @@ export async function loadPdf(file, mode = 'pdf-to-txt', locale = 'en') {
   if (!file.size || file.size > UTILITY_LIMITS.maxPdfBytes) {
     enforceUtilityPdfLimits({ size: file.size, count: 1 }, mode, locale);
   }
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  const bytes = new Uint8Array(await readFileArrayBuffer(file, signal));
+  checkCancelled(signal);
   // Use PDF.js for page counting rather than eagerly parsing a potentially 100 MB
   // document in pdf-lib as well. The actual page-number operation loads pdf-lib later.
   let document;
   try {
-    document = await openPdfJs(bytes);
+    document = await openPdfJs(bytes, signal);
   } catch {
+    checkCancelled(signal);
     throw new Error(locale === 'zh' ? 'PDF 无法打开，文件可能损坏或有密码保护。' : 'The PDF is damaged or password-protected.');
   }
   try {
     enforceUtilityPdfLimits({ size: file.size, count: document.count }, mode, locale);
     return { bytes, count: document.count, size: file.size, name: file.name };
   } finally {
-    await document.destroy();
+    // A stalled PDF.js shutdown must not prevent Cancel from restoring controls.
+    await abortableWait(document.destroy(), signal);
   }
 }
 
-async function openPdfJs(bytes) {
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+async function openPdfJs(bytes, signal = null) {
+  checkCancelled(signal);
+  const pdfjs = await abortableWait(import('pdfjs-dist/legacy/build/pdf.mjs'), signal);
+  checkCancelled(signal);
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs';
   // Pass a copy: PDF.js transfers its buffer to its worker.
   const loadingTask = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true });
+  // Cancel even when loadingTask.promise has not resolved yet.
+  const abort = () => { void loadingTask.destroy().catch(() => {}); };
+  signal?.addEventListener('abort', abort, { once: true });
+  if (signal?.aborted) abort();
   try {
-    const proxy = await loadingTask.promise;
-    // The loading task owns the worker and its memory, not the PDFDocumentProxy.
-    return { count: proxy.numPages, getPage: (number) => proxy.getPage(number), getFieldObjects: () => proxy.getFieldObjects(), destroy: () => loadingTask.destroy() };
+    const proxy = await abortableWait(loadingTask.promise, signal);
+    checkCancelled(signal);
+    return {
+      count: proxy.numPages,
+      getPage: number => proxy.getPage(number),
+      getFieldObjects: () => proxy.getFieldObjects(),
+      destroy: () => {
+        signal?.removeEventListener('abort', abort);
+        return loadingTask.destroy();
+      },
+    };
   } catch (error) {
+    signal?.removeEventListener('abort', abort);
+    if (signal?.aborted) {
+      // Do not await an already-stalled worker during cancellation. A destroy
+      // was scheduled by the abort handler; the UI can recover immediately.
+      checkCancelled(signal);
+    }
     await loadingTask.destroy().catch(() => {});
     throw error;
   }
@@ -77,7 +149,7 @@ export async function convertPdfToImages(pdf, options = {}, reportProgress = () 
   const selected = requestedPages(options.pages ?? '', pdf.count);
   enforceImageBatchLimit(selected.length, options.locale);
   const filenames = imageExportFilenames(selected, pdf.count, format);
-  const document = await openPdfJs(pdf.bytes);
+  const document = await openPdfJs(pdf.bytes, options.signal);
   const files = [];
   let accumulated = 0;
   try {
@@ -111,7 +183,7 @@ export async function compressPdfRaster(pdf, options = {}, reportProgress = () =
   const scale = options.scale === 1.5 ? 1.5 : options.scale === 1 ? 1 : .75;
   const quality = options.quality === .8 ? .8 : options.quality === .55 ? .55 : .7;
   enforceUtilityPdfLimits(pdf, 'compress-pdf', options.locale);
-  const source = await openPdfJs(pdf.bytes);
+  const source = await openPdfJs(pdf.bytes, options.signal);
   const output = await PDFDocument.create();
   let jpegBytes = 0;
   try {
@@ -145,7 +217,7 @@ export async function compressPdfRaster(pdf, options = {}, reportProgress = () =
 }
 
 export async function extractPdfText(pdf, markdown = false, reportProgress = () => {}, signal, onAudit = () => {}, readingOrder = 'rows') {
-  const document = await openPdfJs(pdf.bytes);
+  const document = await openPdfJs(pdf.bytes, signal);
   const pages = [];
   const sparseImagePageNumbers = [];
   let imagePaintOps;
