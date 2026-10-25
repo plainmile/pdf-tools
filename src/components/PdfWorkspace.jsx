@@ -238,7 +238,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   // progress scoped to an exact page revision and split plan, in memory only.
   // Never clear the unsaved-work guard merely because some/all batches ran.
   const splitBatchKey = splitMode === 'chunks' && chunkOutputCount > 50
-    ? JSON.stringify([documentRevision, chunkSizeNumber, chunkOutputCount]) : null;
+    ? JSON.stringify([documentRevision, chunkSizeNumber, chunkOutputCount, outputBase]) : null;
   useEffect(() => {
     setSplitBatchDownloads({ key: null, indices: [] });
   }, [splitBatchKey]);
