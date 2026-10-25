@@ -87,6 +87,30 @@ test('SEO and AI answer-readiness audit of 36 live URLs', async ({ page }) => {
  }
 });
 
+test('split progress has useful bilingual crawlable SSR content and accurate app schema', async ({ request }) => {
+  for (const locale of ['en', 'zh']) {
+    const path = locale === 'zh' ? '/zh/split-pdf/' : '/split-pdf/';
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    // These answers must exist in the original HTML; Google and users do not
+    // need a React hydration pass to discover how the split actually works.
+    expect(html, path).toContain(locale === 'zh'
+      ? '拆分几百页 PDF 时能看到进度或取消吗？'
+      : 'Can I see progress and cancel a long PDF split?');
+    expect(html, path).toContain(locale === 'zh'
+      ? '重复范围按实际输出次数计数'
+      : 'even if a custom range repeats pages');
+    expect(html, path).toContain(locale === 'zh'
+      ? 'ZIP 打包另行显示'
+      : 'ZIP packaging is displayed separately');
+    expect(html, path).toContain(locale === 'zh' ? '/zh/extract-pages/' : '/extract-pages/');
+    expect(html, path).toContain('application/ld+json');
+    expect(html, path).toContain('WebApplication');
+    expect(html, path).toContain('BreadcrumbList');
+  }
+});
+
 test('public language/theme and mobile layout', async ({ page }) => {
  await page.setViewportSize({width:1440,height:900});
  await page.goto('/zh/',{waitUntil:'networkidle'});

@@ -621,6 +621,14 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     if (imageLayoutDirty) throw new Error(t.imageMustApply);
     if (!splitPlan?.parts.length) throw new Error(t.invalidRange);
     const pieces = splitPlan.parts;
+    // Count actual OUTPUT pages, not input pages: overlapping typed ranges can
+    // legitimately export a page more than once, while every-N batch exports
+    // only its current slice and odd/even exports two noncontiguous sets.
+    const pagesTotal = pieces.reduce((sum, range) =>
+      sum + (range.positions?.length ?? (range.end - range.start + 1)), 0);
+    const partProgress = (file, pagesDone) => ({
+      phase: 'parts', file, files: pieces.length, pagesDone, pagesTotal,
+    });
     const batch = splitPlan.batch;
     const markBatchRequested = () => {
       if (!batch || !splitBatchKey) return;
@@ -635,7 +643,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     const controller = new AbortController();
     splitAbortRef.current = controller;
     setSplitCancelling(false);
-    setSplitProgress({ phase: 'parts', done: 0, total: pieces.length });
+    setSplitProgress(partProgress(1, 0));
+    let completedPages = 0;
     let size = 0;
     const sourceDocuments = new Map();
     try {
@@ -646,15 +655,25 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         if (controller.signal.aborted) throw new Error('Split cancelled.');
         const range = pieces[index];
         const chosenPages = getRangePages(pages, range);
+        setSplitProgress(partProgress(index + 1, completedPages));
         // One section that contains the untouched original is an export, not
         // a real split. Preserve outlines, forms, signatures and metadata.
         const pristine = !zip && completeSplit
           ? pristinePdfBytes(sources, chosenPages, watermark) : null;
         const contents = pristine ?? await composePdf(sources, chosenPages, {
           watermark, signal: controller.signal, sourceDocuments,
+          onProgress: (done) => {
+            // composePdf reports only pages copied, not bytes serialized or
+            // ZIP completion. Keep the visible totals honest and cancellable.
+            if (!controller.signal.aborted) {
+              setSplitProgress(partProgress(index + 1, completedPages + done));
+            }
+          },
         });
         if (controller.signal.aborted) throw new Error('Split cancelled.');
         size = enforceSplitZipBudget(size, contents.length);
+        completedPages += chosenPages.length;
+        setSplitProgress(partProgress(index + 1, completedPages));
         if (!zip) {
           saveDownload(contents, range.kind ? `${outputBase}-${range.kind}-pages.pdf` : `${outputBase}-pages-${range.start}-${range.end}.pdf`);
           markBatchRequested();
@@ -668,7 +687,6 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           return;
         }
         zip.file(range.kind ? `${range.kind}-pages.pdf` : `part-${String(index + 1).padStart(2, '0')}-pages-${range.start}-${range.end}.pdf`, contents);
-        setSplitProgress({ phase: 'parts', done: index + 1, total: pieces.length });
         await new Promise(resolve => setTimeout(resolve, 0));
       }
       if (controller.signal.aborted) throw new Error('Split cancelled.');
@@ -1480,9 +1498,18 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     </details>
                   </div>}
                    <p className="input-note" data-testid="split-output-budget">{t.splitOutputBudget}</p>
-                   {splitProgress && <p className="utility-note" role="status" data-testid="split-progress" aria-live="polite">{splitProgress.phase === 'parts'
-                     ? interpolate(t.splitPartsProgress, { done: splitProgress.done, total: splitProgress.total })
-                     : interpolate(t.splitZipProgress, { percent: splitProgress.percent })}</p>}
+                   {splitProgress && <div className="split-progress-container" data-testid="split-progress-container">
+                     <p className="utility-note" role="status" data-testid="split-progress" aria-live="polite" aria-atomic="true">{splitProgress.phase === 'parts'
+                       ? interpolate(t.splitPartsProgress, {
+                         file: splitProgress.file, files: splitProgress.files,
+                         copied: splitProgress.pagesDone, totalpages: splitProgress.pagesTotal,
+                       })
+                       : interpolate(t.splitZipProgress, { percent: splitProgress.percent })}</p>
+                     <progress className="split-progress-meter" data-testid="split-progress-meter"
+                       aria-label={splitProgress.phase === 'parts' ? t.splitPagesProgressLabel : t.splitZipProgressLabel}
+                       value={splitProgress.phase === 'parts' ? splitProgress.pagesDone : splitProgress.percent}
+                       max={splitProgress.phase === 'parts' ? splitProgress.pagesTotal : 100} />
+                   </div>}
                    {busy && splitProgress && <button type="button" className="button button-secondary button-small" data-testid="split-cancel" disabled={splitCancelling} onClick={() => { splitAbortRef.current?.abort(); setSplitCancelling(true); }}>{splitCancelling ? t.splitCancelling : t.splitCancel}</button>}
                   <button type="button" className="button button-primary split-download" onClick={downloadSplit} disabled={busy || splitEstimate === null || imageLayoutDirty}>{busy ? t.creating : splitEstimate === 1 ? t.downloadSingle : splitPlan?.batch ? t.splitBatchDownload : t.downloadZip} ↓</button>
                 </div>

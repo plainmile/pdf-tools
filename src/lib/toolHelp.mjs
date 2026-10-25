@@ -17,6 +17,7 @@ export const toolHelp = {
       ['Can I choose split points by looking at the pages?', 'Yes. Expand Choose split points by clicking pages, then click Cut after this page under a preview. Click again to remove a cut. It uses your current page order; manually entered custom ranges are protected from accidental replacement.'],
       ['How are the split files downloaded?', 'A single result downloads as PDF; multiple results download as ZIP. When splitting every N pages would create over 50 PDFs, use the Next batch and Previous batch buttons. Each download contains up to 50 PDFs.'],
       ['How do I split a 200-page book into one PDF per page?', 'Choose One PDF per page. Download each 50-page ZIP batch, then use Next batch. Each batch is a separate download with the current output page range in its filename.'],
+      ['Can I see progress and cancel a long PDF split?', 'Yes. The progress bar counts output pages copied across the PDFs in the current download, even if a custom range repeats pages. ZIP packaging is displayed separately. Cancel split stops the job without downloading an incomplete result.'],
     ],
     'organize-pdf': [
       ['How do I move several pages together?', 'Select pages using their checkboxes, then drag the selection to its new position. Keyboard-accessible move controls are also provided.'],
@@ -93,6 +94,7 @@ export const toolHelp = {
       ['可以看着页面缩略图选择拆分位置吗？', '可以。展开「按页面预览设置拆分点」，在缩略图下选择「在此页后拆分」，再次点击可取消。拆分按当前页面顺序进行；手工指定的特殊范围不会被意外覆盖。'],
       ['拆分结果怎么保存？', '单份结果直接下载 PDF，多份打包 ZIP。按每 N 页拆分超过 50 份时，可以点击“下一批”逐批下载，每批最多 50 份 PDF。自定义范围仍限制 50 份。'],
       ['一本 200 页的书怎样逐页拆成独立 PDF？', '点击“每页生成一份 PDF”，先下载前 50 页组成的 ZIP，再点击“下一批”逐批下载；每批的页码范围会写入 ZIP 文件名。'],
+      ['拆分几百页 PDF 时能看到进度或取消吗？', '可以。进度条按本次下载实际复制的输出页数累计，重复范围按实际输出次数计数，ZIP 打包另行显示。点击「取消拆分」可中止，不会下载不完整的文件。'],
     ],
     'organize-pdf': [
       ['如何一次移动多页？', '通过复选框选择多页，再拖动整组页面。也支持使用移动按钮调整顺序。'],

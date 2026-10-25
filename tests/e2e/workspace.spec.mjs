@@ -30,6 +30,30 @@ async function captured(page, action, timeout = 30000) {
   return { name: download.suggestedFilename(), bytes: await readFile(await download.path()) };
 }
 
+// Record real rendered progress changes without adding test-only app hooks or
+// slowing production page copying. This also captures fast ZIP phase changes.
+async function trackSplitProgress(page) {
+  await page.evaluate(() => {
+    window.__splitProgressSamples = [];
+    const observe = () => {
+      const status = document.querySelector('[data-testid="split-progress"]');
+      const meter = document.querySelector('[data-testid="split-progress-meter"]');
+      if (!status || !meter) return;
+      const sample = {
+        text: status.textContent ?? '', value: meter.value, max: meter.max,
+        label: meter.getAttribute('aria-label') ?? '',
+      };
+      const samples = window.__splitProgressSamples;
+      if (samples.length < 500 && samples.at(-1)?.text !== sample.text) samples.push(sample);
+    };
+    const observer = new MutationObserver(observe);
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['value', 'max'] });
+  });
+}
+async function splitProgressSamples(page) {
+  return page.evaluate(() => window.__splitProgressSamples);
+}
+
 async function downloadPdf(page, action) {
   const downloadEvent = page.waitForEvent('download');
   await action();
@@ -1026,6 +1050,59 @@ test('Chinese empty workspace explains undo and reset before starting a new docu
   expect(restored.getPages().map(p => p.getWidth())).toEqual([314]);
 });
 
+test('book-length odd-even split reports cumulative copied pages for both PDFs', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'book-progress.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf(Array.from({ length: 320 }, (_, index) => 300 + index % 10)),
+  });
+  await page.getByRole('radio', { name: 'Split into odd-page and even-page PDFs' }).check();
+  await trackSplitProgress(page);
+  const out = await captured(page, () => page.locator('.split-download').click(), 60000);
+  expect(out.name).toMatch(/odd-even\.zip$/);
+  const zip = await JSZip.loadAsync(out.bytes);
+  expect(Object.keys(zip.files).sort()).toEqual(['even-pages.pdf', 'odd-pages.pdf']);
+  const odd = await PDFDocument.load(await zip.file('odd-pages.pdf').async('uint8array'));
+  const even = await PDFDocument.load(await zip.file('even-pages.pdf').async('uint8array'));
+  expect(odd.getPageCount()).toBe(160);
+  expect(even.getPageCount()).toBe(160);
+  expect(odd.getPage(0).getWidth()).toBe(300);
+  expect(even.getPage(0).getWidth()).toBe(301);
+  const samples = await splitProgressSamples(page);
+  const copy = samples.filter(sample => sample.label === 'PDF page copying progress' && sample.max === 320);
+  expect(copy.some(sample => sample.value > 0 && sample.value < 320), JSON.stringify(samples.slice(-12))).toBe(true);
+  expect(copy.some(sample => sample.text.includes('Building PDF 2 of 2') && sample.value >= 160),
+    JSON.stringify(samples.slice(-12))).toBe(true);
+  expect(copy.every(sample => !sample.text.includes('{') && sample.text.includes('output pages')),
+    JSON.stringify(samples.slice(-12))).toBe(true);
+  await expect(page.getByTestId('split-progress-container')).toHaveCount(0);
+});
+
+test('overlapping custom ranges count output copies rather than unique source pages', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'overlaps.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf(Array.from({ length: 105 }, (_, i) => 301 + i % 5)),
+  });
+  await page.locator('#ranges-input').fill('1-105, 51-105');
+  await expect(page.getByTestId('split-coverage-repeated')).toContainText('55');
+  await trackSplitProgress(page);
+  const out = await captured(page, () => page.locator('.split-download').click(), 60000);
+  const zip = await JSZip.loadAsync(out.bytes);
+  const first = await PDFDocument.load(await zip.file('part-01-pages-1-105.pdf').async('uint8array'));
+  const second = await PDFDocument.load(await zip.file('part-02-pages-51-105.pdf').async('uint8array'));
+  expect([first.getPageCount(), second.getPageCount()]).toEqual([105, 55]);
+  const samples = await splitProgressSamples(page);
+  const copy = samples.filter(sample => sample.label === 'PDF page copying progress' && sample.max === 160);
+  expect(copy.some(sample => sample.value > 0 && sample.value < 160), JSON.stringify(samples.slice(-12))).toBe(true);
+  expect(copy.some(sample => sample.text.includes('Building PDF 2 of 2') && sample.value >= 105),
+    JSON.stringify(samples.slice(-12))).toBe(true);
+  expect(copy.every(sample => !sample.text.includes('{') && sample.text.includes('160 output pages')),
+    JSON.stringify(samples.slice(-12))).toBe(true);
+});
+
 test('split ZIP supports 50 outputs with progress controls and valid downloaded PDFs', async ({ page }) => {
   test.setTimeout(60000);
   await page.goto('/workspace/');
@@ -1067,10 +1144,12 @@ test('cancelling a long split stops ZIP download and restores workspace controls
   page.on('download', event => downloads.push(event.suggestedFilename()));
   await page.getByRole('button', { name: 'Download split PDFs (ZIP)' }).click();
   await expect(page.getByTestId('split-cancel')).toBeVisible();
+  await expect(page.getByTestId('split-progress-meter')).toHaveAttribute('max', '320');
   await expect(page.getByRole('tab', { name: 'Organize' })).toBeDisabled();
   await page.getByTestId('split-cancel').click();
   await expect(page.getByRole('alert')).toContainText('Split cancelled', { timeout: 30000 });
   await expect(page.getByRole('button', { name: 'Download split PDFs (ZIP)' })).toBeEnabled();
+  await expect(page.getByTestId('split-progress-meter')).toHaveCount(0);
   expect(downloads).toEqual([]);
 });
 
