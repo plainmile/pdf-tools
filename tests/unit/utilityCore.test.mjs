@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline, wrapTextLines,
-  textContentToLines, textContentToReadingOrderLines, linesToReadableText, hasMinimalSelectableText, summarizeTextCoverage, textFitsUtf8Budget, sanitizeFilename, workspaceFilenameStem,
+  textContentToLines, textContentToReadingOrderLines, linesToReadableText, hasMinimalSelectableText, textLinesFromFormAnnotations, summarizeTextCoverage, textFitsUtf8Budget, sanitizeFilename, workspaceFilenameStem,
   UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageFilename, imageExportFilenames, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
 
@@ -313,6 +313,26 @@ test('PDF positioned text is approximately sorted by vertical position then X', 
   assert.equal(linesToReadableText([lines], false), 'left right\nlast');
   assert.match(linesToReadableText([[{text: 'Large title', fontSize: 24},{text: 'Body',fontSize: 12}]], true), /## Large title/);
 });
+test('visible PDF form annotation text/choices append meaningful values, not checkbox guesses', () => {
+  const values = [
+    { fieldType: 'Tx', fieldName: 'applicant.name', fieldValue: 'Alice' },
+    { fieldType: 'Ch', fieldName: 'selection', fieldValue: ['Blue', 'Green'] },
+    { fieldType: 'Tx', fieldName: 'applicant.name', fieldValue: 'Alice' },
+    { fieldType: 'Tx', fieldName: 'empty', fieldValue: '   ' },
+    { fieldType: 'Btn', fieldName: 'consent', fieldValue: 'Yes' },
+    { fieldType: 'Sig', fieldName: 'signature', fieldValue: 'signed' },
+    null,
+  ];
+  assert.deepEqual(textLinesFromFormAnnotations(values), [
+    { text: 'applicant.name: Alice', fontSize: 12 },
+    { text: 'selection: Blue, Green', fontSize: 12 },
+  ]);
+  assert.deepEqual(textLinesFromFormAnnotations(null), []);
+  assert.deepEqual(textLinesFromFormAnnotations([{ fieldType: 'Tx', fieldValue: 'Fallback' }]), [
+    { text: 'Form field: Fallback', fontSize: 12 },
+  ]);
+});
+
 test('coverage distinguishes truly empty pages from image-backed pages with only a number', () => {
   const pageNumber = [{ text: '  Page 1 ', fontSize: 12 }];
   const realText = [{ text: 'Readable body text on this PDF page', fontSize: 12 }];
