@@ -1419,11 +1419,14 @@ test('visual split previews create correct ZIP partitions and protect custom typ
   await ranges.fill('2-4, 6');
   await cut2.click();
   await expect(page.getByTestId('visual-split-confirm')).toBeVisible();
+  await expect(page.getByTestId('visual-split-confirm')).toBeFocused();
   await expect(ranges).toHaveValue('2-4, 6');
   await page.getByTestId('visual-split-keep').click();
+  await expect(cut2).toBeFocused();
   await expect(ranges).toHaveValue('2-4, 6');
   await cut2.click();
   await page.getByTestId('visual-split-replace').click();
+  await expect(cut2).toBeFocused();
   await expect(ranges).toHaveValue('1-2, 3-6');
   await expect(page.getByTestId('split-coverage-complete')).toBeVisible();
 });
