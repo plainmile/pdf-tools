@@ -564,7 +564,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         {mode === 'add-page-numbers' && <div className="utility-options">
           <label><span>{t.pageStart}</span><input data-testid="number-start" type="number" min="1" max="99999" value={start} disabled={inputLocked} onChange={e => { setStart(e.target.value); setNotice(''); setError(''); }} /></label>
           <label><span>{t.firstPage}</span><input data-testid="number-first-pdf-page" type="number" min="1" max={pdf?.count || UTILITY_LIMITS.maxPages} step="1" value={firstPage} disabled={inputLocked} onChange={e => { setFirstPage(e.target.value); setNotice(''); setError(''); }} /></label>
-          <label><span>{t.pagePosition}</span><select aria-label={t.pagePosition} value={position} disabled={inputLocked} onChange={e => { setPosition(e.target.value); setNotice(''); setError(''); }}><option value="bottom-center">{t.bottomCenter}</option><option value="bottom-right">{t.bottomRight}</option><option value="top-right">{t.topRight}</option></select></label>
+          <label><span>{t.pagePosition}</span><select aria-label={t.pagePosition} value={position} disabled={inputLocked} onChange={e => { setPosition(e.target.value); setNotice(''); setError(''); }}><option value="bottom-left">{t.bottomLeft}</option><option value="bottom-center">{t.bottomCenter}</option><option value="bottom-right">{t.bottomRight}</option><option value="top-left">{t.topLeft}</option><option value="top-center">{t.topCenter}</option><option value="top-right">{t.topRight}</option></select></label>
+          <label><span>{t.pageMargin}</span><select aria-label={t.pageMargin} data-testid="number-margin" value={margin} disabled={inputLocked} onChange={e => { setMargin(e.target.value); setNotice(''); setError(''); }}><option value="12">{t.marginNarrow}</option><option value="24">{t.marginNormal}</option><option value="40">{t.marginWide}</option></select></label>
           <label><span>{t.pageSize}</span><select aria-label={t.pageSize} value={fontSize} disabled={inputLocked} onChange={e => { setFontSize(e.target.value); setNotice(''); setError(''); }}><option value="10">10</option><option value="12">12</option><option value="16">16</option></select></label>
         </div>}
         <p className="utility-note">{description}</p>
@@ -590,13 +591,24 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         {mode === 'add-page-numbers' && output?.bytes && <div className="utility-result" data-testid="numbered-pdf-result">
           {numberedResultStale && <p className="utility-note" role="status" data-testid="numbered-result-stale">{t.numberedResultStale}</p>}
           <p className="utility-note">{locale === 'zh' ? '预览的是生成后的 PDF，请核对页码与原有页脚是否重叠。' : 'This previews the generated PDF. Check that printed numbers do not overlap footers.'}</p>
-          <div className="utility-options"><label><span>{locale === 'zh' ? '预览页面' : 'Preview page'}</span>
-            <select data-testid="number-preview-page" value={numberPreviewPage} onChange={event => setNumberPreviewPage(event.target.value)}>
-              <option value="first">{locale === 'zh' ? '第一张编号页' : 'First numbered page'}</option>
-              <option value="last">{locale === 'zh' ? '最后一页' : 'Last page'}</option>
-            </select>
-          </label></div>
-          <PdfFirstPagePreview bytes={output.bytes} pageCount={output.pageCount} pageNumber={numberPreviewPage === 'last' ? output.pageCount : Number(output.numberingSettings.firstPage)} t={t} locale={locale} />
+          <div className="utility-options">
+            <label><span>{locale === 'zh' ? '预览页面' : 'Preview page'}</span>
+              <select data-testid="number-preview-page" value={numberPreviewPage}
+                onChange={event => { setNumberPreviewPage(event.target.value); if (event.target.value === 'custom') setNumberPreviewCustom(output.numberingSettings.firstPage); }}>
+                <option value="first">{locale === 'zh' ? '第一张编号页' : 'First numbered page'}</option>
+                <option value="last">{locale === 'zh' ? '最后一页' : 'Last page'}</option>
+                <option value="custom">{t.customPreview}</option>
+              </select>
+            </label>
+            {numberPreviewPage === 'custom' && <label><span>{t.customPage}</span>
+              <input data-testid="number-preview-custom" type="number" min="1" max={output.pageCount} step="1"
+                value={numberPreviewCustom} onChange={event => setNumberPreviewCustom(event.target.value)} />
+            </label>}
+          </div>
+          {numberPreviewPage === 'custom' && !numberPreviewValid &&
+            <p className="utility-note" role="status" data-testid="number-preview-invalid">{t.invalidPreviewPage.replace('{pages}', output.pageCount)}</p>}
+          {numberPreviewActualPage !== null &&
+            <PdfFirstPagePreview bytes={output.bytes} pageCount={output.pageCount} pageNumber={numberPreviewActualPage} t={t} locale={locale} />}
           <button type="button" className="button button-primary" data-testid="numbered-pdf-download" onClick={() => save(output)}>{numberedResultStale ? t.numberedPreviousDownload : t.downloadPdf} ↓</button>
         </div>}
         {isTextInput && output?.bytes && <div className="utility-result" data-testid="text-pdf-result">
