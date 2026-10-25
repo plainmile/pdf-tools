@@ -23,6 +23,13 @@ async function loadInput(page) {
   await expect(page.getByText('Added 2 files and 3 pages.')).toBeVisible();
 }
 
+async function captured(page, action, timeout = 30000) {
+  const waiting = page.waitForEvent('download', { timeout });
+  await action();
+  const download = await waiting;
+  return { name: download.suggestedFilename(), bytes: await readFile(await download.path()) };
+}
+
 async function downloadPdf(page, action) {
   const downloadEvent = page.waitForEvent('download');
   await action();
