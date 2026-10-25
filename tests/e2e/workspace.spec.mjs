@@ -723,7 +723,8 @@ test('every 2 pages splits a 105-page PDF into two bounded batches without missi
     name: 'two-page-book.pdf', mimeType: 'application/pdf',
     buffer: await makePdf(Array.from({ length: 105 }, (_, index) => 360 + index)),
   });
-  await expect(page.getByTestId('page-tile')).toHaveCount(105);
+  // The dedicated /split-pdf/ route opens the Split tab, not page tiles.
+  await expect(page.locator('.file-count')).toContainText('105 pages');
   await page.getByRole('radio', { name: 'Split every N pages' }).check();
   await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('2');
   await expect(page.getByTestId('split-batch-status')).toContainText('Batch 1 of 2');
