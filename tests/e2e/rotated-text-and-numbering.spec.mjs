@@ -80,6 +80,9 @@ test('numbered PDF pending preview survives changed options, invalid retries and
   await page.getByTestId('utility-clear-keep').click();
   await expect(page.getByTestId('numbered-pdf-result')).toBeVisible();
 
+  // 99999 is valid if exactly one page is numbered. Request two pages
+  // so that the last printed number exceeds the allowed maximum.
+  await page.getByTestId('number-first-pdf-page').fill('3');
   await page.getByTestId('number-start').fill('99999');
   await page.getByTestId('utility-run').click();
   await expect(page.getByRole('alert')).toContainText('99999');
@@ -89,6 +92,7 @@ test('numbered PDF pending preview survives changed options, invalid retries and
 
   // A new successful run uses the newly selected first page (not the old
   // PDF's preview page), and no longer claims the result is stale.
+  await page.getByTestId('number-first-pdf-page').fill('4');
   await page.getByTestId('number-start').fill('41');
   await page.getByTestId('utility-run').click();
   await expect(page.getByTestId('numbered-result-stale')).toHaveCount(0);
