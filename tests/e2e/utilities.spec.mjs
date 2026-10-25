@@ -822,7 +822,7 @@ test('cancel a stalled PDF import without losing the previous document, then imp
   });
   await expect(page.getByTestId('utility-file-summary')).toContainText('next.pdf');
   const result = await getDownload(page, () => page.getByTestId('utility-run').click(), 25000);
-  expect(result.name).toMatch(/\\.zip$/);
+  expect(result.name).toMatch(/\.zip$/);
   const zip = await JSZip.loadAsync(result.bytes);
   expect(Object.keys(zip.files)).toHaveLength(2);
 });
