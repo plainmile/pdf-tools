@@ -607,14 +607,14 @@ export function textContentToReadingOrderLines(content, order = 'rows', viewport
 /** A small selectable page number is not evidence that the body of a
  * scanned page was extracted. Check only non-whitespace text, not line count.
  */
-export function hasMinimalSelectableText(lines, maxCharacters = 24) {
+export function hasMinimalSelectableText(lines, maxCharacters = 10) {
   if (!Array.isArray(lines) || !lines.length) return false;
-  let count = 0;
-  for (const line of lines) {
-    count += String(line.text ?? '').replace(/\s/gu, '').length;
-    if (count > maxCharacters) return false;
-  }
-  return count > 0;
+  const text = lines.map(line => String(line.text ?? '')).join(' ').replace(/\s+/gu, ' ').trim();
+  if (!text) return false;
+  // A page-number-only layer is common on scanned books, including "Page 1 of 1000".
+  if (/^(?:(?:page|p\.)\s*)?\d{1,5}(?:\s*(?:of|\/)\s*\d{1,5})?$/iu.test(text) ||
+      /^第\s*\d{1,5}\s*页$/u.test(text)) return true;
+  return text.replace(/\s/gu, '').length <= maxCharacters;
 }
 
 /** Surface empty pages and image-backed pages with almost no selectable text.
