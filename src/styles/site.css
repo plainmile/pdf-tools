@@ -356,6 +356,20 @@ main { flex: 1; }
 .input-label { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
 .split-fields > input { border: 1px solid var(--border); border-radius: 5px; padding: 10px 12px; height: 41px; background: var(--surface); color: var(--text); }
 .input-note { color: var(--subtle); font-size: 11px; line-height: 1.6; margin: 8px 0 0; }
+/* Visual splitting uses the same lazy PDF.js page thumbnails as Organize.
+   Cut actions are real buttons; the separate preview button only opens zoom. */
+.split-visual-panel { min-width: 0; margin: 18px 0 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); padding: 11px; }
+.split-visual-panel > summary { cursor: pointer; font-size: 13px; font-weight: 650; line-height: 1.5; }
+.split-visual-panel .input-note { margin: 7px 0 11px; }
+.split-visual-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(125px,1fr)); gap: 10px; max-height: 470px; min-width: 0; overflow-y: auto; padding: 9px 3px 4px; }
+.split-visual-tile { display: flex; flex-direction: column; min-width: 0; padding: 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--panel); }
+.split-visual-tile.is-cut { border-color: var(--accent); }
+.split-visual-number { font-size: 11px; font-weight: 650; color: var(--text); }
+.split-visual-tile .page-preview { height: 155px; margin: 7px 0; }
+.split-visual-tile > button:last-child { font-size: 11px; min-height: 33px; margin-top: auto; white-space: normal; text-align: center; }
+.split-visual-tile > button[aria-pressed="true"] { background: var(--accent-wash); border-color: var(--accent); color: var(--accent); }
+.split-visual-last { font-size: 11px; color: var(--muted); text-align: center; padding: 9px 0; }
+.split-visual-panel .workspace-clear-confirm { margin: 10px 0; }
 .split-estimate { font-size: 12px; color: var(--muted); margin-top: 17px; }
 .split-coverage-review { display: grid; gap: 8px; min-width: 0; margin-top: 9px; }
 .split-coverage-review .input-note { margin: 0; }
