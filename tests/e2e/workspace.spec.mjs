@@ -542,7 +542,12 @@ test('batch-drag selected pages together across documents in the exported PDF', 
   await page.getByRole('checkbox', { name: 'Select page 1' }).check();
   await page.getByRole('checkbox', { name: 'Select page 3' }).check();
   const cards = page.getByTestId('page-tile');
-  await cards.nth(0).dragTo(cards.nth(1));
+  // The tile contains an independent preview button in its center. Drag from
+  // the visible grip and drop on the tile edge to exercise the intended user
+  // affordance without accidentally clicking the PDF zoom preview.
+  const handle = cards.nth(0).getByTestId('page-drag-handle');
+  await expect(handle).toHaveAttribute('draggable', 'true');
+  await handle.dragTo(cards.nth(1), { targetPosition: { x: 9, y: 62 } });
   const output = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
   expect(output.getPages().map((p) => p.getWidth())).toEqual([300, 320, 310]);
 });

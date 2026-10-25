@@ -1208,7 +1208,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                         <PageThumbnail source={source} pageRef={pageRef} getPreviewDoc={getPreviewDoc} locale={locale} t={t}
           watermarkPreview={watermarkPreview} onOpen={setPreviewPageId} outputPosition={index + 1} busy={busy} />
                         <div className="tile-info" title={source?.name}><strong>{pageName(pageRef.pageIndex + 1)}</strong><small>{source?.name ?? t.document}</small></div>
-                        <div className="tile-moves"><button type="button" disabled={index === 0 || busy} title={t.moveLeft.replace('{n}', index + 1)} aria-label={interpolate(t.moveLeft, { n: index + 1 })} onClick={() => commit((previous) => shiftPage(previous, pageRef.id, -1))}>←</button><span title={t.dragTitle} aria-hidden="true">⠿</span><button type="button" disabled={index === pages.length - 1 || busy} title={interpolate(t.moveRight, { n: index + 1 })} aria-label={interpolate(t.moveRight, { n: index + 1 })} onClick={() => commit((previous) => shiftPage(previous, pageRef.id, 1))}>→</button></div>
+                        <div className="tile-moves"><button type="button" disabled={index === 0 || busy} title={t.moveLeft.replace('{n}', index + 1)} aria-label={interpolate(t.moveLeft, { n: index + 1 })} onClick={() => commit((previous) => shiftPage(previous, pageRef.id, -1))}>←</button><span className="page-drag-handle" data-testid="page-drag-handle" title={t.dragTitle}
+                          draggable={!busy} aria-hidden="true">⠿</span><button type="button" disabled={index === pages.length - 1 || busy} title={interpolate(t.moveRight, { n: index + 1 })} aria-label={interpolate(t.moveRight, { n: index + 1 })} onClick={() => commit((previous) => shiftPage(previous, pageRef.id, 1))}>→</button></div>
                       </div>
                     );
                   })}
