@@ -18,6 +18,19 @@ async function take(page, action, timeout = 30000) {
   return { filename: item.suggestedFilename(), bytes: await readFile(await item.path()) };
 }
 
+async function diagnosticState(page) {
+  return page.evaluate(() => ({
+    url: location.href,
+    errors: [...document.querySelectorAll('.notice-error')].map(x=>x.textContent.trim()),
+    statuses: [...document.querySelectorAll('[role="status"]')].map(x=>x.textContent.trim().slice(0,250)),
+    warnings: [...document.querySelectorAll('[data-testid="text-extraction-warning"]')].map(x=>x.textContent.trim()),
+    result: [...document.querySelectorAll('[data-testid$="-text-result"]')].map(x=>x.dataset.testid),
+    preview: document.querySelector('#utility-preview')?.value?.slice(0,220) || '',
+    buttonDisabled: document.querySelector('[data-testid="utility-run"]')?.disabled,
+    fileSummary: document.querySelector('[data-testid="utility-file-summary"]')?.textContent || '',
+  })).catch(error => ({ unavailable: String(error) }));
+}
+
 test('Firefox/WebKit: full PDF edit and split preserves page widths, no rasterized blank pages', async ({ page }) => {
   await page.goto('/workspace/');
   await page.getByTestId('file-input').setInputFiles([
@@ -52,7 +65,12 @@ test('Firefox/WebKit: interactive form text remains visible in TXT, with an expl
   const auto = [];
   page.on('download', d=>auto.push(d.suggestedFilename()));
   await page.getByTestId('utility-run').click();
-  await expect(page.getByTestId('form-text-result')).toBeVisible();
+  try {
+    await expect(page.getByTestId('form-text-result')).toBeVisible();
+  } catch (error) {
+    throw new Error('Form-field regression diagnostic: ' +
+      JSON.stringify({ page: await diagnosticState(page), autoDownloads: auto }) + '; ' + error.message);
+  }
   expect(auto).toEqual([]);
   const out = await take(page, () => page.getByTestId('form-text-download').click());
   expect(out.bytes.toString('utf8')).toContain('person.name: FRIENDLY-PRIVATE-FORM');
@@ -74,7 +92,13 @@ test('Firefox/WebKit: cancelled local file reading releases controls and preserv
   await page.getByTestId('utility-load-cancel').click();
   await expect(page.getByTestId('utility-load-cancel')).toHaveCount(0);
   await expect(page.getByTestId('utility-file-summary')).toContainText('original.pdf');
-  const downloaded = await take(page, () => page.getByTestId('utility-run').click());
+  let downloaded;
+  try {
+    downloaded = await take(page, () => page.getByTestId('utility-run').click());
+  } catch (error) {
+    throw new Error('Post-cancel text conversion diagnostic: ' +
+      JSON.stringify(await diagnosticState(page)) + '; ' + error.message);
+  }
   expect(downloaded.bytes.toString('utf8')).toContain('CROSS-BROWSER 1');
 });
 
