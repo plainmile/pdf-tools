@@ -271,7 +271,10 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
         extractionStage = `page ${i}: readPdfTextContent`;
         const content = await readPdfTextContent(page, signal);
         extractionStage = `page ${i}: textContentToReadingOrderLines`;
-        const viewport = readingOrder === 'rows' ? null : page.getViewport({ scale: 1 });
+        // /Rotate 90/180/270 changes visible row direction. Raw PDF text
+        // baselines cannot be sorted by user-space Y on those pages.
+        const viewport = readingOrder === 'rows' && page.rotate % 360 === 0
+          ? null : page.getViewport({ scale: 1 });
         const lines = textContentToReadingOrderLines(content, readingOrder, viewport);
         pages.push(lines);
         // PDF.js text layers can contain only a page number while an image
