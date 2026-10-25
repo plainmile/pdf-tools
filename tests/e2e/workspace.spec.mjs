@@ -667,8 +667,14 @@ test('split output count over 50 is explained before download', async ({ page })
   expect(lastPageDownload.suggestedFilename()).toBe('fifty-one-pages-51-51.pdf');
   const lastPagePdf = await PDFDocument.load(await readFile(await lastPageDownload.path()));
   expect(lastPagePdf.getPageCount()).toBe(1);
-  await expect(page.locator('.notice-success')).toContainText('Final batch (2 of 2) downloaded');
+  await expect(page.locator('.notice-success')).toContainText('Download requested for final batch (2 of 2)');
   await expect(page.locator('.notice-success')).not.toContainText('Next batch');
+  await expect(page.getByTestId('split-batch-progress')).toContainText('1 of 2');
+  await expect(page.getByTestId('split-batch-current-requested')).toBeVisible();
+  // A user may start with the last batch; the shortcut finds the first missing batch.
+  await page.getByTestId('split-batch-go-pending').click();
+  await expect(page.getByTestId('split-batch-status')).toContainText('Batch 1 of 2');
+  await expect(page.getByTestId('split-batch-current-requested')).toHaveCount(0);
   await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('2');
   await expect(page.getByTestId('split-batch-nav')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Download split PDFs (ZIP)' })).toBeEnabled();
@@ -705,15 +711,25 @@ test('105-page book downloads three separate, correctly numbered per-page ZIP ba
       expect(pdf.getPage(0).getWidth()).toBe(299 + pageNumber);
     }
     await expect(page.getByTestId('split-coverage-omitted')).toHaveCount(0);
+    await expect(page.getByTestId('split-batch-progress')).toContainText(batch + ' of 3');
     if (batch === 3) {
-      await expect(page.locator('.notice-success')).toContainText('Final batch (3 of 3) downloaded');
+      await expect(page.locator('.notice-success')).toContainText('Download requested for final batch (3 of 3)');
       await expect(page.locator('.notice-success')).not.toContainText('Next batch');
     }
     if (batch < 3) await page.getByTestId('split-batch-next').click();
   }
   await expect(page.getByTestId('split-batch-next')).toBeDisabled();
+  await expect(page.getByTestId('split-batch-all-requested')).toBeVisible();
+  await expect(page.getByTestId('split-batch-go-pending')).toHaveCount(0);
   await page.getByTestId('split-batch-prev').click();
   await expect(page.getByTestId('split-batch-status')).toContainText('Batch 2 of 3');
+  await expect(page.getByTestId('split-batch-current-requested')).toBeVisible();
+  await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('2');
+  await expect(page.getByTestId('split-batch-progress')).toContainText('0 of 2');
+  await expect(page.getByTestId('split-batch-all-requested')).toHaveCount(0);
+  // Reverting the settings must not resurrect stale progress from the old plan.
+  await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('1');
+  await expect(page.getByTestId('split-batch-progress')).toContainText('0 of 3');
 });
 
 test('every 2 pages splits a 105-page PDF into two bounded batches without missing outputs', async ({ page }) => {
@@ -751,7 +767,46 @@ test('every 2 pages splits a 105-page PDF into two bounded batches without missi
     if (batch === 1) await page.getByTestId('split-batch-next').click();
   }
   await expect(page.getByTestId('split-batch-next')).toBeDisabled();
-  await expect(page.locator('.notice-success')).toContainText('Final batch (2 of 2) downloaded');
+  await expect(page.locator('.notice-success')).toContainText('Download requested for final batch (2 of 2)');
+});
+
+test('375px Chinese visual split jumps to a late page without changing PDF order', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'phone-book.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf(Array.from({ length: 105 }, (_, i) => 300 + i)),
+  });
+  await expect(page.locator('.file-count')).toContainText('105 页');
+  await page.getByTestId('visual-split-panel').locator('summary').click();
+  const jump = page.getByTestId('split-visual-jump-input');
+  await expect(jump).toBeVisible();
+  await jump.fill('１０６');
+  await page.getByTestId('split-visual-jump-submit').click();
+  await expect(page.locator('.notice-error')).toContainText('105');
+  await jump.fill('１００');
+  await page.getByTestId('split-visual-jump-submit').click();
+  const selected = page.locator('[data-testid="visual-split-page"][data-export-position="100"]');
+  await expect(selected).toBeFocused();
+  await expect(page.locator('.notice-success')).toContainText('100');
+  const widths = await page.evaluate(() => ({
+    document: document.documentElement.scrollWidth,
+    viewport: document.documentElement.clientWidth,
+  }));
+  expect(widths.document).toBeLessThanOrEqual(widths.viewport + 2);
+  await page.locator('[data-testid="visual-split-cut"][data-after-page="100"]').click();
+  await expect(page.getByTestId('split-coverage-complete')).toContainText('105');
+  const out = await captured(page, () => page.locator('.split-download').click());
+  const zip = await JSZip.loadAsync(out.bytes);
+  const entries = Object.keys(zip.files).sort();
+  expect(entries).toEqual(['part-01-pages-1-100.pdf', 'part-02-pages-101-105.pdf']);
+  const counts = [];
+  for (const name of entries) {
+    const document = await PDFDocument.load(await zip.file(name).async('uint8array'));
+    counts.push(document.getPageCount());
+  }
+  expect(counts).toEqual([100, 5]);
 });
 
 test('Undo, Redo and blank insertion reset stale every-N split batch navigation', async ({ page }) => {
