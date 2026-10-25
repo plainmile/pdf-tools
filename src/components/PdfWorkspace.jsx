@@ -995,12 +995,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         {error && <div className="notice notice-error" role="alert">{error}<button type="button" aria-label={t.dismiss} onClick={() => setError('')}>×</button></div>}
         {notice && <div className="notice notice-success" role="status">{notice}<button type="button" aria-label={t.dismiss} onClick={() => setNotice('')}>×</button></div>}
         {pristineOutput && <p className="utility-note" data-testid="workspace-original-preserved">{locale === 'zh' ? '当前页面未修改，直接导出会保留原始 PDF 字节，包括书签、交互表单及签名。' : 'This PDF is unchanged. Export all preserves the original bytes, including bookmarks, form fields and signatures.'}</p>}
-        {hasOriginalPdf && !pristineOutput && <p className="utility-note" data-testid="workspace-document-caution">{t.documentCaution}</p>}
-        {!pristineOutput && activeFormSourceCount > 0 && <p className="utility-note workspace-form-risk"
+        {hasOriginalPdf && <p className="utility-note" data-testid="workspace-document-caution">{pristineOutput ? (locale === 'zh' ? '但提取部分页面、拆分或修改 PDF 会创建新文件，可能丢失表单、附件、注释或使数字签名失效。原始文件请保留。' : 'Extracting, splitting or editing this PDF creates a new file and may affect forms, attachments, annotations and digital signatures. Keep your original.') : t.documentCaution}</p>}
+        {activeFormSourceCount > 0 && <p className="utility-note workspace-form-risk"
           data-testid="workspace-form-risk" role="alert">
           {interpolate(t.formRisk, { files: activeFormSourceCount })}
         </p>}
-        {!pristineOutput && activeBookmarkSourceCount > 0 && <p className="utility-note workspace-bookmark-risk"
+        {activeBookmarkSourceCount > 0 && <p className="utility-note workspace-bookmark-risk"
           data-testid="workspace-bookmark-risk" role="alert">
           {interpolate(t.bookmarkRisk, { files: activeBookmarkSourceCount })}
         </p>}
