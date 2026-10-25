@@ -823,10 +823,17 @@ test('Undo, Redo and blank insertion reset stale every-N split batch navigation'
   const next = page.getByTestId('split-batch-next');
   await next.click();
   await expect(page.getByTestId('split-batch-status')).toContainText('Batch 2 of 2');
+  // Only the final three output PDFs are in this batch. Their successful
+  // download request must not survive a later page-order edit or Undo.
+  const lateBatch = await captured(page, () => page.locator('.split-download').click());
+  const archive = await JSZip.loadAsync(lateBatch.bytes);
+  expect(Object.keys(archive.files)).toHaveLength(3);
+  await expect(page.getByTestId('split-batch-progress')).toContainText('1 of 2');
   await page.getByRole('tab', { name: 'Organize' }).click();
   await page.getByRole('button', { name: 'Undo' }).click();
   await page.getByRole('tab', { name: 'Split' }).click();
   await expect(page.getByTestId('split-batch-status')).toContainText('Batch 1 of 2');
+  await expect(page.getByTestId('split-batch-progress')).toContainText('0 of 2');
   await next.click();
   await page.getByRole('tab', { name: 'Organize' }).click();
   await page.getByRole('button', { name: 'Redo' }).click();
