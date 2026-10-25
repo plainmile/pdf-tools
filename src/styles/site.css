@@ -349,7 +349,7 @@ main { flex: 1; }
 .split-graphic span { opacity: .65; }
 .split-intro h3 { font-size: 21px; margin-bottom: 10px; }
 .split-intro p { color: var(--muted); font-size: 12px; line-height: 1.8; }
-.split-fields { display: flex; flex-direction: column; align-items: stretch; }
+.split-fields { display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
 .option-radio { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 650; margin-bottom: 12px; }
 .option-radio input { accent-color: var(--accent); }
 .option-divider { margin-top: 19px; padding-top: 19px; border-top: 1px solid var(--border); }
