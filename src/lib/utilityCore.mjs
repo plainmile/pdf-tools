@@ -617,6 +617,24 @@ export function hasMinimalSelectableText(lines, maxCharacters = 10) {
   return text.replace(/\s/gu, '').length <= maxCharacters;
 }
 
+// A scan may contain a whole-page raster image but still have a footer or
+// running header longer than the ten-character "page number only" heuristic.
+// Only do the extra image-operator check for such sparse, short-line pages;
+// we do not claim that any image is definitely OCR text.
+export function hasSparseTextScanRisk(lines) {
+  if (!Array.isArray(lines) || lines.length === 0 || lines.length > 3) return false;
+  if (hasMinimalSelectableText(lines)) return true;
+  const text = lines.map(line => String(line.text ?? '')).join(' ').replace(/\s+/gu, ' ').trim();
+  if (!text) return false;
+  const length = text.replace(/\s/gu, '').length;
+  if (length <= 32) return true;
+  // Longer running headers still often include an explicit page label.
+  // Never scan a page containing an ordinary full paragraph just because
+  // the body mentions "Page 12".
+  return length <= 120 &&
+    /(?:\b(?:page|p\.)\s*\d{1,5}(?:\s*(?:of|\/)\s*\d{1,5})?|第\s*\d{1,5}\s*页)/iu.test(text);
+}
+
 /** Filled text and dropdown widget values live in PDF annotations, not
  * necessarily in the page text stream. Include only visible form values that
  * PDF.js exposes; do not invent values for checkbox, radio or signature widgets.
@@ -650,7 +668,7 @@ export function summarizeTextCoverage(pages, sparseImagePageNumbers = []) {
   const imagePages = new Set(sparseImagePageNumbers);
   for (let index = 0; index < pages.length; index++) {
     if (!pages[index].length) missingPages.push(index + 1);
-    else if (imagePages.has(index + 1) && hasMinimalSelectableText(pages[index])) {
+    else if (imagePages.has(index + 1) && hasSparseTextScanRisk(pages[index])) {
       suspectPages.push(index + 1);
     }
   }
