@@ -53,6 +53,14 @@ test('page previews reuse one PDF.js worker while navigating and release it for 
   await expect(preview).toHaveAttribute('data-rendered-page', '5');
   const middleScreenshot = await preview.locator('canvas').screenshot();
   expect(firstScreenshot.equals(middleScreenshot)).toBe(false);
+  // Even a temporarily invalid custom page must not destroy the existing
+  // PDF.js document. Hide the preview but preserve its Worker until input
+  // becomes valid again.
+  await page.getByTestId('number-preview-custom').fill('0');
+  await expect(preview).toHaveCount(0);
+  await expect(page.getByTestId('number-preview-invalid')).toBeVisible();
+  await page.getByTestId('number-preview-custom').fill('7');
+  await expect(preview).toHaveAttribute('data-rendered-page', '7');
   expect(await page.evaluate(() => window.__pdfWorkerCreations)).toBe(workerBaseline);
 
   // The preview always uses the real output bytes. A new generation must
