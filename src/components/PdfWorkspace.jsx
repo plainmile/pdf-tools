@@ -1212,6 +1212,53 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); }} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
                   <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} placeholder="5" onChange={(event) => setChunkSize(event.target.value)} disabled={splitMode !== 'chunks' || busy} />
+                  {pages.length > 1 && <details className="split-visual-panel" data-testid="visual-split-panel">
+                    <summary>{t.visualSplitToggle}</summary>
+                    <p className="input-note">{t.visualSplitHint}</p>
+                    {visualCuts?.length > 0 && splitMode === 'ranges' &&
+                      <button type="button" className="button button-secondary button-small"
+                        data-testid="visual-split-clear" disabled={busy}
+                        onClick={() => applyVisualCuts([])}>{t.visualSplitClear}</button>}
+                    {pendingVisualCut !== null && <div className="workspace-clear-confirm"
+                      role="group" aria-label={t.visualSplitConfirmTitle}
+                      data-testid="visual-split-confirm">
+                      <p>{t.visualSplitConfirmText}</p>
+                      <div className="workspace-clear-buttons">
+                        <button type="button" className="button button-secondary button-small"
+                          data-testid="visual-split-keep"
+                          onClick={() => setPendingVisualCut(null)}>{t.visualSplitKeep}</button>
+                        <button type="button" className="button button-secondary button-small"
+                          data-testid="visual-split-replace"
+                          onClick={() => applyVisualCuts([pendingVisualCut])}>{t.visualSplitReplace}</button>
+                      </div>
+                    </div>}
+                    <div className="split-visual-grid" data-testid="visual-split-grid">
+                      {pages.map((pageRef, index) => {
+                        const afterPage = index + 1;
+                        const isCut = Boolean(visualCuts?.includes(afterPage) && splitMode === 'ranges');
+                        const source = sourceLookup.get(pageRef.sourceId);
+                        return <div className={'split-visual-tile' + (isCut ? ' is-cut' : '')}
+                          key={pageRef.id} data-testid="visual-split-page"
+                          data-export-position={afterPage}>
+                          <span className="split-visual-number">
+                            {interpolate(t.visualSplitPage, { n: afterPage })}
+                          </span>
+                          <PageThumbnail source={source} pageRef={pageRef} getPreviewDoc={getPreviewDoc}
+                            locale={locale} t={t} watermarkPreview={watermarkPreview}
+                            onOpen={setPreviewPageId} outputPosition={afterPage} busy={busy} />
+                          {afterPage < pages.length
+                            ? <button type="button" className="button button-secondary button-small"
+                                data-testid="visual-split-cut" data-after-page={afterPage}
+                                aria-pressed={isCut} disabled={busy || pendingVisualCut !== null}
+                                aria-label={interpolate(t.visualSplitCutAfter, { n: afterPage })}
+                                onClick={() => toggleVisualCut(afterPage)}>
+                                {isCut ? t.visualSplitUndoCut : t.visualSplitCut}
+                              </button>
+                            : <span className="split-visual-last">{t.visualSplitLast}</span>}
+                        </div>;
+                      })}
+                    </div>
+                  </details>}
                   <div className="split-estimate" aria-live="polite">{splitEstimate === null ? (splitNeedsInput ? (splitMode === 'ranges' ? t.enterSplitRanges : t.enterSplitSize) : t.invalidRange) : interpolate(t.estimate, { files: splitEstimate })}</div>
                   {splitPlan && <div className="split-coverage-review" aria-live="polite" data-testid="split-coverage-review">
                     {splitPlan.coverage.complete && <p className="input-note" data-testid="split-coverage-complete">{interpolate(t.splitCoverageComplete, { total: splitPlan.coverage.total })}</p>}
