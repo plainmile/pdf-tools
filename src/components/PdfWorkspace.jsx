@@ -1502,7 +1502,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                      <p className="utility-note" role="status" data-testid="split-progress" aria-live="polite" aria-atomic="true">{splitProgress.phase === 'parts'
                        ? interpolate(t.splitPartsProgress, {
                          file: splitProgress.file, files: splitProgress.files,
-                         pagesDone: splitProgress.pagesDone, pagesTotal: splitProgress.pagesTotal,
+                         copied: splitProgress.pagesDone, totalpages: splitProgress.pagesTotal,
                        })
                        : interpolate(t.splitZipProgress, { percent: splitProgress.percent })}</p>
                      <progress className="split-progress-meter" data-testid="split-progress-meter"
