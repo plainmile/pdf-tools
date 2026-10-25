@@ -146,6 +146,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [ranges, setRanges] = useState('');
   const [chunkSize, setChunkSize] = useState('');
   const [pendingVisualCut, setPendingVisualCut] = useState(null);
+  const [visualSplitOpen, setVisualSplitOpen] = useState(false);
   const [exportSettingsOpen, setExportSettingsOpen] = useState(mode === 'watermark-pdf');
   const [watermarkEnabled, setWatermarkEnabled] = useState(false);
   const [watermarkText, setWatermarkText] = useState('');
@@ -1212,7 +1213,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); }} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
                   <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} placeholder="5" onChange={(event) => setChunkSize(event.target.value)} disabled={splitMode !== 'chunks' || busy} />
-                  {pages.length > 1 && <details className="split-visual-panel" data-testid="visual-split-panel">
+                  {pages.length > 1 && <details className="split-visual-panel" data-testid="visual-split-panel"
+                    open={visualSplitOpen} onToggle={event => setVisualSplitOpen(event.currentTarget.open)}>
                     <summary>{t.visualSplitToggle}</summary>
                     <p className="input-note">{t.visualSplitHint}</p>
                     {visualCuts?.length > 0 && splitMode === 'ranges' &&
@@ -1232,7 +1234,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                           onClick={() => applyVisualCuts([pendingVisualCut])}>{t.visualSplitReplace}</button>
                       </div>
                     </div>}
-                    <div className="split-visual-grid" data-testid="visual-split-grid">
+                    {visualSplitOpen && <div className="split-visual-grid" data-testid="visual-split-grid">
                       {pages.map((pageRef, index) => {
                         const afterPage = index + 1;
                         const isCut = Boolean(visualCuts?.includes(afterPage) && splitMode === 'ranges');
@@ -1257,7 +1259,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                             : <span className="split-visual-last">{t.visualSplitLast}</span>}
                         </div>;
                       })}
-                    </div>
+                    </div>}
                   </details>}
                   <div className="split-estimate" aria-live="polite">{splitEstimate === null ? (splitNeedsInput ? (splitMode === 'ranges' ? t.enterSplitRanges : t.enterSplitSize) : t.invalidRange) : interpolate(t.estimate, { files: splitEstimate })}</div>
                   {splitPlan && <div className="split-coverage-review" aria-live="polite" data-testid="split-coverage-review">
