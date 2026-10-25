@@ -16,10 +16,10 @@ const COPY = {
     compressionReady: 'The output is smaller. Check text sharpness before using it.', compressionResultStale: 'This is the previous result, made with a different compression level. You can still download it, or run again with the new setting.', compressionRetryKept: 'The new attempt did not reduce file size. The numbers and download below still belong to your previous successful result.', previewCompressed: 'Preview compressed page 1', hidePreview: 'Hide preview',
     noSavingEarly: 'Stopped early: JPEG data already exceeds the original size. Keep the original or lower the resolution.',
     compressionLowerBound: 'At least', previewAction: 'Generate PDF preview', previewTitle: 'Generated PDF preview', previewFirst: 'Previewing page 1 of {pages}', previewFailed: 'Preview unavailable; you can still download the PDF.', downloadPdf: 'Download PDF',
-    textWarning: 'Extracts existing selectable PDF text only, not OCR. Columns, tables and heading formatting may not be preserved. Check the exported text.',
+    textWarning: 'Extracts existing selectable PDF text and common filled text/dropdown form fields, not OCR. Columns, tables and complex forms may need review.',
     textOrderLabel: 'Text reading order', textOrderRows: 'By rows (single-column documents and tables)', textOrderLeft: 'Two columns: left first', textOrderRight: 'Two columns: right first', textOrderHint: 'For newspapers and side-by-side articles. Full-width headings, tables and complex layouts can still need manual review.', textOrderStale: 'This download uses your previous reading order. Convert again to apply the new selection.',
     missingTextPages: 'Important: {missing} of {total} pages have no selectable text (pages {pages}). Those pages may be blank or scanned images. Their content was not extracted; OCR would be required for scanned text. Check your original PDF.',
-    partialTextReady: 'Some PDF pages were not extracted. Review the warning before choosing to download this incomplete text file.', imageOnlyTextWarning: 'Review before downloading: {count} of {total} pages have images but very little selectable text (pages {pages}). Scanned text may be inside those images and was NOT extracted. These may also be ordinary illustrated pages. Compare with your original; this tool does not run OCR.', imageOnlyTextReady: 'Possible missing text inside images. Automatic download was paused; review the warning and download explicitly if the result is suitable.',
+    partialTextReady: 'Some PDF pages were not extracted. Review the warning before choosing to download this incomplete text file.', imageOnlyTextWarning: 'Review before downloading: {count} of {total} pages have images but very little selectable text (pages {pages}). Scanned text may be inside those images and was NOT extracted. These may also be ordinary illustrated pages. Compare with your original; this tool does not run OCR.', imageOnlyTextReady: 'Possible missing text inside images. Automatic download was paused; review the warning and download explicitly if the result is suitable.', formFieldWarning: 'This PDF contains interactive form fields. Visible filled text and dropdown values are included when exposed by PDF.js, but checkbox/radio states, signatures and unsupported or hidden form fields may be missing. Verify the original PDF before downloading.', formFieldReady: 'Interactive PDF form detected. Review extracted field values and any missing controls before downloading.',
     markdownWarning: 'Markdown conversion is approximate; headings are inferred from font size. Complex PDF layout cannot be faithfully recovered.',
     textLabel: 'Text to convert', textPlaceholder: 'Paste text here or import a .txt / .md file…',
     textInputHint: 'Import UTF-8 or BOM-marked UTF-16 text. Pages containing characters unsupported by built-in PDF fonts use local browser fonts as images; other pages keep selectable text.',
@@ -42,10 +42,10 @@ const COPY = {
     compressionReady: '输出文件确实更小。请先核对文字清晰度。', compressionResultStale: '这是之前压缩强度生成的结果。您仍可下载，或按当前设置重新处理。', compressionRetryKept: '新一轮处理未能缩小文件。下方的大小比较和下载按钮仍对应上一次成功的压缩结果。', previewCompressed: '预览压缩后的首页', hidePreview: '收起预览',
     noSavingEarly: '已提前停止：JPEG 数据已不小于原文件，继续转换也不能节省空间。请保留原文件或降低清晰度。',
     compressionLowerBound: '至少', previewAction: '生成 PDF 预览', previewTitle: '生成的 PDF 预览', previewFirst: '第 1 页预览（共 {pages} 页）', previewFailed: '无法生成预览，但仍可下载 PDF。', downloadPdf: '下载 PDF',
-    textWarning: '只提取 PDF 中已有的可选择文字，不具备 OCR。多栏、表格和段落顺序可能不准确，请核对导出内容。',
+    textWarning: '提取 PDF 中已有的可选择文字，以及常见的已填写文本框和下拉框内容，不具备 OCR。多栏、表格及复杂表单仍需核对。',
     textOrderLabel: '文字阅读顺序', textOrderRows: '按行读取（单栏文档、表格）', textOrderLeft: '双栏：先左栏后右栏', textOrderRight: '双栏：先右栏后左栏', textOrderHint: '适用于报纸、双栏论文等。跨栏标题、表格和复杂版式仍需人工核对。', textOrderStale: '当前结果使用之前的阅读顺序。请重新转换以应用新设置。',
     missingTextPages: '重要提示：共 {total} 页中有 {missing} 页未检测到可选择文字（第 {pages} 页）。这些页可能是空白页或扫描图片，其内容未被提取；扫描文字需要 OCR。请对照原始 PDF 核查。',
-    partialTextReady: '有些 PDF 页面未能提取文字。请先查看缺页提示，再决定是否下载这份不完整的文字文件。', imageOnlyTextWarning: '下载前请核查：共 {total} 页中有 {count} 页包含图片，但只能提取到极少文字（第 {pages} 页）。扫描正文可能仍在图片里，未被提取；也可能是正常的图片页面。请对照原 PDF，本工具不提供 OCR。', imageOnlyTextReady: '部分页面的图片中可能藏有未提取的文字。已暂停自动下载，请核对后主动下载。',
+    partialTextReady: '有些 PDF 页面未能提取文字。请先查看缺页提示，再决定是否下载这份不完整的文字文件。', imageOnlyTextWarning: '下载前请核查：共 {total} 页中有 {count} 页包含图片，但只能提取到极少文字（第 {pages} 页）。扫描正文可能仍在图片里，未被提取；也可能是正常的图片页面。请对照原 PDF，本工具不提供 OCR。', imageOnlyTextReady: '部分页面的图片中可能藏有未提取的文字。已暂停自动下载，请核对后主动下载。', formFieldWarning: '检测到可交互 PDF 表单。已尝试提取可见的已填写文本框及下拉框内容，但复选框、单选框、签名、隐藏或特殊字段仍可能遗漏。请对照原文件核查后再下载。', formFieldReady: '检测到交互表单，请核对已提取字段及可能遗漏的选项后主动下载。',
     markdownWarning: 'Markdown 为近似转换：根据字号推测标题，复杂 PDF 的版式无法完整还原。',
     textLabel: '需要转换的文本', textPlaceholder: '粘贴文字，或选择 .txt / .md 文件……',
     textInputHint: '支持 UTF-8 或带 BOM 的 UTF-16 文本。含内置 PDF 字体不支持字符的页面将使用本地字体图片化，其他页面保留可选中、可搜索的文字。',
@@ -350,6 +350,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         ensureNotCancelled();
         const incomplete = Boolean(textCoverage?.missingPages.length);
         const suspectText = Boolean(textCoverage?.suspectPages.length);
+        const hasFormFields = Boolean(textCoverage?.hasFormFields);
         const extractionNotices = [];
         if (incomplete) {
           const { missingPages, total } = textCoverage;
@@ -369,12 +370,14 @@ export default function PdfUtility({ mode, locale = 'en' }) {
             .replace('{total}', total)
             .replace('{pages}', previewPages));
         }
+        if (hasFormFields) extractionNotices.push(t.formFieldWarning);
         setExtractionWarning(extractionNotices.join(' '));
         setPreview(value.slice(0, 1600));
         result = { bytes: new TextEncoder().encode(value), mime: 'text/plain;charset=utf-8', name: `${pdfName}.${markdown ? 'md' : 'txt'}` };
-        setOutput({ ...result, partialText: incomplete, suspectText, readingOrder });
-        if (incomplete || suspectText) {
-          // Never auto-download a file that may omit text embedded in images.
+        setOutput({ ...result, partialText: incomplete, suspectText, hasFormFields, readingOrder });
+        if (incomplete || suspectText || hasFormFields) {
+          // Never auto-download a file with image-only body text or
+          // interactive controls whose values may not all be represented.
           // The user can inspect the warning and choose an explicit download.
           setNotDownloaded(true);
           setNotice('');
@@ -547,13 +550,14 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         {extractionWarning && <div className="utility-note" role="alert"
           data-testid="text-extraction-warning">{extractionWarning}</div>}
         {isTextOutput && output?.bytes && <div className="utility-result"
-          data-testid={output.partialText ? 'partial-text-result' : output.suspectText ? 'suspect-text-result' : 'complete-text-result'}>
+          data-testid={output.partialText ? 'partial-text-result' : output.suspectText ? 'suspect-text-result' : output.hasFormFields ? 'form-text-result' : 'complete-text-result'}>
           {output.partialText && <p className="utility-note">{t.partialTextReady}</p>}
           {output.suspectText && <p className="utility-note">{t.imageOnlyTextReady}</p>}
+          {output.hasFormFields && <p className="utility-note">{t.formFieldReady}</p>}
           {output.readingOrder !== readingOrder && <p className="utility-note" role="status" data-testid="text-reading-order-stale">{t.textOrderStale}</p>}
           <button type="button" className="button button-primary"
-            data-testid={output.partialText ? 'partial-text-download' : output.suspectText ? 'suspect-text-download' : 'complete-text-download'}
-            onClick={() => save(output)}>{output.partialText || output.suspectText ? t.download : t.downloadAgain} ↓</button>
+            data-testid={output.partialText ? 'partial-text-download' : output.suspectText ? 'suspect-text-download' : output.hasFormFields ? 'form-text-download' : 'complete-text-download'}
+            onClick={() => save(output)}>{output.partialText || output.suspectText || output.hasFormFields ? t.download : t.downloadAgain} ↓</button>
         </div>}
         {notice && <p className="utility-note" data-testid="utility-next-step"><a href={locale === 'zh' ? '/zh/#all-tools' : '/#all-tools'}>{t.nextStep} →</a></p>}
         {isTextOutput && preview && <div className="utility-preview"><label className="utility-field-label" htmlFor="utility-preview">{t.resultPreview}</label><textarea id="utility-preview" readOnly spellCheck={false} rows={8} value={preview} /></div>}
