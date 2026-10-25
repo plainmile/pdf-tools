@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import { pageNumberPlacement } from './pageNumberGeometry.mjs';
 import {
   UTILITY_LIMITS, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, requestedPages, imageExportFilenames, parseTextBlocks, wrapTextLines, textContentToLines,
-  linesToReadableText, textContentToReadingOrderLines, summarizeTextCoverage, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
+  linesToReadableText, textContentToReadingOrderLines, hasMinimalSelectableText, summarizeTextCoverage, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
   enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled,
 } from './utilityCore.mjs';
 
@@ -147,6 +147,8 @@ export async function compressPdfRaster(pdf, options = {}, reportProgress = () =
 export async function extractPdfText(pdf, markdown = false, reportProgress = () => {}, signal, onAudit = () => {}, readingOrder = 'rows') {
   const document = await openPdfJs(pdf.bytes);
   const pages = [];
+  const sparseImagePageNumbers = [];
+  let imagePaintOps;
   try {
     for (let i = 1; i <= pdf.count; i++) {
       checkCancelled(signal);
@@ -154,15 +156,35 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
       try {
         const content = await page.getTextContent();
         const viewport = readingOrder === 'rows' ? null : page.getViewport({ scale: 1 });
-        pages.push(textContentToReadingOrderLines(content, readingOrder, viewport));
+        const lines = textContentToReadingOrderLines(content, readingOrder, viewport);
+        pages.push(lines);
+        // PDF.js text layers can contain only a page number while an image
+        // holds the real document body. Only inspect drawing operators on
+        // sparse pages; avoid this extra work on ordinary searchable books.
+        if (hasMinimalSelectableText(lines)) {
+          if (!imagePaintOps) {
+            const { OPS } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+            imagePaintOps = new Set([
+              OPS.paintImageXObject, OPS.paintJpegXObject,
+              OPS.paintInlineImageXObject, OPS.paintInlineImageXObjectGroup,
+              OPS.paintImageXObjectRepeat, OPS.paintImageMaskXObject,
+              OPS.paintImageMaskXObjectGroup, OPS.paintImageMaskXObjectRepeat,
+            ].filter(Number.isInteger));
+          }
+          const operations = await page.getOperatorList();
+          checkCancelled(signal);
+          if (operations.fnArray.some(operator => imagePaintOps.has(operator))) {
+            sparseImagePageNumbers.push(i);
+          }
+        }
       } finally { page.cleanup(); }
       reportProgress(i, pdf.count);
     }
   } finally { await document.destroy(); }
-  const coverage = summarizeTextCoverage(pages);
+  const coverage = summarizeTextCoverage(pages, sparseImagePageNumbers);
   if (!coverage.withText) throw new Error('No selectable text found. Scanned PDFs require OCR, which this tool does not provide.');
   checkCancelled(signal);
-  onAudit(coverage); // Never report a complete extraction when pages were omitted.
+  onAudit(coverage); // Also flag image-backed sparse pages, not just empty ones.
   return linesToReadableText(pages, markdown);
 }
 

@@ -604,16 +604,34 @@ export function textContentToReadingOrderLines(content, order = 'rows', viewport
   const ordered = order === 'left-first' ? columns : [columns[1], columns[0]];
   return ordered.flatMap(items => textContentToLines({ items }));
 }
-/** Surface incomplete PDF text extraction instead of implying success.
- * A blank page and an image-only/scanned page are indistinguishable by their
- * text layer alone, so report "no selectable text", not "scanned".
+/** A small selectable page number is not evidence that the body of a
+ * scanned page was extracted. Check only non-whitespace text, not line count.
  */
-export function summarizeTextCoverage(pages) {
+export function hasMinimalSelectableText(lines, maxCharacters = 10) {
+  if (!Array.isArray(lines) || !lines.length) return false;
+  const text = lines.map(line => String(line.text ?? '')).join(' ').replace(/\s+/gu, ' ').trim();
+  if (!text) return false;
+  // A page-number-only layer is common on scanned books, including "Page 1 of 1000".
+  if (/^(?:(?:page|p\.)\s*)?\d{1,5}(?:\s*(?:of|\/)\s*\d{1,5})?$/iu.test(text) ||
+      /^第\s*\d{1,5}\s*页$/u.test(text)) return true;
+  return text.replace(/\s/gu, '').length <= maxCharacters;
+}
+
+/** Surface empty pages and image-backed pages with almost no selectable text.
+ * An image may be a photograph rather than a scan; callers must describe
+ * suspicious pages as "review required", not claim OCR detection certainty.
+ */
+export function summarizeTextCoverage(pages, sparseImagePageNumbers = []) {
   const missingPages = [];
+  const suspectPages = [];
+  const imagePages = new Set(sparseImagePageNumbers);
   for (let index = 0; index < pages.length; index++) {
     if (!pages[index].length) missingPages.push(index + 1);
+    else if (imagePages.has(index + 1) && hasMinimalSelectableText(pages[index])) {
+      suspectPages.push(index + 1);
+    }
   }
-  return { total: pages.length, withText: pages.length - missingPages.length, missingPages };
+  return { total: pages.length, withText: pages.length - missingPages.length, missingPages, suspectPages };
 }
 
 export function linesToReadableText(pages, markdown = false) {

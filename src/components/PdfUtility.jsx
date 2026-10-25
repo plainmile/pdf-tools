@@ -19,7 +19,7 @@ const COPY = {
     textWarning: 'Extracts existing selectable PDF text only, not OCR. Columns, tables and heading formatting may not be preserved. Check the exported text.',
     textOrderLabel: 'Text reading order', textOrderRows: 'By rows (single-column documents and tables)', textOrderLeft: 'Two columns: left first', textOrderRight: 'Two columns: right first', textOrderHint: 'For newspapers and side-by-side articles. Full-width headings, tables and complex layouts can still need manual review.', textOrderStale: 'This download uses your previous reading order. Convert again to apply the new selection.',
     missingTextPages: 'Important: {missing} of {total} pages have no selectable text (pages {pages}). Those pages may be blank or scanned images. Their content was not extracted; OCR would be required for scanned text. Check your original PDF.',
-    partialTextReady: 'Some PDF pages were not extracted. Review the warning before choosing to download this incomplete text file.',
+    partialTextReady: 'Some PDF pages were not extracted. Review the warning before choosing to download this incomplete text file.', imageOnlyTextWarning: 'Review before downloading: {count} of {total} pages have images but very little selectable text (pages {pages}). Scanned text may be inside those images and was NOT extracted. These may also be ordinary illustrated pages. Compare with your original; this tool does not run OCR.', imageOnlyTextReady: 'Possible missing text inside images. Automatic download was paused; review the warning and download explicitly if the result is suitable.',
     markdownWarning: 'Markdown conversion is approximate; headings are inferred from font size. Complex PDF layout cannot be faithfully recovered.',
     textLabel: 'Text to convert', textPlaceholder: 'Paste text here or import a .txt / .md file…',
     textInputHint: 'Import UTF-8 or BOM-marked UTF-16 text. Pages containing characters unsupported by built-in PDF fonts use local browser fonts as images; other pages keep selectable text.',
@@ -45,7 +45,7 @@ const COPY = {
     textWarning: '只提取 PDF 中已有的可选择文字，不具备 OCR。多栏、表格和段落顺序可能不准确，请核对导出内容。',
     textOrderLabel: '文字阅读顺序', textOrderRows: '按行读取（单栏文档、表格）', textOrderLeft: '双栏：先左栏后右栏', textOrderRight: '双栏：先右栏后左栏', textOrderHint: '适用于报纸、双栏论文等。跨栏标题、表格和复杂版式仍需人工核对。', textOrderStale: '当前结果使用之前的阅读顺序。请重新转换以应用新设置。',
     missingTextPages: '重要提示：共 {total} 页中有 {missing} 页未检测到可选择文字（第 {pages} 页）。这些页可能是空白页或扫描图片，其内容未被提取；扫描文字需要 OCR。请对照原始 PDF 核查。',
-    partialTextReady: '有些 PDF 页面未能提取文字。请先查看缺页提示，再决定是否下载这份不完整的文字文件。',
+    partialTextReady: '有些 PDF 页面未能提取文字。请先查看缺页提示，再决定是否下载这份不完整的文字文件。', imageOnlyTextWarning: '下载前请核查：共 {total} 页中有 {count} 页包含图片，但只能提取到极少文字（第 {pages} 页）。扫描正文可能仍在图片里，未被提取；也可能是正常的图片页面。请对照原 PDF，本工具不提供 OCR。', imageOnlyTextReady: '部分页面的图片中可能藏有未提取的文字。已暂停自动下载，请核对后主动下载。',
     markdownWarning: 'Markdown 为近似转换：根据字号推测标题，复杂 PDF 的版式无法完整还原。',
     textLabel: '需要转换的文本', textPlaceholder: '粘贴文字，或选择 .txt / .md 文件……',
     textInputHint: '支持 UTF-8 或带 BOM 的 UTF-16 文本。含内置 PDF 字体不支持字符的页面将使用本地字体图片化，其他页面保留可选中、可搜索的文字。',
@@ -349,29 +349,37 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           coverage => { textCoverage = coverage; }, readingOrder);
         ensureNotCancelled();
         const incomplete = Boolean(textCoverage?.missingPages.length);
+        const suspectText = Boolean(textCoverage?.suspectPages.length);
+        const extractionNotices = [];
         if (incomplete) {
           const { missingPages, total } = textCoverage;
           const previewPages = missingPages.slice(0, 6).join(', ') +
             (missingPages.length > 6 ? ', …' : '');
-          setExtractionWarning(t.missingTextPages
+          extractionNotices.push(t.missingTextPages
             .replace('{missing}', missingPages.length)
             .replace('{total}', total)
             .replace('{pages}', previewPages));
-        } else {
-          setExtractionWarning('');
         }
+        if (suspectText) {
+          const { suspectPages, total } = textCoverage;
+          const previewPages = suspectPages.slice(0, 6).join(', ') +
+            (suspectPages.length > 6 ? ', …' : '');
+          extractionNotices.push(t.imageOnlyTextWarning
+            .replace('{count}', suspectPages.length)
+            .replace('{total}', total)
+            .replace('{pages}', previewPages));
+        }
+        setExtractionWarning(extractionNotices.join(' '));
         setPreview(value.slice(0, 1600));
         result = { bytes: new TextEncoder().encode(value), mime: 'text/plain;charset=utf-8', name: `${pdfName}.${markdown ? 'md' : 'txt'}` };
-        if (incomplete) {
-          // Never auto-download a file that silently omits some source pages.
-          // Keep it for explicit review and allow repeated download after consent.
-          setOutput({ ...result, partialText: true, readingOrder });
+        setOutput({ ...result, partialText: incomplete, suspectText, readingOrder });
+        if (incomplete || suspectText) {
+          // Never auto-download a file that may omit text embedded in images.
+          // The user can inspect the warning and choose an explicit download.
           setNotDownloaded(true);
           setNotice('');
         } else {
-          // Keep successful full extractions available for a second download.
-          // This does not change the existing one-click automatic download.
-          setOutput({ ...result, partialText: false, readingOrder });
+          // Only fully ordinary text extraction auto-downloads as before.
           save(result);
           setNotice(`${t.ready}: ${formatBytes(result.bytes.length)}`);
         }
@@ -539,12 +547,13 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         {extractionWarning && <div className="utility-note" role="alert"
           data-testid="text-extraction-warning">{extractionWarning}</div>}
         {isTextOutput && output?.bytes && <div className="utility-result"
-          data-testid={output.partialText ? 'partial-text-result' : 'complete-text-result'}>
+          data-testid={output.partialText ? 'partial-text-result' : output.suspectText ? 'suspect-text-result' : 'complete-text-result'}>
           {output.partialText && <p className="utility-note">{t.partialTextReady}</p>}
+          {output.suspectText && <p className="utility-note">{t.imageOnlyTextReady}</p>}
           {output.readingOrder !== readingOrder && <p className="utility-note" role="status" data-testid="text-reading-order-stale">{t.textOrderStale}</p>}
           <button type="button" className="button button-primary"
-            data-testid={output.partialText ? 'partial-text-download' : 'complete-text-download'}
-            onClick={() => save(output)}>{output.partialText ? t.download : t.downloadAgain} ↓</button>
+            data-testid={output.partialText ? 'partial-text-download' : output.suspectText ? 'suspect-text-download' : 'complete-text-download'}
+            onClick={() => save(output)}>{output.partialText || output.suspectText ? t.download : t.downloadAgain} ↓</button>
         </div>}
         {notice && <p className="utility-note" data-testid="utility-next-step"><a href={locale === 'zh' ? '/zh/#all-tools' : '/#all-tools'}>{t.nextStep} →</a></p>}
         {isTextOutput && preview && <div className="utility-preview"><label className="utility-field-label" htmlFor="utility-preview">{t.resultPreview}</label><textarea id="utility-preview" readOnly spellCheck={false} rows={8} value={preview} /></div>}

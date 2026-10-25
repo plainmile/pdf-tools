@@ -1411,6 +1411,58 @@ test('mixed selectable text and genuine scanned-image page warns about omitted t
   }
 });
 
+test('image-backed scanned pages with only a selectable page number do not auto-download incomplete text', async ({ page }) => {
+  const scannedImageBase64 = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 360; canvas.height = 160;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#111'; context.font = '25px serif';
+    context.fillText('BODY TEXT ONLY IN PIXELS', 10, 80);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  const doc = await PDFDocument.create();
+  const bitmap = await doc.embedPng(Buffer.from(scannedImageBase64, 'base64'));
+  for (let i = 1; i <= 2; i++) {
+    const sheet = doc.addPage([500, 700]);
+    sheet.drawImage(bitmap, { x: 40, y: 270, width: 420, height: 188 });
+    sheet.drawText(String(i), { x: 225, y: 30, size: 12 });
+  }
+  const input = Buffer.from(await doc.save());
+  for (const [route, label] of [
+    ['/pdf-to-txt/', 'images but very little selectable text'],
+    ['/zh/pdf-to-markdown/', '只能提取到极少文字'],
+  ]) {
+    await page.goto(route);
+    await upload(page, input);
+    const autoDownloads = [];
+    const recordDownload = item => autoDownloads.push(item.suggestedFilename());
+    page.on('download', recordDownload);
+    await page.getByTestId('utility-run').click();
+    await expect(page.getByTestId('suspect-text-result')).toBeVisible({ timeout: 25000 });
+    await expect(page.getByTestId('text-extraction-warning')).toContainText(label);
+    await expect(page.getByTestId('text-extraction-warning')).toContainText('1, 2');
+    expect(autoDownloads).toEqual([]);
+    const downloaded = await getDownload(page, () => page.getByTestId('suspect-text-download').click());
+    page.off('download', recordDownload);
+    const text = downloaded.bytes.toString('utf8');
+    expect(text).toContain('1');
+    expect(text).toContain('2');
+    expect(text).not.toContain('BODY TEXT ONLY IN PIXELS');
+  }
+});
+
+test('a genuinely short PDF without images still auto-downloads its complete selectable text', async ({ page }) => {
+  const doc = await PDFDocument.create();
+  doc.addPage([480, 620]).drawText('OK', { x: 40, y: 550, size: 12 });
+  await page.goto('/pdf-to-txt/');
+  await upload(page, Buffer.from(await doc.save()));
+  const result = await getDownload(page, () => page.getByTestId('utility-run').click());
+  expect(result.bytes.toString('utf8')).toContain('OK');
+  await expect(page.getByTestId('text-extraction-warning')).toHaveCount(0);
+  await expect(page.getByTestId('complete-text-result')).toBeVisible();
+});
+
 test('incomplete text result allows repeat downloads without reprocessing', async ({ page }) => {
   const doc = await PDFDocument.create();
   doc.addPage([400, 600]).drawText('Partial source report', { x: 25, y: 500 });
