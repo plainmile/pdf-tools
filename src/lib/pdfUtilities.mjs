@@ -223,11 +223,10 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
   let imagePaintOps;
   let hasFormFields = false;
   try {
-    // PDF.js page text excludes interactive widget values. Avoid reading
-    // annotations on every page of long ordinary books without forms.
-    const fieldObjects = await document.getFieldObjects();
-    hasFormFields = fieldObjects instanceof Map ? fieldObjects.size > 0
-      : Boolean(fieldObjects && Object.keys(fieldObjects).length);
+    // Read widget values via page annotations rather than the document-level
+    // getFieldObjects() method. The latter throws in some WebKit PDF.js builds,
+    // breaking *every* PDF to TXT/Markdown extraction, even ordinary PDFs.
+    // Include non-text widgets in the completeness warning.
     for (let i = 1; i <= pdf.count; i++) {
       checkCancelled(signal);
       const page = await document.getPage(i);
@@ -255,11 +254,12 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
             sparseImagePageNumbers.push(i);
           }
         }
-        if (hasFormFields) {
-          // AcroForm text/dropdown values are annotation data, not ordinary
-          // selectable page text. Append clearly labeled values to this page.
-          const annotations = await page.getAnnotations({ intent: 'display' });
-          checkCancelled(signal);
+        // Text, choice, checkbox and signature widgets are annotations.
+        // Detect form presence on the *actual* page and append visible values.
+        const annotations = await page.getAnnotations({ intent: 'display' });
+        checkCancelled(signal);
+        if (annotations.some(item => ['Tx', 'Ch', 'Btn', 'Sig'].includes(item?.fieldType))) {
+          hasFormFields = true;
           lines.push(...textLinesFromFormAnnotations(annotations));
         }
       } finally { page.cleanup(); }
