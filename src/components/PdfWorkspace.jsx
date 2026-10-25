@@ -205,6 +205,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const hasOriginalPdf = pages.some(page => { const src = sourceLookup.get(page.sourceId); return src && !src.isImage && !src.isGeneratedBlank; });
   const activeFormSourceCount = countActiveSources(pages.filter(page => sourceLookup.get(page.sourceId)?.hasInteractiveForms));
   const activeBookmarkSourceCount = countActiveSources(pages.filter(page => sourceLookup.get(page.sourceId)?.hasOutlineBookmarks));
+  const pristineOutput = pages.length > 0 && Boolean(pristinePdfBytes(sources, pages, watermark));
   // Only a full Export PDF marks these particular edits as safely downloaded.
   // A later rotation/reorder/paper/watermark change immediately re-enables the
   // navigation guard; no document bytes ever leave browser RAM or enter storage.
@@ -993,12 +994,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       <div className="workspace-content" onDragOver={(event) => { if (Array.from(event.dataTransfer.types ?? []).includes('Files')) event.preventDefault(); }} onDrop={(event) => { if (event.dataTransfer.files?.length) { event.preventDefault(); void addFiles(event.dataTransfer.files); } }}>
         {error && <div className="notice notice-error" role="alert">{error}<button type="button" aria-label={t.dismiss} onClick={() => setError('')}>×</button></div>}
         {notice && <div className="notice notice-success" role="status">{notice}<button type="button" aria-label={t.dismiss} onClick={() => setNotice('')}>×</button></div>}
-        {hasOriginalPdf && <p className="utility-note" data-testid="workspace-document-caution">{t.documentCaution}</p>}
-        {activeFormSourceCount > 0 && <p className="utility-note workspace-form-risk"
+        {pristineOutput && <p className="utility-note" data-testid="workspace-original-preserved">{locale === 'zh' ? '当前页面未修改，直接导出会保留原始 PDF 字节，包括书签、交互表单及签名。' : 'This PDF is unchanged. Export all preserves the original bytes, including bookmarks, form fields and signatures.'}</p>}
+        {hasOriginalPdf && !pristineOutput && <p className="utility-note" data-testid="workspace-document-caution">{t.documentCaution}</p>}
+        {!pristineOutput && activeFormSourceCount > 0 && <p className="utility-note workspace-form-risk"
           data-testid="workspace-form-risk" role="alert">
           {interpolate(t.formRisk, { files: activeFormSourceCount })}
         </p>}
-        {activeBookmarkSourceCount > 0 && <p className="utility-note workspace-bookmark-risk"
+        {!pristineOutput && activeBookmarkSourceCount > 0 && <p className="utility-note workspace-bookmark-risk"
           data-testid="workspace-bookmark-risk" role="alert">
           {interpolate(t.bookmarkRisk, { files: activeBookmarkSourceCount })}
         </p>}
