@@ -657,7 +657,9 @@ test('split output count over 50 is explained before download', async ({ page })
   await expect(page.getByTestId('split-coverage-omitted')).toHaveCount(0);
   await page.getByTestId('split-batch-next').click();
   await expect(page.getByTestId('split-batch-status')).toContainText('output pages 51–51');
-  await expect(page.getByRole('button', { name: 'Download PDF', exact: true })).toBeEnabled();
+  const singleDownload = page.locator('.split-download');
+  await expect(singleDownload).toContainText('Download PDF');
+  await expect(singleDownload).toBeEnabled();
   await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('2');
   await expect(page.getByTestId('split-batch-nav')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Download split PDFs (ZIP)' })).toBeEnabled();
