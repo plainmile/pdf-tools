@@ -1365,7 +1365,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                         {t.splitBatchGoPending}
                       </button>}
                     <p className="input-note">{t.splitBatchWarning}</p>
-                  </div>
+                  </div>}
                   {pages.length > 1 && <details className="split-visual-panel" data-testid="visual-split-panel"
                     open={visualSplitOpen} onToggle={event => setVisualSplitOpen(event.currentTarget.open)}>
                     <summary>{t.visualSplitToggle}</summary>
