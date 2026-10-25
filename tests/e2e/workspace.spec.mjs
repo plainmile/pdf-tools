@@ -1074,6 +1074,8 @@ test('book-length odd-even split reports cumulative copied pages for both PDFs',
   expect(copy.some(sample => sample.value > 0 && sample.value < 320), JSON.stringify(samples.slice(-12))).toBe(true);
   expect(copy.some(sample => sample.text.includes('Building PDF 2 of 2') && sample.value >= 160),
     JSON.stringify(samples.slice(-12))).toBe(true);
+  expect(copy.every(sample => !sample.text.includes('{') && sample.text.includes('output pages')),
+    JSON.stringify(samples.slice(-12))).toBe(true);
   await expect(page.getByTestId('split-progress-container')).toHaveCount(0);
 });
 
@@ -1096,6 +1098,8 @@ test('overlapping custom ranges count output copies rather than unique source pa
   const copy = samples.filter(sample => sample.label === 'PDF page copying progress' && sample.max === 160);
   expect(copy.some(sample => sample.value > 0 && sample.value < 160), JSON.stringify(samples.slice(-12))).toBe(true);
   expect(copy.some(sample => sample.text.includes('Building PDF 2 of 2') && sample.value >= 105),
+    JSON.stringify(samples.slice(-12))).toBe(true);
+  expect(copy.every(sample => !sample.text.includes('{') && sample.text.includes('160 output pages')),
     JSON.stringify(samples.slice(-12))).toBe(true);
 });
 
