@@ -13,6 +13,7 @@ export const toolHelp = {
     ],
     'split-pdf': [
       ['Can I split a PDF into custom page ranges?', 'Yes. Enter ranges such as 1-3, 4-6, or choose a fixed number of pages per output file.'],
+      ['Can I choose split points by looking at the pages?', 'Yes. Expand Choose split points by clicking pages, then click Cut after this page under a preview. Click again to remove a cut. It uses your current page order; manually entered custom ranges are protected from accidental replacement.'],
       ['How are the split files downloaded?', 'A single section downloads directly as PDF. Two or more sections are bundled into ZIP, with up to 50 parts per operation.'],
     ],
     'organize-pdf': [
@@ -84,6 +85,7 @@ export const toolHelp = {
     ],
     'split-pdf': [
       ['可以按自定义范围拆分吗？', '可以。输入 1-3、4-6 这样的页码范围，或者指定每份文件包含几页。'],
+      ['可以看着页面缩略图选择拆分位置吗？', '可以。展开「按页面预览设置拆分点」，在缩略图下选择「在此页后拆分」，再次点击可取消。拆分按当前页面顺序进行；手工指定的特殊范围不会被意外覆盖。'],
       ['拆分结果怎么保存？', '拆出一份时直接下载 PDF；拆出多份时打包成 ZIP。单次最多生成 50 份。'],
     ],
     'organize-pdf': [
