@@ -660,7 +660,7 @@ test('split output count over 50 is explained before download', async ({ page })
   const singleDownload = page.locator('.split-download');
   await expect(singleDownload).toContainText('Download PDF');
   await expect(singleDownload).toBeEnabled();
-  await expect(page.getByTestId('split-batch-nav')).toContainText('one-page batch downloads as PDF');
+  await expect(page.getByTestId('split-batch-nav')).toContainText('a batch with one output PDF downloads directly');
   const lastPageDownloading = page.waitForEvent('download');
   await singleDownload.click();
   const lastPageDownload = await lastPageDownloading;
@@ -714,6 +714,75 @@ test('105-page book downloads three separate, correctly numbered per-page ZIP ba
   await expect(page.getByTestId('split-batch-next')).toBeDisabled();
   await page.getByTestId('split-batch-prev').click();
   await expect(page.getByTestId('split-batch-status')).toContainText('Batch 2 of 3');
+});
+
+test('every 2 pages splits a 105-page PDF into two bounded batches without missing outputs', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'two-page-book.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf(Array.from({ length: 105 }, (_, index) => 360 + index)),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(105);
+  await page.getByRole('radio', { name: 'Split every N pages' }).check();
+  await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('2');
+  await expect(page.getByTestId('split-batch-status')).toContainText('Batch 1 of 2');
+  for (const [batch, firstPage, lastPage, outputs] of [[1, 1, 100, 50], [2, 101, 105, 3]]) {
+    await expect(page.getByTestId('split-batch-status')).toContainText('output pages ' + firstPage + '–' + lastPage);
+    await expect(page.getByTestId('split-batch-estimate')).toHaveCount(0);
+    const waiting = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download this batch (ZIP)' }).click();
+    const saved = await waiting;
+    expect(saved.suggestedFilename()).toBe('two-page-book-pages-' + firstPage + '-' + lastPage + '-split.zip');
+    const archive = await JSZip.loadAsync(await readFile(await saved.path()));
+    const files = Object.keys(archive.files).sort();
+    expect(files).toHaveLength(outputs);
+    for (let offset = 0; offset < outputs; offset++) {
+      const start = firstPage + offset * 2;
+      const end = Math.min(105, start + 1);
+      const name = 'part-' + String(offset + 1).padStart(2, '0') + '-pages-' + start + '-' + end + '.pdf';
+      expect(files).toContain(name);
+      const part = await PDFDocument.load(await archive.files[name].async('uint8array'));
+      expect(part.getPageCount()).toBe(end - start + 1);
+      expect(part.getPages().map(p => p.getWidth())).toEqual(
+        Array.from({ length: end - start + 1 }, (_, i) => 359 + start + i));
+    }
+    if (batch === 1) await page.getByTestId('split-batch-next').click();
+  }
+  await expect(page.getByTestId('split-batch-next')).toBeDisabled();
+  await expect(page.locator('.notice-success')).toContainText('Final batch (2 of 2) downloaded');
+});
+
+test('Undo, Redo and blank insertion reset stale every-N split batch navigation', async ({ page }) => {
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'book-105.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf(Array.from({ length: 105 }, (_, index) => 300 + index)),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(105);
+  await page.getByRole('button', { name: 'Move page 1 right' }).click();
+  await page.getByRole('tab', { name: 'Split' }).click();
+  await page.getByRole('radio', { name: 'Split every N pages' }).check();
+  await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('2');
+  const next = page.getByTestId('split-batch-next');
+  await next.click();
+  await expect(page.getByTestId('split-batch-status')).toContainText('Batch 2 of 2');
+  await page.getByRole('tab', { name: 'Organize' }).click();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.getByRole('tab', { name: 'Split' }).click();
+  await expect(page.getByTestId('split-batch-status')).toContainText('Batch 1 of 2');
+  await next.click();
+  await page.getByRole('tab', { name: 'Organize' }).click();
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await page.getByRole('tab', { name: 'Split' }).click();
+  await expect(page.getByTestId('split-batch-status')).toContainText('Batch 1 of 2');
+  await next.click();
+  await page.getByRole('tab', { name: 'Organize' }).click();
+  await page.getByTestId('insert-blank-page').click();
+  await expect(page.getByTestId('page-tile')).toHaveCount(106);
+  await page.getByRole('tab', { name: 'Split' }).click();
+  await expect(page.getByTestId('split-batch-status')).toContainText('Batch 1 of 2');
+  await expect(page.getByTestId('split-batch-status')).toContainText('output pages 1–100');
 });
 
 test('image import uses filename when MIME is generic and blocks oversized PNG before decoding', async ({ page }) => {
