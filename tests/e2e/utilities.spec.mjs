@@ -144,6 +144,33 @@ test('PDF to image PNG selected pages ZIP has valid images, JPG single page vali
   expect(Array.from(single.bytes.slice(0, 3))).toEqual([255,216,255]);
 });
 
+test('PDF to images retains a manual download fallback, then clears stale results', async ({ page }) => {
+  await page.goto('/zh/pdf-to-images/');
+  await upload(page, await fixturePdf('Repeat image download', 2));
+  await page.getByRole('combobox', { name: '图片格式' }).selectOption('png');
+  const first = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+  expect(first.name).toMatch(/\.zip$/);
+  const repeatButton = page.getByTestId('image-download-again');
+  await expect(repeatButton).toBeVisible();
+  await expect(page.getByTestId('image-result')).toContainText(first.name);
+  const repeat = await getDownload(page, () => repeatButton.click());
+  expect(repeat.name).toBe(first.name);
+  expect(repeat.bytes.equals(first.bytes)).toBe(true);
+
+  // Changing the format must not offer an old ZIP as the new result.
+  await page.getByRole('combobox', { name: '图片格式' }).selectOption('jpg');
+  await expect(repeatButton).toHaveCount(0);
+  await page.getByTestId('utility-page-ranges').fill('2');
+  const single = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+  expect(single.name).toMatch(/\.jpg$/);
+  expect(Array.from(single.bytes.slice(0, 3))).toEqual([255, 216, 255]);
+  const singleRepeat = await getDownload(page, () => repeatButton.click());
+  expect(singleRepeat.name).toBe(single.name);
+  expect(singleRepeat.bytes.equals(single.bytes)).toBe(true);
+  await page.getByTestId('utility-page-ranges').fill('1');
+  await expect(repeatButton).toHaveCount(0);
+});
+
 test('220 DPI PDF-to-PNG export matches real pixel dimensions and keeps safety limit', async ({ page }) => {
   const document = await PDFDocument.create();
   document.addPage([72, 72]).drawRectangle({ x: 8, y: 8, width: 50, height: 50 });
