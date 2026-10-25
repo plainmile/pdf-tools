@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { loadPdf, convertPdfToImages, compressPdfRaster, extractPdfText, textToPdf, addPageNumbers } from '../lib/pdfUtilities.mjs';
+import { loadPdf, readFileArrayBuffer, convertPdfToImages, compressPdfRaster, extractPdfText, textToPdf, addPageNumbers } from '../lib/pdfUtilities.mjs';
 import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, translateUtilityError, decodeImportedText, textFitsUtf8Budget, IMAGE_PRINT_SCALE } from '../lib/utilityCore.mjs';
 import { saveDownload } from '../lib/pdfEngine.mjs';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
@@ -7,7 +7,7 @@ import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 const COPY = {
   en: {
     label: 'Browser-local processing', file: 'Choose a PDF', textFile: 'Import TXT / Markdown', uploaded: 'Loaded', pages: 'pages', choose: 'Choose file', start: 'Process file', run: 'Convert and download', busy: 'Working on your device…',
-    privacy: 'No files are uploaded. Processing may use significant device memory on large documents.', clear: 'Clear', replaceConfirmTitle: 'Replace the current file?', replaceConfirmHint: 'Opening {name} will discard your unsaved PDF result or edited text. Download or copy your current work first, or cancel this replacement.', replaceKeep: 'Keep current work', replaceAccept: 'Replace file', clearConfirmTitle: 'Discard unsaved conversion?', clearConfirmHint: 'The generated PDF preview or edited text has not been safely saved. Clearing now will remove it from this browser.', clearKeep: 'Keep my work', clearConfirm: 'Discard and clear',
+    privacy: 'No files are uploaded. Processing may use significant device memory on large documents.', clear: 'Clear', loadingFile: 'Opening file locally…', cancelLoad: 'Cancel opening', fileLoadCancelled: 'File opening cancelled. Your previous file and unsaved work were kept.', replaceConfirmTitle: 'Replace the current file?', replaceConfirmHint: 'Opening {name} will discard your unsaved PDF result or edited text. Download or copy your current work first, or cancel this replacement.', replaceKeep: 'Keep current work', replaceAccept: 'Replace file', clearConfirmTitle: 'Discard unsaved conversion?', clearConfirmHint: 'The generated PDF preview or edited text has not been safely saved. Clearing now will remove it from this browser.', clearKeep: 'Keep my work', clearConfirm: 'Discard and clear',
     pageRange: 'Pages (blank selects all if ≤60)', rangeHint: 'Example: 301-360. Long PDFs start with pages 1-60; use Next pages for later batches. For custom orders like 3,1, ZIP filenames get order-001, order-002 prefixes so extracted files stay in your chosen order.', imageType: 'Image format', quality: 'Render resolution',
     low: 'Smaller (72 DPI)', medium: 'Balanced (108 DPI)', high: 'Sharper (144 DPI)', print: 'Print quality (220 DPI)', printHint: 'Best for printing. Large pages may be rejected to protect your device memory.',
     download: 'Download result', downloadAgain: 'Download again', compressionMethod: 'Compression level', compressionLow: 'Smaller size (lossier)', compressionMid: 'Balanced', compressionHigh: 'Clearer (larger)',
@@ -33,7 +33,7 @@ const COPY = {
   },
   zh: {
     label: '仅在浏览器本地处理', file: '选择 PDF 文件', textFile: '导入 TXT / Markdown', uploaded: '已读取', pages: '页', choose: '选择文件', start: '开始处理', run: '转换并下载', busy: '正在本机处理…',
-    privacy: '文件不上传服务器。大文件可能消耗较多设备内存。', clear: '清空', replaceConfirmTitle: '确定替换当前文件？', replaceConfirmHint: '打开 {name} 将丢弃尚未下载的 PDF 结果或未保存的文字修改。请先下载或复制当前内容，也可以取消替换。', replaceKeep: '保留当前工作', replaceAccept: '确认替换文件', clearConfirmTitle: '确定丢弃未保存的转换结果？', clearConfirmHint: '当前生成的 PDF 预览或编辑后的文字尚未妥善保存。清空将从浏览器删除这些内容。', clearKeep: '继续编辑', clearConfirm: '丢弃并清空',
+    privacy: '文件不上传服务器。大文件可能消耗较多设备内存。', clear: '清空', loadingFile: '正在本机读取文件…', cancelLoad: '取消读取', fileLoadCancelled: '已取消读取文件，原文件和未保存的内容均已保留。', replaceConfirmTitle: '确定替换当前文件？', replaceConfirmHint: '打开 {name} 将丢弃尚未下载的 PDF 结果或未保存的文字修改。请先下载或复制当前内容，也可以取消替换。', replaceKeep: '保留当前工作', replaceAccept: '确认替换文件', clearConfirmTitle: '确定丢弃未保存的转换结果？', clearConfirmHint: '当前生成的 PDF 预览或编辑后的文字尚未妥善保存。清空将从浏览器删除这些内容。', clearKeep: '继续编辑', clearConfirm: '丢弃并清空',
     pageRange: '选择页码（总页数不超过 60 时可留空）', rangeHint: '例如 301-360。长 PDF 默认选前 60 页，可用“下一批”继续。若输入 3,1 等自定义顺序，ZIP 文件名会加上 order-001、order-002 前缀，解压排序后也保持指定顺序。', imageType: '图片格式', quality: '渲染清晰度',
     low: '更小（72 DPI）', medium: '平衡（108 DPI）', high: '高清（144 DPI）', print: '打印高清（220 DPI）', printHint: '适合打印。超大页面可能因设备内存安全限制而无法转换。',
     download: '下载结果', downloadAgain: '再次下载', compressionMethod: '压缩强度', compressionLow: '更小体积（画质较低）', compressionMid: '平衡', compressionHigh: '画质较清晰（体积较大）',
@@ -116,6 +116,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const isTextOutput = TEXT_OUTPUT_MODES.has(mode);
   const isCompress = mode === 'compress-pdf';
   const taskRef = useRef(null);
+  const fileLoadAbortRef = useRef(null);
   // React busy state is a display flag, NOT an admission lock. Two same-tick
   // native drops or Run events can otherwise both start asynchronous work.
   const operationRef = useRef(false);
@@ -138,6 +139,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const [position, setPosition] = useState('bottom-center');
   const [fontSize, setFontSize] = useState('12');
   const [busy, setBusy] = useState(false);
+  const [loadingFile, setLoadingFile] = useState(false);
+  const [loadCancelling, setLoadCancelling] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState('');
@@ -157,6 +160,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const hasUnsavedUtilityWork = Boolean((output?.bytes && notDownloaded) ||
     (isTextInput && sourceText.trim() && (!textFileName || textEdited)));
   const inputLocked = busy || Boolean(pendingReplacementName);
+  useEffect(() => () => { fileLoadAbortRef.current?.abort(); taskRef.current?.abort(); }, []);
   const textResultStale = Boolean(isTextInput && output?.bytes && output.textRevision !== textRevision);
 
 
@@ -219,6 +223,10 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     if (!file || operationRef.current) return;
     // Reserve synchronously before awaiting PDF parsing or File.text().
     operationRef.current = true;
+    const loadController = new AbortController();
+    fileLoadAbortRef.current = loadController;
+    setLoadCancelling(false);
+    setLoadingFile(true);
     // A failed replacement must preserve the previously generated result,
     // preview and download button, not just the old input document.
     setError('');
@@ -226,20 +234,22 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     try {
       if (isTextInput) {
         if (!/\.(?:txt|md|markdown)$/i.test(file.name) || !file.size || file.size > UTILITY_LIMITS.maxTextBytes) throw new Error(file.size > UTILITY_LIMITS.maxTextBytes ? t.tooMuchText : t.invalidFile);
-        const content = decodeImportedText(new Uint8Array(await file.arrayBuffer()), locale);
+        const content = decodeImportedText(new Uint8Array(await readFileArrayBuffer(file, loadController.signal)), locale);
         // UTF-16 can be smaller on disk than the UTF-8 text we actually
         // convert. Reject at import time, before discarding the previous
         // draft or generated PDF, instead of failing only after Run.
         if (new TextEncoder().encode(content).length > UTILITY_LIMITS.maxTextBytes) {
           throw new Error(t.tooMuchText);
         }
+        if (loadController.signal.aborted) throw new Error('Processing cancelled.');
         clearOutput();
         setSourceText(content);
         setTextRevision(previous => previous + 1);
         setTextFileName(file.name);
         setTextEdited(false);
       } else {
-        const loaded = await loadPdf(file, mode, locale);
+        const loaded = await loadPdf(file, mode, locale, loadController.signal);
+        if (loadController.signal.aborted) throw new Error('Processing cancelled.');
         clearOutput();
         setPdf(loaded);
         if (mode === 'add-page-numbers' &&
@@ -254,8 +264,19 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           ? imagePageBatch(loaded.count).range : '');
       }
     } catch (e) {
-      setError(translateUtilityError(e, locale) + ((pdf || textFileName) ? ' ' + t.replacedFailed.replace('{name}', pdf?.name || textFileName) : ''));
-    } finally { operationRef.current = false; setBusy(false); }
+      if (loadController.signal.aborted) {
+        // Cancellation is not a corrupt-file error and must never erase the
+        // previously selected document, unsaved result or text draft.
+        setError('');
+        setNotice(t.fileLoadCancelled);
+      } else {
+        setError(translateUtilityError(e, locale) + ((pdf || textFileName) ? ' ' + t.replacedFailed.replace('{name}', pdf?.name || textFileName) : ''));
+      }
+    } finally {
+      if (fileLoadAbortRef.current === loadController) fileLoadAbortRef.current = null;
+      operationRef.current = false;
+      setLoadingFile(false); setLoadCancelling(false); setBusy(false);
+    }
   }
   async function chooseFile(event) {
     const file = event.target.files?.[0];
@@ -452,6 +473,14 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           </label>
           <span className="utility-drop-hint">{t.dropHint}</span>
         </div>
+        {loadingFile && <div className="utility-load-controls" role="status">
+          <span>{t.loadingFile}</span>
+          <button type="button" className="button button-secondary button-small"
+            data-testid="utility-load-cancel" disabled={loadCancelling}
+            onClick={() => { setLoadCancelling(true); fileLoadAbortRef.current?.abort(); }}>
+            {loadCancelling ? t.cancelling : t.cancelLoad}
+          </button>
+        </div>}
         {isTextInput && textFileName && <div className="utility-file-summary" data-testid="text-file-summary"><strong>{t.imported}: {textFileName}{textEdited ? ` · ${t.modified}` : ''}</strong><button type="button" disabled={inputLocked} onClick={reset}>{t.clear}</button></div>}
         {pdf && <div className="utility-file-summary" data-testid="utility-file-summary"><strong>{pdf.name}</strong><span>{formatBytes(pdf.size)} · {pdf.count} {t.pages}</span><button type="button" onClick={reset} disabled={inputLocked}>{t.clear}</button></div>}
         {pendingReplacementName && !busy && <div className="workspace-clear-confirm" role="group"
