@@ -459,7 +459,7 @@ test('invalid split ranges disable download until corrected', async ({ page }) =
   await expect(page.locator('.split-estimate')).toContainText('Enter page ranges');
   await page.getByRole('textbox', { name: 'Page ranges', exact: true }).fill('3-1');
   await expect(button).toBeDisabled();
-  await expect(page.locator('.split-estimate')).toContainText('maximum 50 output PDFs');
+  await expect(page.locator('.split-estimate')).toContainText('maximum 50 PDFs per download');
   await page.getByRole('textbox', { name: 'Page ranges', exact: true }).fill('1-2, 3');
   await expect(button).toBeEnabled();
 });
