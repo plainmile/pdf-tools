@@ -48,7 +48,7 @@ test('only main-branch CI can trigger an image publish workflow run', () => {
 
 test('image publication serializes the mutable latest tag and rechecks main after queuing', () => {
   const yaml = readWorkflow('publish.yml');
-  assert.match(yaml, /concurrency:\s*\n\s+group: pdf-tools-publish-main\s*\n\s+cancel-in-progress: false/);
+  assert.match(yaml, /concurrency:\s*\n(?:\s*#.*\n)*\s+group: pdf-tools-publish-main\s*\n\s+cancel-in-progress: false/);
   assert.match(yaml, /id: main-head/);
   assert.match(yaml, /repos\/plainmile\/pdf-tools\/branches\/main/);
   assert.match(yaml, /jq -er '\.commit\.sha'/);
