@@ -476,11 +476,11 @@ test('numbered PDF stores the requested starting numbers as selectable text', as
   await upload(page, await fixturePdf());
   await page.getByTestId('number-start').fill('7');
   await page.getByRole('combobox', { name: 'Position' }).selectOption('top-right');
-  const downloaded = await getDownload(page, () => page.getByTestId('utility-run').click());
+  const downloaded = await getDownload(page, async () => { await page.getByTestId('utility-run').click(); await page.getByTestId('numbered-pdf-download').click(); });
   expect((await PDFDocument.load(downloaded.bytes)).getPageCount()).toBe(2);
   await page.goto('/pdf-to-txt/');
   await upload(page, downloaded.bytes);
-  const text = (await getDownload(page, () => page.getByTestId('utility-run').click())).bytes.toString('utf8');
+  const text = (await getDownload(page, async () => { await page.getByTestId('utility-run').click(); await page.getByTestId('numbered-pdf-download').click(); })).bytes.toString('utf8');
   expect(text).toMatch(/\b7\b/);
   expect(text).toMatch(/\b8\b/);
 });
@@ -499,11 +499,11 @@ test('numbered PDF skips cover and contents so page 3 starts at printed 1', asyn
   await expect(page.getByTestId('number-first-page-hint')).toContainText('stay unnumbered');
   await page.getByTestId('number-first-pdf-page').fill('3');
   await page.getByTestId('number-start').fill('1');
-  const numbered = await getDownload(page, () => page.getByTestId('utility-run').click(), 15000);
+  const numbered = await getDownload(page, async () => { await page.getByTestId('utility-run').click(); await page.getByTestId('numbered-pdf-download').click(); }, 15000);
   expect((await PDFDocument.load(numbered.bytes)).getPageCount()).toBe(5);
   await page.goto('/pdf-to-txt/');
   await upload(page, numbered.bytes);
-  const extracted = await getDownload(page, () => page.getByTestId('utility-run').click(), 15000);
+  const extracted = await getDownload(page, async () => { await page.getByTestId('utility-run').click(); await page.getByTestId('numbered-pdf-download').click(); }, 15000);
   const parts = extracted.bytes.toString('utf8').trim().split(/\n\s*\n/).map(s => s.trim());
   expect(parts).toEqual(['COVER WITHOUT NUMBER', 'CONTENTS WITHOUT NUMBER', '1', '2', '3']);
 });
@@ -518,7 +518,7 @@ test('new shorter PDF resets stale page-number start while valid settings surviv
   await expect(page.getByTestId('utility-file-summary')).toContainText('short.pdf');
   await expect(page.getByTestId('number-first-pdf-page')).toHaveValue('1');
   await expect(page.getByRole('status')).toContainText('reset to PDF page 1');
-  const numbered = await getDownload(page, () => page.getByTestId('utility-run').click(), 15000);
+  const numbered = await getDownload(page, async () => { await page.getByTestId('utility-run').click(); await page.getByTestId('numbered-pdf-download').click(); }, 15000);
   expect((await PDFDocument.load(numbered.bytes)).getPageCount()).toBe(2);
   await page.getByTestId('number-first-pdf-page').fill('2');
   await page.getByTestId('utility-file-input').setInputFiles({
@@ -541,7 +541,7 @@ test('Chinese mobile PDF numbering validates starting PDF page and last printed 
   await page.getByTestId('utility-run').click();
   await expect(page.getByRole('alert')).toContainText('不能超过 99999');
   await page.getByTestId('number-first-pdf-page').fill('5');
-  const output = await getDownload(page, () => page.getByTestId('utility-run').click(), 15000);
+  const output = await getDownload(page, async () => { await page.getByTestId('utility-run').click(); await page.getByTestId('numbered-pdf-download').click(); }, 15000);
   expect((await PDFDocument.load(output.bytes)).getPageCount()).toBe(5);
   const viewport = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, width: document.documentElement.clientWidth }));
   expect(viewport.scroll).toBeLessThanOrEqual(viewport.width + 2);
@@ -566,7 +566,7 @@ test('320-page book extracts its first and last text and preserves all pages whe
   await upload(page, book);
   await expect(page.getByTestId('utility-file-summary')).toContainText('320');
   await expect(page.getByTestId('large-document-note')).toBeVisible();
-  const textFile = await getDownload(page, () => page.getByTestId('utility-run').click(), 90000);
+  const textFile = await getDownload(page, async () => { await page.getByTestId('utility-run').click(); await page.getByTestId('numbered-pdf-download').click(); }, 90000);
   const plain = textFile.bytes.toString('utf8');
   expect(plain).toContain('Book chapter 1');
   expect(plain).toContain('Book chapter 320');
@@ -574,12 +574,12 @@ test('320-page book extracts its first and last text and preserves all pages whe
   await page.goto('/add-page-numbers/');
   await upload(page, book);
   await page.getByTestId('number-start').fill('201');
-  const numberedFile = await getDownload(page, () => page.getByTestId('utility-run').click(), 90000);
+  const numberedFile = await getDownload(page, async () => { await page.getByTestId('utility-run').click(); await page.getByTestId('numbered-pdf-download').click(); }, 90000);
   const numberedPdf = await PDFDocument.load(numberedFile.bytes);
   expect(numberedPdf.getPageCount()).toBe(320);
   await page.goto('/pdf-to-txt/');
   await upload(page, numberedFile.bytes);
-  const numbers = (await getDownload(page, () => page.getByTestId('utility-run').click(), 90000)).bytes.toString('utf8');
+  const numbers = (await getDownload(page, async () => { await page.getByTestId('utility-run').click(); await page.getByTestId('numbered-pdf-download').click(); }, 90000)).bytes.toString('utf8');
   expect(numbers).toMatch(/\b201\b/);
   expect(numbers).toMatch(/\b520\b/);
 });
@@ -974,7 +974,7 @@ test('English Markdown quotes, rules and numbered steps produce searchable PDF t
   await expect(page.getByRole('status')).toContainText('Output text is selectable');
   await page.goto('/pdf-to-txt/');
   await upload(page, result.bytes);
-  const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
+  const extracted = await getDownload(page, async () => { await page.getByTestId('utility-run').click(); await page.getByTestId('numbered-pdf-download').click(); });
   const text = extracted.bytes.toString('utf8');
   expect(text).toContain('Important notice');
   expect(text).toContain('1. First step');
@@ -1140,7 +1140,7 @@ test('page numbering on rotated cropped PDFs preserves page rotations and search
     await upload(page, original);
     await page.getByTestId('number-start').fill('41');
     await page.getByRole('combobox', { name: 'Position' }).selectOption(position);
-    const output = await getDownload(page, () => page.getByTestId('utility-run').click(), 15000);
+    const output = await getDownload(page, async () => { await page.getByTestId('utility-run').click(); await page.getByTestId('numbered-pdf-download').click(); }, 15000);
     const numbered = await PDFDocument.load(output.bytes);
     expect(numbered.getPages().map(p => p.getRotation().angle)).toEqual([0, 90, 180, 270]);
     for (const p of numbered.getPages()) {
@@ -1148,7 +1148,7 @@ test('page numbering on rotated cropped PDFs preserves page rotations and search
     }
     await page.goto('/pdf-to-txt/');
     await upload(page, output.bytes);
-    const extracted = await getDownload(page, () => page.getByTestId('utility-run').click(), 15000);
+    const extracted = await getDownload(page, async () => { await page.getByTestId('utility-run').click(); await page.getByTestId('numbered-pdf-download').click(); }, 15000);
     expect(extracted.bytes.toString('utf8')).toMatch(/\b41\b/);
     expect(extracted.bytes.toString('utf8')).toMatch(/\b44\b/);
   }
@@ -1172,29 +1172,29 @@ test('numbering rejects too-small pages and page labels over 99999 in Chinese', 
 test('changing any page numbering setting removes stale finished-result messaging', async ({ page }) => {
   await page.goto('/add-page-numbers/');
   await upload(page, await fixturePdf('New page number workflow', 2));
-  const run = () => page.getByTestId('utility-run').click();
-  await getDownload(page, run);
-  await expect(page.getByRole('status')).toContainText('Ready to download');
+  const run = async () => { await page.getByTestId('utility-run').click(); await page.getByTestId('numbered-pdf-download').click(); };
+  await getDownload(page, numberedRun);
+  await expect(page.getByRole('status')).toContainText('Numbered PDF generated');
   await expect(page.getByTestId('utility-next-step')).toBeVisible();
 
   await page.getByTestId('number-start').fill('41');
   await expect(page.getByRole('status')).toHaveCount(0);
   await expect(page.getByTestId('utility-next-step')).toHaveCount(0);
 
-  await getDownload(page, run);
-  await expect(page.getByRole('status')).toContainText('Ready to download');
+  await getDownload(page, numberedRun);
+  await expect(page.getByRole('status')).toContainText('Numbered PDF generated');
   await page.getByRole('combobox', { name: 'Position' }).selectOption('top-right');
   await expect(page.getByRole('status')).toHaveCount(0);
 
-  await getDownload(page, run);
-  await expect(page.getByRole('status')).toContainText('Ready to download');
+  await getDownload(page, numberedRun);
+  await expect(page.getByRole('status')).toContainText('Numbered PDF generated');
   await page.getByRole('combobox', { name: 'Font size' }).selectOption('16');
   await expect(page.getByRole('status')).toHaveCount(0);
 
-  const numbered = await getDownload(page, run);
+  const numbered = await getDownload(page, numberedRun);
   await page.goto('/pdf-to-txt/');
   await upload(page, numbered.bytes);
-  const text = await getDownload(page, run);
+  const text = await getDownload(page, numberedRun);
   expect(text.bytes.toString('utf8')).toMatch(/\b41\b/);
   expect(text.bytes.toString('utf8')).toMatch(/\b42\b/);
 });
@@ -1410,8 +1410,10 @@ test('two same-turn converter Run clicks produce one real PDF download', async (
   });
   // Wait for the single result; short browser timing must not make a
   // successful fast conversion fail merely because the busy state was brief.
-  await expect(page.getByRole('status')).toContainText('Ready', { timeout: 70000 });
+  await expect(page.getByTestId('numbered-pdf-result')).toBeVisible({ timeout: 70000 });
   await expect(page.getByTestId('utility-run')).toBeEnabled();
+  expect(downloads).toHaveLength(0);
+  await page.getByTestId('numbered-pdf-download').click();
   await expect.poll(() => downloads.length, { timeout: 10000 }).toBe(1);
   const file = downloads[0];
   expect(file.suggestedFilename()).toBe('fixture-numbered.pdf');
