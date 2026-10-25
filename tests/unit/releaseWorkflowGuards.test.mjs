@@ -46,6 +46,18 @@ test('only main-branch CI can trigger an image publish workflow run', () => {
   assert.match(yaml, /github\.sha == github\.event\.workflow_run\.head_sha/);
 });
 
+test('image publication serializes the mutable latest tag and rechecks main after queuing', () => {
+  const yaml = readWorkflow('publish.yml');
+  assert.match(yaml, /concurrency:\s*\n\s+group: pdf-tools-publish-main\s*\n\s+cancel-in-progress: false/);
+  assert.match(yaml, /id: main-head/);
+  assert.match(yaml, /repos\/plainmile\/pdf-tools\/branches\/main/);
+  assert.match(yaml, /jq -er '\.commit\.sha'/);
+  assert.match(yaml, /if \[ "\$current_sha" = "\$EXPECTED_SHA" \]/);
+  assert.match(yaml, /current=false/);
+  assert.match(yaml, /- name: Docker login\n\s+if: steps\.main-head\.outputs\.current == 'true'/);
+  assert.match(yaml, /- name: Publish commit-pinned image\n\s+if: steps\.main-head\.outputs\.current == 'true'/);
+});
+
 test('only main-branch Publish Image completion can trigger deployment', () => {
   const yaml = readWorkflow('deploy.yml');
   const trigger = yaml.split(/^permissions:/m)[0];

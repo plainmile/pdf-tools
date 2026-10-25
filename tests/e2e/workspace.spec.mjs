@@ -615,6 +615,32 @@ test('workbench reports the actual 100 MB file limit, not a stale 25 MB limit', 
   await expect(page.getByRole('alert')).not.toContainText('25 MB');
 });
 
+test('one-click every-page split downloads correct PDFs in current export order', async ({ page }) => {
+  await loadInput(page);
+  await page.getByRole('tab', { name: 'Split' }).click();
+  const preset = page.getByTestId('split-each-page');
+  await expect(preset).toBeEnabled();
+  await preset.click();
+  await expect(preset).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('radio', { name: 'Split every N pages' })).toBeChecked();
+  await expect(page.getByRole('spinbutton', { name: 'Pages per PDF' })).toHaveValue('1');
+  await expect(page.getByTestId('split-coverage-complete')).toContainText('3 total');
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download split PDFs (ZIP)' }).click();
+  const archive = await JSZip.loadAsync(await readFile(await (await downloading).path()));
+  const filenames = Object.keys(archive.files).sort();
+  expect(filenames).toEqual([
+    'part-01-pages-1-1.pdf', 'part-02-pages-2-2.pdf', 'part-03-pages-3-3.pdf',
+  ]);
+  const widths = [];
+  for (const filename of filenames) {
+    const pdf = await PDFDocument.load(await archive.files[filename].async('uint8array'));
+    expect(pdf.getPageCount()).toBe(1);
+    widths.push(pdf.getPage(0).getWidth());
+  }
+  expect(widths).toEqual([300, 310, 320]);
+});
+
 test('split output count over 50 is explained before download', async ({ page }) => {
   await page.goto('/workspace/');
   await page.getByTestId('file-input').setInputFiles({
@@ -623,6 +649,8 @@ test('split output count over 50 is explained before download', async ({ page })
   });
   await expect(page.getByTestId('page-tile')).toHaveCount(51);
   await page.getByRole('tab', { name: 'Split' }).click();
+  await expect(page.getByTestId('split-each-page')).toBeDisabled();
+  await expect(page.getByTestId('split-each-page-limit')).toContainText('at least 2 pages per PDF');
   await page.getByRole('radio', { name: 'Split every N pages' }).check();
   await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('1');
   const button = page.getByRole('button', { name: 'Download split PDFs (ZIP)' });
