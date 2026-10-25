@@ -294,28 +294,38 @@ export function invertPageIdSelection(pages, selectedIds) {
   return new Set(pages.filter(page => !selected.has(page.id)).map(page => page.id));
 }
 
-/** A long book can produce one PDF per output page without allocating
- * hundreds of PDF documents in one ZIP or initiating multiple downloads.
- * A user explicitly downloads each <=50-part batch in turn.
- * All ranges refer to CURRENT workspace export order, not source page IDs.
+/** Split every N CURRENT output pages into explicit batches of up to
+ * 50 output PDFs. Never allocate or download the other batches implicitly.
+ * A final PDF may contain fewer than N pages; no pages are omitted/repeated.
+ * We retain a strict 600-page workspace and 50-PDF download ceiling.
  */
-export function splitSinglePageBatch(pageCount, batchIndex) {
+export function splitChunkBatch(pageCount, chunkSize, batchIndex) {
   if (!Number.isSafeInteger(pageCount) || pageCount < 1 || pageCount > 600) {
     throw new Error('Choose a document with 1 to 600 pages.');
   }
-  const total = Math.ceil(pageCount / 50);
+  if (!Number.isSafeInteger(chunkSize) || chunkSize < 1 || chunkSize > pageCount) {
+    throw new Error('Choose a valid pages-per-file value.');
+  }
+  const fileCount = Math.ceil(pageCount / chunkSize);
+  const total = Math.ceil(fileCount / 50);
   if (!Number.isSafeInteger(batchIndex) || batchIndex < 0 || batchIndex >= total) {
     throw new Error('Choose a valid split batch.');
   }
-  const start = batchIndex * 50 + 1;
-  const end = Math.min(pageCount, start + 49);
+  const firstOutput = batchIndex * 50;
+  const parts = Array.from({ length: Math.min(50, fileCount - firstOutput) }, (_, offset) => {
+    const start = (firstOutput + offset) * chunkSize + 1;
+    return { start, end: Math.min(pageCount, start + chunkSize - 1) };
+  });
   return {
-    index: batchIndex, total, start, end,
-    parts: Array.from({ length: end - start + 1 }, (_, offset) => {
-      const page = start + offset;
-      return { start: page, end: page };
-    }),
+    index: batchIndex, total,
+    start: parts[0].start, end: parts[parts.length - 1].end,
+    parts,
   };
+}
+
+/** Compatibility helper for the existing One PDF per page shortcut. */
+export function splitSinglePageBatch(pageCount, batchIndex) {
+  return splitChunkBatch(pageCount, 1, batchIndex);
 }
 
 export function chunkPageRanges(pageCount, chunkSize) {
