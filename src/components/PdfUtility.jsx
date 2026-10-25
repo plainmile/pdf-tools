@@ -60,7 +60,7 @@ const COPY = {
 };
 
 
-function PdfFirstPagePreview({ bytes, pageCount, t, locale }) {
+function PdfFirstPagePreview({ bytes, pageCount, t, locale, pageNumber = 1 }) {
   const canvasRef = useRef(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -74,7 +74,7 @@ function PdfFirstPagePreview({ bytes, pageCount, t, locale }) {
       loadingTask = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true });
       const doc = await loadingTask.promise;
       if (closed) return;
-      pdfPage = await doc.getPage(1);
+      pdfPage = await doc.getPage(pageNumber);
       if (closed) return;
       const base = pdfPage.getViewport({ scale: 1 });
       const viewport = pdfPage.getViewport({ scale: Math.min(1, 550 / base.width) });
@@ -97,10 +97,10 @@ function PdfFirstPagePreview({ bytes, pageCount, t, locale }) {
       loadingTask?.destroy().catch(() => {});
       if (canvas) { canvas.width = 0; canvas.height = 0; }
     };
-  }, [bytes]);
+  }, [bytes, pageNumber]);
   return <div className="utility-preview" data-testid="utility-pdf-preview">
     <strong>{t.previewTitle}</strong>
-    <p className="utility-note">{t.previewFirst.replace('{pages}', pageCount)}</p>
+    <p className="utility-note">{pageNumber === 1 ? t.previewFirst.replace('{pages}', pageCount) : (locale === 'zh' ? `预览第 ${pageNumber} / ${pageCount} 页` : `Preview page ${pageNumber} of ${pageCount}`)}</p>
     <canvas ref={canvasRef} role="img" aria-label={locale === 'zh' ? 'PDF 首页预览' : 'PDF first page preview'}
       style={{ maxWidth: '100%', height: 'auto', display: failed ? 'none' : 'block' }} />
     {failed && <p className="utility-note">{t.previewFailed}</p>}
@@ -134,6 +134,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const [readingOrder, setReadingOrder] = useState('rows');
   const [scale, setScale] = useState('1.5');
   const [compressMode, setCompressMode] = useState('balanced');
+  const [numberPreviewPage, setNumberPreviewPage] = useState('first');
   const [start, setStart] = useState('1');
   const [firstPage, setFirstPage] = useState('1');
   const [position, setPosition] = useState('bottom-center');
@@ -171,6 +172,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     setClearConfirm(false); setOutput(null); setNotice(''); setError('');
     setPreview(''); setExtractionWarning(''); setProgress(null);
     setShowCompressionPreview(false); setCompressionRetryKept(false);
+    setNumberPreviewPage('first');
     setNotDownloaded(false);
   }
   function clearSession() {
@@ -427,8 +429,10 @@ export default function PdfUtility({ mode, locale = 'en' }) {
       } else if (mode === 'add-page-numbers') {
         result = { bytes: await addPageNumbers(pdf, { start: Number(start), firstPage: Number(firstPage), position, fontSize: Number(fontSize), signal: controller.signal }, report), name: `${pdfName}-numbered.pdf` };
         ensureNotCancelled();
-        save(result);
-        setNotice(`${t.ready}: ${pdf.count} ${t.pages}`);
+        setOutput(result);
+        setNumberPreviewPage('first');
+        setNotDownloaded(true);
+        setNotice(locale === 'zh' ? '已生成带页码的 PDF。请检查实际页码位置，再下载。' : 'Numbered PDF generated. Check the actual page number placement before downloading.');
       }
     } catch (e) { setError(translateUtilityError(e, locale)); }
     finally { taskRef.current = null; operationRef.current = false; setBusy(false); setProcessing(false); setCancelling(false); }
@@ -567,6 +571,17 @@ export default function PdfUtility({ mode, locale = 'en' }) {
             <PdfFirstPagePreview bytes={output.bytes} pageCount={pdf.count} t={t} locale={locale} />
           </div>}
           <button type="button" className="button button-primary" data-testid="compression-download" disabled={!output.stats.smaller || !output.bytes} onClick={() => save(output)}>{t.download} ↓</button>
+        </div>}
+        {mode === 'add-page-numbers' && output?.bytes && <div className="utility-result" data-testid="numbered-pdf-result">
+          <p className="utility-note">{locale === 'zh' ? '预览的是生成后的 PDF，请核对页码与原有页脚是否重叠。' : 'This previews the generated PDF. Check that printed numbers do not overlap footers.'}</p>
+          <label>{locale === 'zh' ? '预览页面' : 'Preview page'}
+            <select data-testid="number-preview-page" value={numberPreviewPage} onChange={event => setNumberPreviewPage(event.target.value)}>
+              <option value="first">{locale === 'zh' ? '第一张编号页' : 'First numbered page'}</option>
+              <option value="last">{locale === 'zh' ? '最后一页' : 'Last page'}</option>
+            </select>
+          </label>
+          <PdfFirstPagePreview bytes={output.bytes} pageCount={pdf.count} pageNumber={numberPreviewPage === 'last' ? pdf.count : Number(firstPage)} t={t} locale={locale} />
+          <button type="button" className="button button-primary" data-testid="numbered-pdf-download" onClick={() => save(output)}>{t.downloadPdf} ↓</button>
         </div>}
         {isTextInput && output?.bytes && <div className="utility-result" data-testid="text-pdf-result">
           {textResultStale && <p className="utility-note" role="status" data-testid="text-result-stale">{t.textResultStale}</p>}
