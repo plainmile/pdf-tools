@@ -97,7 +97,8 @@ test('Firefox/WebKit: 320px split UI remains usable and keeps manually typed par
   await page.setViewportSize({width:320,height:720});
   await page.goto('/zh/split-pdf/');
   await page.getByTestId('file-input').setInputFiles({name:'mobile.pdf',mimeType:'application/pdf',buffer:await source([301,302,303,304])});
-  await expect(page.getByTestId('page-tile')).toHaveCount(4);
+  // This route starts on Split, so the Organize page cards are intentionally hidden.
+  await expect(page.locator('.file-count')).toContainText('4 页');
   await page.getByRole('textbox', { name: '页码范围' }).fill('2-3');
   await page.getByTestId('visual-split-panel').locator('summary').click();
   await page.locator('[data-testid="visual-split-cut"][data-after-page="1"]').click();
