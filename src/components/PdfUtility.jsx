@@ -62,7 +62,7 @@ const COPY = {
 };
 
 
-function PdfFirstPagePreview({ bytes, pageCount, t, locale, pageNumber = 1 }) {
+function PdfFirstPagePreview({ bytes, pageCount, t, locale, pageNumber = 1, suppressed = false }) {
   const canvasRef = useRef(null);
   const [failed, setFailed] = useState(false);
   const [pdfState, setPdfState] = useState(null);
@@ -133,7 +133,8 @@ function PdfFirstPagePreview({ bytes, pageCount, t, locale, pageNumber = 1 }) {
     };
   }, [pdfState, bytes, pageNumber]);
 
-  return <div className="utility-preview" data-testid="utility-pdf-preview"
+  return <div className="utility-preview" data-testid={suppressed ? undefined : 'utility-pdf-preview'}
+    aria-hidden={suppressed} style={suppressed ? { display: 'none' } : undefined}
     data-rendered-page={renderedPage === pageNumber ? String(pageNumber) : undefined}>
     <strong>{t.previewTitle}</strong>
     <p className="utility-note">{pageNumber === 1 ? t.previewFirst.replace('{pages}', pageCount) : (locale === 'zh' ? `预览第 ${pageNumber} / ${pageCount} 页` : `Preview page ${pageNumber} of ${pageCount}`)}</p>
@@ -201,13 +202,17 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     (isTextInput && sourceText.trim() && (!textFileName || textEdited)));
   const inputLocked = busy || Boolean(pendingReplacementName);
   useEffect(() => () => { fileLoadAbortRef.current?.abort(); taskRef.current?.abort(); }, []);
-  // A book-sized file can be 100 MB. Only create a new PDF.js preview once
-  // typing has settled, rather than loading pages 5, 50 and 500 in sequence.
+  // While editing a custom page number, keep the last valid page mounted
+  // but hidden. Unmounting it here would destroy its worker and force the
+  // entire PDF to reopen after the 300ms debounce (pages 5, 50, 500).
   useEffect(() => {
-    if (numberPreviewPage !== 'custom') return undefined;
+    if (numberPreviewPage !== 'custom' || !output?.pageCount) return undefined;
+    const page = Number(numberPreviewCustom);
+    if (!numberPreviewCustom.trim() || !Number.isSafeInteger(page) ||
+        page < 1 || page > output.pageCount) return undefined;
     const handle = setTimeout(() => setNumberPreviewSettled(numberPreviewCustom), 300);
     return () => clearTimeout(handle);
-  }, [numberPreviewPage, numberPreviewCustom]);
+  }, [numberPreviewPage, numberPreviewCustom, output?.pageCount]);
   const textResultStale = Boolean(isTextInput && output?.bytes && output.textRevision !== textRevision);
   const numberedResultStale = Boolean(mode === 'add-page-numbers' && output?.bytes && output.numberingSettings &&
     (output.numberingSettings.start !== start || output.numberingSettings.firstPage !== firstPage ||
@@ -499,8 +504,9 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     selectedPreviewNumber >= 1 && selectedPreviewNumber <= output.pageCount);
   const numberPreviewReady = numberPreviewValid && numberPreviewSettled === numberPreviewCustom;
   const numberPreviewActualPage = numberPreviewPage === 'last' ? output?.pageCount
-    : numberPreviewPage === 'custom' ? (numberPreviewReady ? selectedPreviewNumber : null)
+    : numberPreviewPage === 'custom' ? Number(numberPreviewSettled)
       : Number(output?.numberingSettings?.firstPage ?? 1);
+  const numberPreviewSuppressed = numberPreviewPage === 'custom' && !numberPreviewReady;
   const description = isCompress ? t.compressionWarning : isTextOutput ? `${t.textWarning} ${mode === 'pdf-to-markdown' ? t.markdownWarning : ''}` : isTextInput ? mode === 'markdown-to-pdf' ? t.markdownInputHint : t.textInputHint : mode === 'add-page-numbers' ? t.numbersHint : t.privacy;
   return (
     <section className="pdf-workspace pdf-utility" data-testid="pdf-utility">
@@ -652,8 +658,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
             <p className="utility-note" role="status" data-testid="number-preview-invalid">{t.invalidPreviewPage.replace('{pages}', output.pageCount)}</p>}
           {numberPreviewPage === 'custom' && numberPreviewValid && !numberPreviewReady &&
             <p className="utility-note" role="status" data-testid="number-preview-preparing">{t.previewPreparing}</p>}
-          {numberPreviewActualPage !== null &&
-            <PdfFirstPagePreview bytes={output.bytes} pageCount={output.pageCount} pageNumber={numberPreviewActualPage} t={t} locale={locale} />}
+          <PdfFirstPagePreview bytes={output.bytes} pageCount={output.pageCount}
+            pageNumber={numberPreviewActualPage} t={t} locale={locale} suppressed={numberPreviewSuppressed} />
           <button type="button" className="button button-primary" data-testid="numbered-pdf-download" onClick={() => save(output)}>{numberedResultStale ? t.numberedPreviousDownload : t.downloadPdf} ↓</button>
         </div>}
         {isTextInput && output?.bytes && <div className="utility-result" data-testid="text-pdf-result">
