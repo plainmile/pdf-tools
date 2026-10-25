@@ -5,7 +5,7 @@ test('workspace file import can be cancelled without discarding existing page ed
   await page.goto('/organize-pdf/');
   const original = await PDFDocument.create();
   original.addPage([300, 400]); original.addPage([300, 400]);
-  await page.getByTestId('workspace-file-input').setInputFiles({ name: 'original.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await original.save()) });
+  await page.getByTestId('file-input').setInputFiles({ name: 'original.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await original.save()) });
   await expect(page.getByTestId('page-tile')).toHaveCount(2);
   await page.evaluate(() => {
     const originalRead = FileReader.prototype.readAsArrayBuffer;
@@ -13,7 +13,7 @@ test('workspace file import can be cancelled without discarding existing page ed
     FileReader.prototype.readAsArrayBuffer = function () { /* hold until cancelled */ };
   });
   const incoming = await PDFDocument.create(); incoming.addPage([300, 400]);
-  await page.getByTestId('workspace-file-input').setInputFiles({ name:'stall.pdf', mimeType:'application/pdf', buffer:Buffer.from(await incoming.save()) });
+  await page.getByTestId('file-input').setInputFiles({ name:'stall.pdf', mimeType:'application/pdf', buffer:Buffer.from(await incoming.save()) });
   await expect(page.getByTestId('workspace-import-cancel')).toBeVisible();
   await page.getByTestId('workspace-import-cancel').click();
   await expect(page.getByTestId('workspace-import-progress')).toHaveCount(0);
