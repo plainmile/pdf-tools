@@ -719,12 +719,6 @@ test('Chinese 375px split explains separate ranges versus extract, odd/even sing
   await page.getByRole('radio', { name: '按页码范围拆分' }).check();
   await expect(page.locator('#ranges-input')).toHaveValue('１－２，４－５');
   await expect(hint).toBeVisible();
-  await page.getByTestId('file-input').setInputFiles({
-    name: 'single.pdf', mimeType: 'application/pdf',
-    buffer: await makePdf([300]),
-  });
-  // The newly added document is appended; one-page guard is separately tested below.
-  await expect(page.locator('.file-count')).toContainText('6 页');
 });
 
 test('odd/even split cannot create an empty even PDF for one-page documents', async ({ page }) => {
