@@ -794,6 +794,70 @@ test('failed replacement never silently changes the active PDF and editing state
   await expect(page.getByTestId('text-file-summary')).toContainText('导入后已修改');
 });
 
+test('cancel a stalled PDF import without losing the previous document, then import again', async ({ page }) => {
+  await page.goto('/pdf-to-images/');
+  await upload(page, await fixturePdf('Previous PDF', 2));
+  await page.evaluate(() => {
+    const original = FileReader.prototype.readAsArrayBuffer;
+    FileReader.prototype.readAsArrayBuffer = function (blob) {
+      if (blob.name === 'stalled.pdf') {
+        window.__delayedPdfImport = true;
+        return; // Simulate a file read that never finishes.
+      }
+      return original.call(this, blob);
+    };
+  });
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'stalled.pdf', mimeType: 'application/pdf', buffer: await fixturePdf('Slow import'),
+  });
+  await expect(page.getByTestId('utility-load-cancel')).toBeVisible();
+  await expect(page.getByTestId('utility-file-input')).toBeDisabled();
+  expect(await page.evaluate(() => window.__delayedPdfImport)).toBe(true);
+  await page.getByTestId('utility-load-cancel').click();
+  await expect(page.getByTestId('utility-load-cancel')).toHaveCount(0);
+  await expect(page.getByTestId('utility-file-summary')).toContainText('fixture.pdf');
+  await expect(page.getByRole('status')).toContainText('File opening cancelled');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'next.pdf', mimeType: 'application/pdf', buffer: await fixturePdf('Recovered import', 2),
+  });
+  await expect(page.getByTestId('utility-file-summary')).toContainText('next.pdf');
+  const result = await getDownload(page, () => page.getByTestId('utility-run').click(), 25000);
+  expect(result.name).toMatch(/\\.zip$/);
+  const zip = await JSZip.loadAsync(result.bytes);
+  expect(Object.keys(zip.files)).toHaveLength(2);
+});
+
+test('cancelling a replacement on Chinese PDF to TXT preserves undownloaded form results', async ({ page }) => {
+  const original = await PDFDocument.create();
+  const sheet = original.addPage([410, 590]);
+  const form = original.getForm().createTextField('applicant');
+  form.setText('ALICE-ORIGINAL');
+  form.addToPage(sheet);
+  await page.goto('/zh/pdf-to-txt/');
+  await upload(page, Buffer.from(await original.save()));
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('form-text-result')).toBeVisible({ timeout: 20000 });
+  await page.evaluate(() => {
+    const read = FileReader.prototype.readAsArrayBuffer;
+    FileReader.prototype.readAsArrayBuffer = function (file) {
+      if (file.name === 'stalled.pdf') return;
+      return read.call(this, file);
+    };
+  });
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'stalled.pdf', mimeType: 'application/pdf', buffer: await fixturePdf('Later file'),
+  });
+  await expect(page.getByTestId('utility-replace-confirm')).toBeVisible();
+  await page.getByTestId('utility-replace-accept').click();
+  await expect(page.getByTestId('utility-load-cancel')).toContainText('取消读取');
+  await page.getByTestId('utility-load-cancel').click();
+  await expect(page.getByRole('status')).toContainText('已取消读取文件');
+  await expect(page.getByTestId('form-text-result')).toBeVisible();
+  await expect(page.getByTestId('utility-file-summary')).toContainText('fixture.pdf');
+  const saved = await getDownload(page, () => page.getByTestId('form-text-download').click());
+  expect(saved.bytes.toString('utf8')).toContain('ALICE-ORIGINAL');
+});
+
 test('image conversion exposes cancel and a ZIP packaging stage', async ({ page }) => {
   await page.goto('/pdf-to-images/');
   await upload(page, await fixturePdf('Batch example', 6));
