@@ -1003,7 +1003,17 @@ test('all eight EXIF orientations render actual PDF pages upright, including mir
       name: 'exported-' + orientation + '.pdf', mimeType: 'application/pdf', buffer: bytes,
     });
     await expect(page.getByTestId('page-tile')).toHaveCount(1);
-    await expect.poll(async () => (await visiblePhotoCorners(page)).join(''), { timeout: 15000 })
+    // Thumbnails intentionally lazy-render only near the viewport. In a
+    // multi-navigation EXIF loop the browser can restore a distant scroll
+    // position; actively bring the preview into view before asserting pixels.
+    // This does not bypass rendering: the exact downloaded PDF's corners
+    // are still checked for all eight orientations.
+    await page.getByTestId('page-tile').first().scrollIntoViewIfNeeded();
+    let lastCorners = '';
+    await expect.poll(async () => {
+      lastCorners = (await visiblePhotoCorners(page)).join('');
+      return lastCorners;
+    }, { timeout: 15000, message: `EXIF ${orientation}: expected ${expected[orientation]}` })
       .toBe(expected[orientation]);
     // Release the imported preview PDF before moving to the next scenario.
     // Its image source has not itself been re-exported, so navigation would
