@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import { pageNumberPlacement } from './pageNumberGeometry.mjs';
 import {
   UTILITY_LIMITS, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, requestedPages, imageExportFilenames, parseTextBlocks, wrapTextLines, textContentToLines,
-  linesToReadableText, textContentToReadingOrderLines, hasMinimalSelectableText, summarizeTextCoverage, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
+  linesToReadableText, textContentToReadingOrderLines, hasMinimalSelectableText, textLinesFromFormAnnotations, summarizeTextCoverage, compressionStats, enforceUtilityPdfLimits, enforceImageBatchLimit,
   enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled,
 } from './utilityCore.mjs';
 
@@ -40,7 +40,7 @@ async function openPdfJs(bytes) {
   try {
     const proxy = await loadingTask.promise;
     // The loading task owns the worker and its memory, not the PDFDocumentProxy.
-    return { count: proxy.numPages, getPage: (number) => proxy.getPage(number), destroy: () => loadingTask.destroy() };
+    return { count: proxy.numPages, getPage: (number) => proxy.getPage(number), getFieldObjects: () => proxy.getFieldObjects(), destroy: () => loadingTask.destroy() };
   } catch (error) {
     await loadingTask.destroy().catch(() => {});
     throw error;
@@ -149,7 +149,13 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
   const pages = [];
   const sparseImagePageNumbers = [];
   let imagePaintOps;
+  let hasFormFields = false;
   try {
+    // PDF.js page text excludes interactive widget values. Avoid reading
+    // annotations on every page of long ordinary books without forms.
+    const fieldObjects = await document.getFieldObjects();
+    hasFormFields = fieldObjects instanceof Map ? fieldObjects.size > 0
+      : Boolean(fieldObjects && Object.keys(fieldObjects).length);
     for (let i = 1; i <= pdf.count; i++) {
       checkCancelled(signal);
       const page = await document.getPage(i);
@@ -177,14 +183,23 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
             sparseImagePageNumbers.push(i);
           }
         }
+        if (hasFormFields) {
+          // AcroForm text/dropdown values are annotation data, not ordinary
+          // selectable page text. Append clearly labeled values to this page.
+          const annotations = await page.getAnnotations({ intent: 'display' });
+          checkCancelled(signal);
+          lines.push(...textLinesFromFormAnnotations(annotations));
+        }
       } finally { page.cleanup(); }
       reportProgress(i, pdf.count);
     }
   } finally { await document.destroy(); }
   const coverage = summarizeTextCoverage(pages, sparseImagePageNumbers);
-  if (!coverage.withText) throw new Error('No selectable text found. Scanned PDFs require OCR, which this tool does not provide.');
+  if (!coverage.withText) throw new Error(hasFormFields
+    ? 'No extractable text or filled form values found. Review the original PDF and its form fields.'
+    : 'No selectable text found. Scanned PDFs require OCR, which this tool does not provide.');
   checkCancelled(signal);
-  onAudit(coverage); // Also flag image-backed sparse pages, not just empty ones.
+  onAudit({ ...coverage, hasFormFields }); // Review remaining interactive fields before download.
   return linesToReadableText(pages, markdown);
 }
 
