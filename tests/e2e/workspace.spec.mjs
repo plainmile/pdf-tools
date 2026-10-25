@@ -728,9 +728,9 @@ test('every 2 pages splits a 105-page PDF into two bounded batches without missi
   await page.getByRole('radio', { name: 'Split every N pages' }).check();
   await page.getByRole('spinbutton', { name: 'Pages per PDF' }).fill('2');
   await expect(page.getByTestId('split-batch-status')).toContainText('Batch 1 of 2');
+  await expect(page.getByTestId('split-each-page-limit')).toContainText('One PDF per page would split');
   for (const [batch, firstPage, lastPage, outputs] of [[1, 1, 100, 50], [2, 101, 105, 3]]) {
     await expect(page.getByTestId('split-batch-status')).toContainText('output pages ' + firstPage + '–' + lastPage);
-    await expect(page.getByTestId('split-batch-estimate')).toHaveCount(0);
     const waiting = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Download this batch (ZIP)' }).click();
     const saved = await waiting;
