@@ -323,6 +323,22 @@ export function splitChunkBatch(pageCount, chunkSize, batchIndex) {
   };
 }
 
+/** Separate current output positions into two complete, noncontiguous PDFs.
+ * These are NOT source-page indices: after reordering page 7 may be first.
+ * Positions are one-based to match the labels users see on the page tiles.
+ * Each original output position appears exactly once, with no 50-range cap
+ * because there are only two output PDFs, not hundreds of tiny range files.
+ */
+export function oddEvenSplitParts(pageCount) {
+  if (!Number.isSafeInteger(pageCount) || pageCount < 2 || pageCount > 600) {
+    throw new Error('Odd/even splitting needs 2 to 600 pages.');
+  }
+  return [
+    { kind: 'odd', positions: Array.from({ length: Math.ceil(pageCount / 2) }, (_, i) => i * 2 + 1) },
+    { kind: 'even', positions: Array.from({ length: Math.floor(pageCount / 2) }, (_, i) => i * 2 + 2) },
+  ];
+}
+
 /** Compatibility helper for the existing One PDF per page shortcut. */
 export function splitSinglePageBatch(pageCount, batchIndex) {
   return splitChunkBatch(pageCount, 1, batchIndex);
@@ -349,10 +365,19 @@ export function splitCoverageDetails(ranges, pageCount) {
   // A byte per output page is enough: count 0, 1, or "two or more".
   const occurrences = new Uint8Array(pageCount);
   for (const range of ranges) {
-    if (!Number.isSafeInteger(range?.start) || !Number.isSafeInteger(range?.end) ||
-        range.start < 1 || range.end < range.start || range.end > pageCount) return null;
-    for (let page = range.start; page <= range.end; page++) {
-      occurrences[page - 1] = Math.min(2, occurrences[page - 1] + 1);
+    if (range && Object.hasOwn(range, 'positions')) {
+      if (!Array.isArray(range.positions) || !range.positions.length ||
+          range.positions.some(position => !Number.isSafeInteger(position) ||
+            position < 1 || position > pageCount)) return null;
+      for (const position of range.positions) {
+        occurrences[position - 1] = Math.min(2, occurrences[position - 1] + 1);
+      }
+    } else {
+      if (!Number.isSafeInteger(range?.start) || !Number.isSafeInteger(range?.end) ||
+          range.start < 1 || range.end < range.start || range.end > pageCount) return null;
+      for (let page = range.start; page <= range.end; page++) {
+        occurrences[page - 1] = Math.min(2, occurrences[page - 1] + 1);
+      }
     }
   }
   const omitted = [];
@@ -372,6 +397,14 @@ export function splitCoversAllPagesExactlyOnce(ranges, pageCount) {
 }
 
 export function getRangePages(pages, range) {
+  if (range && Object.hasOwn(range, 'positions')) {
+    if (!Array.isArray(range.positions) || !range.positions.length ||
+        range.positions.some(position => !Number.isSafeInteger(position) ||
+          position < 1 || position > pages.length)) {
+      throw new Error('Invalid split output page position.');
+    }
+    return range.positions.map(position => pages[position - 1]);
+  }
   return pages.slice(range.start - 1, range.end);
 }
 

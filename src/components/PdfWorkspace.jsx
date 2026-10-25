@@ -8,7 +8,7 @@ import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLay
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
-  movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges, splitChunkBatch,
+  movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges, splitChunkBatch, oddEvenSplitParts,
   getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
@@ -226,7 +226,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const recoverableDeletedPages = pages.length === 0 && history.past.some(snapshot => snapshot.length > 0);
   const navigationWouldLoseWork = recoverableDeletedPages ||
     Boolean(pages.length && documentRevision !== lastDownloadedRevision);
-  const splitNeedsInput = splitMode === 'ranges' ? !ranges.trim() : !chunkSize.trim();
+  const splitNeedsInput = splitMode === 'ranges' ? !ranges.trim() : splitMode === 'chunks' ? !chunkSize.trim() : false;
   // Every-N splitting behaves consistently whether N=1 or N=2, 3, etc.
   // Above 50 output PDFs, page-aligned batches keep each download bounded.
   const chunkSizeNumber = Number(chunkSize);
@@ -250,7 +250,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         ? splitChunkBatch(pages.length, chunkSizeNumber, safeSplitBatchIndex) : null;
       const parts = splitMode === 'ranges'
         ? parsePageRanges(ranges, pages.length)
-        : batch ? batch.parts : chunkPageRanges(pages.length, chunkSizeNumber);
+        : splitMode === 'chunks'
+          ? batch ? batch.parts : chunkPageRanges(pages.length, chunkSizeNumber)
+          : oddEvenSplitParts(pages.length);
       const coverage = splitCoverageDetails(parts, pages.length);
       return coverage ? { parts, coverage, batch } : null;
     } catch (_error) { return null; }
@@ -654,7 +656,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         if (controller.signal.aborted) throw new Error('Split cancelled.');
         size = enforceSplitZipBudget(size, contents.length);
         if (!zip) {
-          saveDownload(contents, `${outputBase}-pages-${range.start}-${range.end}.pdf`);
+          saveDownload(contents, range.kind ? `${outputBase}-${range.kind}-pages.pdf` : `${outputBase}-pages-${range.start}-${range.end}.pdf`);
           markBatchRequested();
           // A one-piece export covering the entire edited workspace is
           // equivalent to Export PDF; don't warn about work already saved.
@@ -665,7 +667,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           ) : t.splitSingleSaved);
           return;
         }
-        zip.file(`part-${String(index + 1).padStart(2, '0')}-pages-${range.start}-${range.end}.pdf`, contents);
+        zip.file(range.kind ? `${range.kind}-pages.pdf` : `part-${String(index + 1).padStart(2, '0')}-pages-${range.start}-${range.end}.pdf`, contents);
         setSplitProgress({ phase: 'parts', done: index + 1, total: pieces.length });
         await new Promise(resolve => setTimeout(resolve, 0));
       }
@@ -682,7 +684,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       });
       if (controller.signal.aborted) throw new Error('Split cancelled.');
       saveDownload(archive, batch
-        ? `${outputBase}-pages-${batch.start}-${batch.end}-split.zip` : `${outputBase}-split.zip`, 'application/zip');
+        ? `${outputBase}-pages-${batch.start}-${batch.end}-split.zip`
+        : splitMode === 'parity' ? `${outputBase}-odd-even.zip` : `${outputBase}-split.zip`, 'application/zip');
       markBatchRequested();
       if (completeSplit) setLastDownloadedRevision(documentRevision);
       setNotice(batch
@@ -1366,6 +1369,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                       </button>}
                     <p className="input-note">{t.splitBatchWarning}</p>
                   </div>}
+                  <label className="option-radio option-divider">
+                    <input type="radio" name="split-method" value="parity" checked={splitMode === 'parity'}
+                      disabled={busy || pages.length < 2}
+                      onChange={() => { setSplitMode('parity'); setPendingVisualCut(null); setError(''); setNotice(''); }} />
+                    {t.byOddEven}
+                  </label>
+                  <p className="input-note" data-testid="split-odd-even-hint">{t.oddEvenHint}</p>
                   {pages.length > 1 && <details className="split-visual-panel" data-testid="visual-split-panel"
                     open={visualSplitOpen} onToggle={event => setVisualSplitOpen(event.currentTarget.open)}>
                     <summary>{t.visualSplitToggle}</summary>
@@ -1432,7 +1442,16 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                       })}
                     </div>}
                   </details>}
-                  <div className="split-estimate" aria-live="polite">{splitEstimate === null ? (splitNeedsInput ? (splitMode === 'ranges' ? t.enterSplitRanges : t.enterSplitSize) : t.invalidRange) : interpolate(splitPlan?.batch ? t.splitBatchEstimate : t.estimate, { files: splitEstimate })}</div>
+                  <div className="split-estimate" aria-live="polite">{splitEstimate === null
+                    ? (splitMode === 'parity' && pages.length < 2 ? t.oddEvenNeedTwo
+                      : splitNeedsInput ? (splitMode === 'ranges' ? t.enterSplitRanges : t.enterSplitSize) : t.invalidRange)
+                    : interpolate(splitPlan?.batch ? t.splitBatchEstimate : t.estimate, { files: splitEstimate })}</div>
+                  {splitMode === 'ranges' && splitPlan?.parts.length > 1 && <p className="utility-note"
+                    data-testid="split-multiple-ranges-hint">
+                    {interpolate(t.multipleRangeFilesHint, { files: splitPlan.parts.length })}{' '}
+                    <a href={locale === 'zh' ? '/zh/extract-pages/' : '/extract-pages/'}>{t.multipleRangeExtractLink}</a>
+                    {' '}{t.multipleRangeExtractReload}
+                  </p>}
                   {splitPlan && <div className="split-coverage-review" aria-live="polite" data-testid="split-coverage-review">
                     {splitPlan.coverage.complete && <p className="input-note" data-testid="split-coverage-complete">{interpolate(t.splitCoverageComplete, { total: splitPlan.coverage.total })}</p>}
                     {!splitPlan.batch && splitPlan.coverage.omitted.length > 0 && <p className="utility-note" data-testid="split-coverage-omitted">{interpolate(t.splitCoverageOmitted, {
@@ -1448,10 +1467,16 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     <details className="split-output-preview" data-testid="split-output-preview">
                       <summary>{interpolate(t.splitPreviewToggle, { files: splitPlan.parts.length })}</summary>
                       <ol>{splitPlan.parts.map((part, index) =>
-                        <li key={index}>{interpolate(t.splitPreviewPart, {
-                          index: index + 1, start: part.start, end: part.end, count: part.end - part.start + 1,
-                          unit: part.end === part.start ? 'page' : 'pages',
-                        })}</li>)}</ol>
+                        <li key={index}>{part.kind
+                          ? interpolate(t.splitParityPreviewPart, {
+                            name: part.kind === 'odd' ? t.splitOddName : t.splitEvenName,
+                            count: part.positions.length,
+                            unit: part.positions.length === 1 ? t.page : t.pages,
+                          })
+                          : interpolate(t.splitPreviewPart, {
+                            index: index + 1, start: part.start, end: part.end, count: part.end - part.start + 1,
+                            unit: part.end === part.start ? 'page' : 'pages',
+                          })}</li>)}</ol>
                     </details>
                   </div>}
                    <p className="input-note" data-testid="split-output-budget">{t.splitOutputBudget}</p>

@@ -648,6 +648,90 @@ test('one-click every-page split downloads correct PDFs in current export order'
   expect(widths).toEqual([300, 310, 320]);
 });
 
+test('odd/even split follows reordered output pages and downloads two exact PDFs in one ZIP', async ({ page }) => {
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'alternating.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf([310, 320, 330, 340, 350, 360, 370]),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(7);
+  await page.getByTestId('reverse-all-pages').click();
+  await page.getByRole('tab', { name: 'Split' }).click();
+  const oddEven = page.getByRole('radio', { name: 'Split into odd-page and even-page PDFs' });
+  await oddEven.check();
+  await expect(oddEven).toBeChecked();
+  await expect(page.getByTestId('split-coverage-complete')).toContainText('7 total');
+  await expect(page.getByTestId('split-batch-nav')).toHaveCount(0);
+  await page.getByTestId('split-output-preview').locator('summary').click();
+  const labels = await page.getByTestId('split-output-preview').locator('li').allTextContents();
+  expect(labels).toEqual([
+    expect.stringContaining('Odd output pages (1, 3, 5…)'),
+    expect.stringContaining('Even output pages (2, 4, 6…)'),
+  ]);
+  expect(labels[0]).toContain('4 pages');
+  expect(labels[1]).toContain('3 pages');
+  const saved = await captured(page, () => page.locator('.split-download').click(), 30000);
+  expect(saved.name).toBe('alternating-odd-even.zip');
+  const zip = await JSZip.loadAsync(saved.bytes);
+  expect(Object.keys(zip.files).sort()).toEqual(['even-pages.pdf', 'odd-pages.pdf']);
+  const odd = await PDFDocument.load(await zip.file('odd-pages.pdf').async('uint8array'));
+  const even = await PDFDocument.load(await zip.file('even-pages.pdf').async('uint8array'));
+  expect(odd.getPages().map(p => p.getWidth())).toEqual([370, 350, 330, 310]);
+  expect(even.getPages().map(p => p.getWidth())).toEqual([360, 340, 320]);
+  // Splitting is a download, not a page-edit command. The source order stays unchanged.
+  await page.getByRole('tab', { name: 'Organize' }).click();
+  const first = page.getByTestId('page-tile').first();
+  await expect(first).toHaveAttribute('data-original-page', '7');
+});
+
+test('Chinese 375px split explains separate ranges versus extract, odd/even single-page guard', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'mobile-range.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf([300, 310, 320, 330, 340]),
+  });
+  await expect(page.locator('.file-count')).toContainText('5 页');
+  await page.locator('#ranges-input').fill('１－２，４－５');
+  const hint = page.getByTestId('split-multiple-ranges-hint');
+  await expect(hint).toContainText('2 个范围会生成 2 份独立 PDF');
+  await expect(hint.getByRole('link', { name: '提取 PDF 页面' }))
+    .toHaveAttribute('href', '/zh/extract-pages/');
+  await expect(hint).toContainText('重新添加文件');
+  const parity = page.getByRole('radio', { name: '按奇偶页分别生成 PDF' });
+  await parity.check();
+  await expect(hint).toHaveCount(0);
+  await expect(page.getByTestId('split-coverage-complete')).toContainText('5 页');
+  await page.getByTestId('split-output-preview').locator('summary').click();
+  await expect(page.getByTestId('split-output-preview')).toContainText('奇数位页面');
+  await expect(page.getByTestId('split-output-preview')).toContainText('偶数位页面');
+  const widths = await page.evaluate(() => ({
+    document: document.documentElement.scrollWidth,
+    viewport: document.documentElement.clientWidth,
+  }));
+  expect(widths.document).toBeLessThanOrEqual(widths.viewport + 2);
+  const saved = await captured(page, () => page.locator('.split-download').click());
+  const zip = await JSZip.loadAsync(saved.bytes);
+  const odd = await PDFDocument.load(await zip.file('odd-pages.pdf').async('uint8array'));
+  const even = await PDFDocument.load(await zip.file('even-pages.pdf').async('uint8array'));
+  expect(odd.getPages().map(p => p.getWidth())).toEqual([300, 320, 340]);
+  expect(even.getPages().map(p => p.getWidth())).toEqual([310, 330]);
+  await page.getByRole('radio', { name: '按页码范围拆分' }).check();
+  await expect(page.locator('#ranges-input')).toHaveValue('１－２，４－５');
+  await expect(hint).toBeVisible();
+});
+
+test('odd/even split cannot create an empty even PDF for one-page documents', async ({ page }) => {
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'one.pdf', mimeType: 'application/pdf', buffer: await makePdf([320]),
+  });
+  await expect(page.locator('.file-count')).toContainText('1 page');
+  await expect(page.getByRole('radio', { name: 'Split into odd-page and even-page PDFs' }))
+    .toBeDisabled();
+  await expect(page.locator('.split-download')).toBeDisabled();
+});
+
 test('split output count over 50 is explained before download', async ({ page }) => {
   await page.goto('/workspace/');
   await page.getByTestId('file-input').setInputFiles({
