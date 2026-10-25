@@ -64,7 +64,7 @@ test('a corrupt file later in a multi-file batch cannot import earlier valid fil
     { name: 'should-not-appear.pdf', mimeType: 'application/pdf', buffer: await fixture([477]) },
     { name: 'corrupt.pdf', mimeType: 'application/pdf', buffer: Buffer.from('not a PDF but looks like one') },
   ]);
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.locator('.notice-error')).toBeVisible();
   await expect(page.getByTestId('page-tile')).toHaveCount(1);
   const saved = await captured(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
   const doc = await PDFDocument.load(saved.bytes);
@@ -88,7 +88,7 @@ test('exact original PDF bytes survive a failed second import and unmodified exp
   await page.getByTestId('file-input').setInputFiles({ name:'protected.pdf', mimeType:'application/pdf', buffer:original });
   await expect(page.getByTestId('page-tile')).toHaveCount(1);
   await page.getByTestId('file-input').setInputFiles({ name:'bad.pdf',mimeType:'application/pdf',buffer:Buffer.from('%%%') });
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.locator('.notice-error')).toBeVisible();
   const after = await captured(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
   expect(Buffer.from(after.bytes).equals(original)).toBe(true);
 });
@@ -118,7 +118,7 @@ test('book-page selection error remains atomic across fullwidth Chinese input an
   await expect(page.getByTestId('utility-file-summary')).toContainText('70');
   await page.getByTestId('utility-page-ranges').fill('６９－７１');
   await page.getByTestId('utility-run').click();
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.locator('.notice-error')).toBeVisible();
   await expect(page.getByTestId('utility-file-summary')).toContainText('70');
   await page.getByTestId('utility-page-ranges').fill('７０');
   const result = await captured(page, () => page.getByTestId('utility-run').click());
@@ -150,7 +150,7 @@ test('a corrupt replacement cannot discard an undownloaded generated PDF from ed
   });
   await expect(page.getByTestId('utility-replace-confirm')).toBeVisible();
   await page.getByTestId('utility-replace-accept').click();
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.locator('.notice-error')).toBeVisible();
   await expect(page.getByTestId('text-pdf-result')).toBeVisible();
   const saved = await captured(page, () => page.getByTestId('utility-pdf-download').click());
   const document = await PDFDocument.load(saved.bytes);
