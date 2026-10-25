@@ -51,6 +51,7 @@
 
 - Prefer modest typography, crisp office-style surfaces, practical grouped tools and clear primary actions over gradients, fictional success metrics, stock illustrations or AI-marketing copy.
 - The static HTML catalog must render all 16 genuine tools (four intuitive categories) even when JavaScript is unavailable. Search only filters the already-visible HTML; keep keyboard, mobile and bilingual labels usable.
+- On phone-width layouts, editable search, page-range, file-name and converter text/select controls must compute to at least 16px to prevent involuntary iOS Safari input-focus zoom. Keep pinch zoom enabled, native file pickers/checkboxes untouched, desktop typography unchanged, and verify 375px screens do not overflow.
 - Page-specific useful answers must be true to current implementations, including page limits, rasterized/uncopyable Unicode PDF text and lossy PDF compression. Avoid overclaiming or duplicating generic copy.
 - Keep SEO canonical and reciprocal EN/zh-CN hreflang, sitemap/robots, unique titles and descriptions, one H1 and accurate visible JSON-LD (WebSite, WebApplication, BreadcrumbList) in both languages. Do not add Review/FAQPage rich-result markup unless genuine eligibility and content permit it.
 - Every feature or UI PR must pass unit, container-build and full Playwright E2E before merge; every production deploy runs actual public-site tests on the same Runner and cleans Docker resources. Don't add redundant scheduled QA workflows.

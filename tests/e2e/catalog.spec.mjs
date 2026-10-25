@@ -50,6 +50,53 @@ test('Chinese catalog search, categories and links work on mobile without overfl
   expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport + 2);
 });
 
+test('mobile PDF forms use readable 16px input text without causing horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  const inspect = async (selectors) => {
+    for (const selector of selectors) {
+      const input = page.locator(selector).first();
+      await expect(input, selector).toHaveCount(1);
+      const size = await input.evaluate(element =>
+        Number.parseFloat(window.getComputedStyle(element).fontSize));
+      expect(size, selector + ' should avoid iPhone Safari focus zoom').toBeGreaterThanOrEqual(16);
+    }
+    const width = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      client: document.documentElement.clientWidth,
+    }));
+    expect(width.scroll).toBeLessThanOrEqual(width.client + 2);
+  };
+
+  await page.goto('/zh/');
+  await inspect(['[data-tool-search]']);
+
+  await page.goto('/zh/txt-to-pdf/');
+  await inspect(['[data-testid="utility-text"]']);
+
+  await page.goto('/zh/pdf-to-images/');
+  await inspect(['[data-testid="utility-page-ranges"]', '.utility-options select']);
+
+  await page.goto('/zh/split-pdf/');
+  const pdf = await PDFDocument.create();
+  pdf.addPage([300, 400]);
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'phone.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await pdf.save()),
+  });
+  await expect(page.locator('.file-count')).toContainText('1 页');
+  await expect(page.locator('.split-intro')).toBeVisible();
+  await inspect(['#ranges-input', '#chunk-input', '#download-name-input']);
+
+  const meta = await page.locator('meta[name="viewport"]').getAttribute('content');
+  expect(meta).toContain('width=device-width');
+  expect(meta).not.toMatch(/user-scalable\s*=\s*no|maximum-scale/i);
+
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await page.goto('/');
+  const desktopFontSize = await page.locator('[data-tool-search]').evaluate(element =>
+    Number.parseFloat(window.getComputedStyle(element).fontSize));
+  expect(desktopFontSize).toBeLessThan(16);
+});
+
 test('English tool help is readable, accessible and structured data describes real task', async ({ page }) => {
   await page.goto('/compress-pdf/');
   const accordion = page.locator('.faq-item').first();

@@ -581,3 +581,16 @@ summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
   .utility-batch-nav > div { width: 100%; }
   .utility-batch-nav button { flex: 1; }
 }
+
+/* Mobile Safari can zoom the whole viewport when a focused text field is
+ * rendered under 16px. Enlarge only actual document/search form controls;
+ * preserve browser pinch zoom and desktop typography. Do not enlarge
+ * checkboxes, radio inputs or the native file picker. */
+@media (max-width: 770px) {
+  .tool-search-row input,
+  .pdf-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  .pdf-workspace select,
+  .pdf-workspace textarea {
+    font-size: 16px;
+  }
+}
