@@ -31,7 +31,7 @@ export const toolHelp = {
     ],
     'extract-pages': [
       ['Can I take selected pages out of a long document?', 'Yes. Tick thumbnails to extract in workspace order, or enter ranges such as 3, 1-2 and choose Export ranges as one PDF to combine them in the typed order.'],
-      ['Do extracted pages keep their order?', 'Checkbox extraction follows the current workspace order. Direct range export follows the order you type and ignores repeated/overlapping page numbers after their first occurrence. Neither changes the original PDF.'],
+      ['Do extracted pages keep their order?', 'Checkbox extraction follows the current workspace order. Direct range export follows the order you type and ignores repeated/overlapping page numbers after their first occurrence. Invalid or reversed ranges are flagged before download and cannot be exported. Neither changes the original PDF.'],
     ],
     'delete-pages': [
       ['Are removed pages deleted from my original PDF?', 'No. Removal affects the current browser workspace only. The downloaded PDF contains the pages you kept.'],
@@ -109,7 +109,7 @@ export const toolHelp = {
     ],
     'extract-pages': [
       ['如何从一本长 PDF 中抽出指定页？', '可以勾选缩略图并提取，也可以输入 3，1－2 等多个页码范围，直接按输入顺序合并为一份 PDF 下载。'],
-      ['提取出的页面顺序如何确定？', '勾选后提取按工作台当前页序；直接按范围合并则使用输入顺序，重复或重叠页码只保留首次出现的页面。不会改动原始 PDF。'],
+      ['提取出的页面顺序如何确定？', '勾选后提取按工作台当前页序；直接按范围合并则使用输入顺序，重复或重叠页码只保留首次出现的页面。倒序或越界的范围会在导出前提示，不能直接下载。不会改动原始 PDF。'],
     ],
     'delete-pages': [
       ['删除页面会影响原始 PDF 吗？', '不会。删除只发生在浏览器的编辑副本中，下载后才会得到去除指定页面的新文件。'],
