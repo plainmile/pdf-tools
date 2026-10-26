@@ -174,6 +174,37 @@ test('split progress has useful bilingual crawlable SSR content and accurate app
   }
 });
 
+test('JavaScript-disabled PDF tools give a useful bilingual fallback without hiding SEO content', async ({ request, browser }) => {
+ const context = await browser.newContext({ javaScriptEnabled: false });
+ try {
+  const noJsPage = await context.newPage();
+  for (const locale of ['en', 'zh']) {
+   for (const slug of ['split-pdf/', 'pdf-to-images/', 'txt-to-pdf/']) {
+    const path = locale === 'zh' ? '/zh/' + slug : '/' + slug;
+    const raw = await request.get(path);
+    expect(raw.status(), path).toBe(200);
+    const html = await raw.text();
+    expect(html, path + ' must include readable HTML without hydration').toContain('data-testid="tool-js-required"');
+    expect(html, path + ' must keep prerendered canonical').toContain('rel="canonical"');
+    expect(html, path + ' must keep language alternates').toContain('hreflang="zh-CN"');
+    const response = await noJsPage.goto(path, { waitUntil: 'domcontentloaded' });
+    expect(response?.status(), path).toBe(200);
+    const message = noJsPage.getByTestId('tool-js-required');
+    await expect(message).toBeVisible();
+    await expect(message).toContainText(locale === 'zh'
+      ? '请启用 JavaScript 后刷新页面'
+      : 'Enable JavaScript and reload this page');
+    await expect(noJsPage.locator('main h1'), path).toHaveCount(1);
+    // Chromium's innerText for a parent can omit <noscript> text even when
+    // the noscript child is visibly rendered. Assert on the visible element.
+    await expect(message, path).toContainText(locale === 'zh'
+      ? '文件不会上传服务器' : 'Your documents are not uploaded');
+    await expect(noJsPage.locator('.tool-explanation'), path).toBeVisible();
+   }
+  }
+ } finally { await context.close(); }
+});
+
 test('public language/theme and mobile layout', async ({ page }) => {
  await page.setViewportSize({width:1440,height:900});
  await page.goto('/zh/',{waitUntil:'networkidle'});
