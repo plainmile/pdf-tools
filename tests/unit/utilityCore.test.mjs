@@ -2,9 +2,36 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline, wrapTextLines,
-  textContentToLines, textContentToReadingOrderLines, linesToReadableText, hasMinimalSelectableText, hasSparseTextScanRisk, textLinesFromFormAnnotations, summarizeTextCoverage, textFitsUtf8Budget, sanitizeFilename, workspaceFilenameStem,
+  textContentToLines, textContentToReadingOrderLines, linesToReadableText, hasMinimalSelectableText, hasSparseTextScanRisk, textLinesFromFormAnnotations, summarizeTextCoverage, textFitsUtf8Budget, sanitizeFilename, workspaceFilenameStem, bookmarkSplitPartFilenames,
   UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageFilename, imageExportFilenames, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError,
 } from '../../src/lib/utilityCore.mjs';
+
+test('bookmark ZIP names are opt-in-safe, unique, Unicode-aware and never filesystem paths', () => {
+  const ranges = [
+    { start: 1, end: 2 }, { start: 3, end: 4 },
+    { start: 5, end: 6 }, { start: 7, end: 8 },
+    { start: 9, end: 10 },
+  ];
+  const names = bookmarkSplitPartFilenames(ranges, [
+    { page: 3, title: '../../Chapter: One' },
+    { page: 5, title: 'CON' },
+    { page: 7, title: '../../Chapter: One' },
+    { page: 9, title: '中文 / 第一节' },
+  ]);
+  assert.deepEqual(names, [
+    'part-01-pages-1-2.pdf',
+    'part-02-Chapter-One-pages-3-4.pdf',
+    'part-03-plainmile-CON-pages-5-6.pdf',
+    'part-04-Chapter-One-pages-7-8.pdf',
+    'part-05-中文-第一节-pages-9-10.pdf',
+  ]);
+  assert.equal(new Set(names).size, names.length);
+  assert.ok(names.every(name => !name.includes('/') && !name.includes('\\\\') && !name.includes('..')));
+  assert.deepEqual(bookmarkSplitPartFilenames([{ start: 1, end: 2 }], [{ page: 1, title: '../' }]),
+    ['part-01-pages-1-2.pdf']);
+  assert.throws(() => bookmarkSplitPartFilenames([{ start: 3, end: 2 }], []));
+  assert.throws(() => bookmarkSplitPartFilenames(Array.from({ length: 51 }, (_, i) => ({ start: i + 1, end: i + 1 })), []));
+});
 
 test('UTF-8 text edit budget rejects whole oversize pastes without silently clipping code units', () => {
   assert.equal(textFitsUtf8Budget('a'.repeat(10), 10), true);
