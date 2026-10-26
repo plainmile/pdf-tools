@@ -57,6 +57,26 @@ test('localized tool finder respects conversion direction and fullwidth aliases'
   await expect(page.locator('[data-tool-card]:visible')).toHaveCount(1);
 });
 
+test('tool finder announces localized match counts and no-match status to assistive technology', async ({ page }) => {
+  await page.goto('/');
+  const status = page.locator('[data-tool-results]');
+  await expect(status).toBeHidden();
+  await page.getByRole('searchbox', { name: 'Find a PDF tool' }).fill('compress');
+  await expect(status).toHaveText('1 matching tools.');
+  await expect(status).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Find a PDF tool' }).fill('no-such-tool-match');
+  await expect(status).toHaveText('No tools match that search. Try a different term.');
+  await page.getByRole('button', { name: 'Clear' }).click();
+  await expect(status).toBeHidden();
+
+  await page.goto('/zh/');
+  const zhSearch = page.getByRole('searchbox', { name: '搜索工具' });
+  await zhSearch.fill('水印');
+  await expect(status).toHaveText('找到 1 个工具。');
+  await zhSearch.fill('不存在的工具名称123');
+  await expect(status).toHaveText('没有匹配的工具，请换一个关键词。');
+});
+
 test('Chinese catalog search, categories and links work on mobile without overflow', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/zh/');
