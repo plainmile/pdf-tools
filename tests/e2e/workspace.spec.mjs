@@ -2034,6 +2034,7 @@ test('bookmark split reads actual PDF outline, preserves manual ranges and expor
     name: 'chapter-book.pdf', mimeType: 'application/pdf', buffer: book,
   });
   await expect(page.locator('.file-count')).toContainText('9 pages');
+  await expect(page.locator('.split-intro')).toContainText('chapter bookmarks');
   await page.getByTestId('split-bookmark-panel').locator('summary').click();
   await expect(page.getByTestId('bookmark-scan')).toBeEnabled();
   await page.getByTestId('bookmark-scan').click();
@@ -2079,6 +2080,7 @@ test('bookmark split reads actual PDF outline, preserves manual ranges and expor
 test('bookmark split clearly handles no outline and provides Chinese local guidance', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/zh/split-pdf/');
+  await expect(page.locator('.split-intro')).toContainText('章节书签');
   await page.getByTestId('file-input').setInputFiles({
     name: 'no-outline.pdf', mimeType: 'application/pdf',
     buffer: await makePdf([300, 301, 302]),
