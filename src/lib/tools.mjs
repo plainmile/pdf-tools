@@ -38,9 +38,9 @@ export const tools = [
   {
     slug: 'extract-pages', title: 'Extract PDF Pages', short: 'Keep only what matters',
     headline: 'Save selected pages as their own PDF.',
-    description: 'Pick individual pages from one or more PDFs and export only that selection, preserving your chosen order.',
-    details: 'Checkbox selection makes it easy to assemble a lightweight excerpt from reports, contracts or supporting documents.',
-    steps: ['Add your documents', 'Select the pages you want', 'Export selected pages'],
+    description: 'Extract PDF pages locally: select thumbnails in workspace order, or combine multiple typed page ranges into one PDF in the order entered.',
+    details: 'For a quick excerpt, check thumbnails and click Extract to keep workspace order. To combine custom ranges in a different order, enter page numbers and choose Export ranges as one PDF. Overlapping page numbers are included only once; no ZIP or upload.',
+    steps: ['Add PDFs and inspect the page order', 'Select thumbnails or enter ordered page ranges', 'Download a single PDF containing only the chosen pages'],
   },
   {
     slug: 'delete-pages', title: 'Delete PDF Pages', short: 'Remove unwanted pages',
