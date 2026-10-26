@@ -686,9 +686,15 @@ test('long PDF image exporter accepts late page range and blocks 61 images per b
   const downloaded = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
   const zip = await JSZip.loadAsync(downloaded.bytes);
   expect(Object.keys(zip.files).sort()).toEqual(['page-301.png','page-302.png']);
-  await page.getByTestId('utility-page-ranges').fill('1-61');
-  await page.getByTestId('utility-run').click();
-  await expect(page.getByRole('alert')).toContainText('up to 60 pages');
+  // The invalid 61-page request must be blocked before rasterizing anything.
+  const ranges = page.getByTestId('utility-page-ranges');
+  await ranges.fill('1-61');
+  await expect(ranges).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByTestId('image-range-error')).toContainText('at most 60 pages');
+  await expect(page.getByTestId('utility-run')).toBeDisabled();
+  await ranges.fill('319-320');
+  await expect(page.getByTestId('image-range-error')).toHaveCount(0);
+  await expect(page.getByTestId('utility-run')).toBeEnabled();
 });
 
 test('1000-page PDF image ZIP keeps correct numeric filename order at the last page', async ({ page }) => {
