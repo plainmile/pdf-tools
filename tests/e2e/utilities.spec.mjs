@@ -621,19 +621,69 @@ test('new shorter PDF resets stale page-number start while valid settings surviv
   await expect(page.getByTestId('number-first-pdf-page')).toHaveValue('2');
 });
 
+test('English numbering preflight blocks invalid values but keeps the previously generated PDF', async ({ page }) => {
+  await page.goto('/add-page-numbers/');
+  await upload(page, await fixturePdf('Number plan test', 3));
+  const run = page.getByTestId('utility-run');
+  const start = page.getByTestId('number-start');
+  const first = page.getByTestId('number-first-pdf-page');
+  await start.fill('5');
+  const original = await getDownload(page, async () => {
+    await run.click();
+    await expect(page.getByTestId('numbered-pdf-result')).toBeVisible();
+    await page.getByTestId('numbered-pdf-download').click();
+  });
+  expect((await PDFDocument.load(original.bytes)).getPageCount()).toBe(3);
+  await start.fill('99999');
+  await expect(start).toHaveAttribute('aria-invalid', 'true');
+  await expect(start).toHaveAttribute('aria-describedby', 'numbering-plan-error');
+  await expect(page.getByTestId('numbering-plan-error')).toContainText('exceed 99999');
+  await expect(run).toBeDisabled();
+  await expect(page.getByTestId('numbered-result-stale')).toBeVisible();
+  const oldResult = await getDownload(page, () => page.getByTestId('numbered-pdf-download').click());
+  expect(oldResult.bytes).toEqual(original.bytes);
+
+  await start.fill('0');
+  await expect(page.getByTestId('numbering-plan-error')).toContainText('from 1 to 99999');
+  await expect(run).toBeDisabled();
+  await start.fill('99997'); // 3 pages -> 99997, 99998, 99999
+  await first.fill('1');
+  await expect(page.getByTestId('numbering-plan-error')).toHaveCount(0);
+  await expect(run).toBeEnabled();
+  const updated = await getDownload(page, async () => {
+    await run.click();
+    await expect(page.getByTestId('numbered-result-stale')).toHaveCount(0);
+    await page.getByTestId('numbered-pdf-download').click();
+  });
+  expect((await PDFDocument.load(updated.bytes)).getPageCount()).toBe(3);
+  expect(updated.bytes).not.toEqual(original.bytes);
+
+  await first.fill('2.5');
+  await expect(first).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByTestId('numbering-plan-error')).toContainText('from 1 to 3');
+  await expect(run).toBeDisabled();
+});
+
 test('Chinese mobile PDF numbering validates starting PDF page and last printed number', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/zh/add-page-numbers/');
   await upload(page, await fixturePdf('Chinese numbering control', 5));
   await expect(page.getByTestId('number-first-page-hint')).toContainText('封面');
-  await page.getByTestId('number-first-pdf-page').fill('6');
-  await page.getByTestId('utility-run').click();
-  await expect(page.getByRole('alert')).toContainText('开始编号的 PDF 页码超出范围');
-  await page.getByTestId('number-first-pdf-page').fill('3');
-  await page.getByTestId('number-start').fill('99999');
-  await page.getByTestId('utility-run').click();
-  await expect(page.getByRole('alert')).toContainText('不能超过 99999');
-  await page.getByTestId('number-first-pdf-page').fill('5');
+  const run = page.getByTestId('utility-run');
+  const first = page.getByTestId('number-first-pdf-page');
+  const start = page.getByTestId('number-start');
+  await first.fill('6');
+  await expect(first).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByTestId('numbering-plan-error')).toContainText('1 至 5');
+  await expect(run).toBeDisabled();
+  await first.fill('3');
+  await start.fill('99999');
+  await expect(start).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByTestId('numbering-plan-error')).toContainText('末页页码不能超过 99999');
+  await expect(run).toBeDisabled();
+  await first.fill('5');
+  await expect(page.getByTestId('numbering-plan-error')).toHaveCount(0);
+  await expect(run).toBeEnabled();
   const output = await getDownload(page, async () => { await page.getByTestId('utility-run').click(); await page.getByTestId('numbered-pdf-download').click(); }, 15000);
   expect((await PDFDocument.load(output.bytes)).getPageCount()).toBe(5);
   const viewport = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, width: document.documentElement.clientWidth }));
@@ -1340,8 +1390,8 @@ test('numbering rejects too-small pages and page labels over 99999 in Chinese', 
   longer.addPage([595, 842]); longer.addPage([595, 842]);
   await upload(page, Buffer.from(await longer.save()));
   await page.getByTestId('number-start').fill('99999');
-  await page.getByTestId('utility-run').click();
-  await expect(page.getByRole('alert')).toContainText('不能超过 99999');
+  await expect(page.getByTestId('numbering-plan-error')).toContainText('不能超过 99999');
+  await expect(page.getByTestId('utility-run')).toBeDisabled();
 });
 
 test('changing page numbering settings marks the preserved preview stale and clears the old success toast', async ({ page }) => {
