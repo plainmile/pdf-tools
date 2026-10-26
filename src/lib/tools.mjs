@@ -60,7 +60,7 @@ export const tools = [
     slug: 'pdf-to-images', title: 'PDF to JPG / PNG', short: 'Save pages as images',
     headline: 'Export PDF pages to sharp JPG or PNG images.',
     description: 'Convert PDF pages to PNG or JPG in your browser. Choose resolution and page ranges; multiple images download as ZIP, without uploads.',
-    details: 'Images are rendered directly from each PDF page. Choose output format and resolution; download one image or a ZIP archive of selected pages.',
+    details: 'Each whole PDF page is rendered into a new image, not extracted as an original embedded photo. Choose JPG or PNG, resolution and a page range; repeated pages are kept only once in your chosen order. Download one image or a ZIP archive.',
     steps: ['Choose a PDF', 'Select image format and pages', 'Download JPG, PNG or ZIP'],
   },
   {
