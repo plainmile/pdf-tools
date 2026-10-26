@@ -2033,7 +2033,7 @@ test('bookmark split reads actual PDF outline, preserves manual ranges and expor
   await page.getByTestId('file-input').setInputFiles({
     name: 'chapter-book.pdf', mimeType: 'application/pdf', buffer: book,
   });
-  await expect(page.getByTestId('page-tile')).toHaveCount(9);
+  await expect(page.locator('.file-count')).toContainText('9 pages');
   await page.getByTestId('split-bookmark-panel').locator('summary').click();
   await expect(page.getByTestId('bookmark-scan')).toBeEnabled();
   await page.getByTestId('bookmark-scan').click();
