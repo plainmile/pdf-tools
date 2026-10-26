@@ -336,6 +336,28 @@ export function pageIdsForRanges(pages, input) {
   return chosen;
 }
 
+/** For a SINGLE combined PDF, honor the order of manually entered ranges.
+ * Repeated/overlapping page positions are kept once, at their first occurrence:
+ * "3,1-2,3" becomes [3,1,2], never a silent duplicate third page. This
+ * differs intentionally from selecting page checkboxes, which exports in the
+ * current workspace order. Validate every part BEFORE any caller exports.
+ */
+export function pagePositionsForCombinedRanges(input, pageCount) {
+  if (typeof input !== 'string' || !input.trim()) throw new Error('Enter page ranges to combine.');
+  const positions = [];
+  const seen = new Set();
+  for (const { start, end } of parsePageRanges(input, pageCount)) {
+    for (let position = start; position <= end; position++) {
+      if (!seen.has(position)) {
+        seen.add(position);
+        positions.push(position);
+        if (positions.length > 600) throw new Error('At most 600 combined pages are supported.');
+      }
+    }
+  }
+  return positions;
+}
+
 /** Odd/even refer to the CURRENT one-based export position, never an original
  * PDF source-page label. These operations avoid the 50-range input limit and
  * create no document edit/history entry.

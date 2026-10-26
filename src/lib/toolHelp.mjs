@@ -12,7 +12,7 @@ export const toolHelp = {
       ['Will merging upload private documents?', 'No. Files are processed locally in the browser and are not sent to a PDF conversion server.'],
     ],
     'split-pdf': [
-      ['Can I split a PDF into custom page ranges?', 'Yes. Enter ranges such as 1-3, 4-6; each range generates a separate PDF. For one combined PDF, use Extract PDF Pages and select the pages to keep.'],
+      ['Can I split a PDF into custom page ranges?', 'Yes. Enter ranges such as 1-3, 4-6; each range generates a separate PDF. For one combined PDF, use Extract PDF Pages and enter ranges in the desired combined order.'],
       ['Can I split odd and even pages into two PDFs?', 'Yes. Choose Split into odd-page and even-page PDFs to get two PDFs in one ZIP. Odd and even refer to the current export page order, not the original scanned page numbers.'],
       ['Can I split a PDF by chapters or subchapters?', 'Yes. For one PDF in its complete original page order, choose bookmark level 1, 2 or 3 and preview the exact chapter boundaries before applying. Up to 50 output PDFs are supported; missing levels or invalid destinations do not invent chapters. You can optionally add sanitized chapter titles to ZIP filenames, but this is off by default. Exported PDFs do not retain the original clickable bookmarks.'],
       ['Can I choose split points by looking at the pages?', 'Yes. Expand Choose split points by clicking pages, then click Cut after this page under a preview. Click again to remove a cut. It uses your current page order; manually entered custom ranges are protected from accidental replacement.'],
@@ -30,8 +30,8 @@ export const toolHelp = {
       ['Does rotating reduce image resolution?', 'Page rotation changes the PDF page orientation without intentionally converting its content to images. Always check important exports.'],
     ],
     'extract-pages': [
-      ['Can I take selected pages out of a long document?', 'Yes. Tick thumbnails or enter output-page ranges such as 2-3, 5, 8 to select pages in one step, then export only that selection.'],
-      ['Do extracted pages keep their order?', 'Yes. They follow the order shown in the current workspace. You can reorder pages before extracting them.'],
+      ['Can I take selected pages out of a long document?', 'Yes. Tick thumbnails to extract in workspace order, or enter ranges such as 3, 1-2 and choose Export ranges as one PDF to combine them in the typed order.'],
+      ['Do extracted pages keep their order?', 'Checkbox extraction follows the current workspace order. Direct range export follows the order you type and ignores repeated/overlapping page numbers after their first occurrence. Neither changes the original PDF.'],
     ],
     'delete-pages': [
       ['Are removed pages deleted from my original PDF?', 'No. Removal affects the current browser workspace only. The downloaded PDF contains the pages you kept.'],
@@ -90,7 +90,7 @@ export const toolHelp = {
       ['合并时会上传合同等隐私文件吗？', '不会。文件直接在您的浏览器中处理，不上传到转换服务器。'],
     ],
     'split-pdf': [
-      ['可以按自定义范围拆分吗？', '可以。输入 1-3、4-6 这样的页码范围，每个范围单独生成一份 PDF；若要把选中页合并成一份 PDF，请使用「提取 PDF 页面」。'],
+      ['可以按自定义范围拆分吗？', '可以。输入 1-3、4-6 这样的页码范围，每个范围单独生成一份 PDF；需要合并成一份 PDF 时请使用「提取 PDF 页面」，直接按所需顺序输入页码范围。'],
       ['能把奇数页、偶数页分别保存吗？', '可以。选择「按奇偶页分别生成 PDF」，会把当前页序的奇数位、偶数位页面分别生成两份 PDF，并打包为一个 ZIP；不是依据原文件印刷页码。'],
       ['能按 PDF 的章节和子章节书签拆分吗？', '可以，前提是单份 PDF 保留了完整原始页序并且带有内置书签。选择第 1、2 或 3 级书签，先预览并确认；不存在的层级不会虚构拆分点，单次最多 50 份。ZIP 文件名可主动选择使用经过清理的章节标题，默认关闭。导出的 PDF 不保留原书签导航，也不能通过扫描文字识别章节。'],
       ['可以看着页面缩略图选择拆分位置吗？', '可以。展开「按页面预览设置拆分点」，在缩略图下选择「在此页后拆分」，再次点击可取消。拆分按当前页面顺序进行；手工指定的特殊范围不会被意外覆盖。'],
@@ -108,8 +108,8 @@ export const toolHelp = {
       ['旋转会降低清晰度吗？', '旋转修改的是 PDF 页面的方向，并不会刻意将页面图片化。重要文档仍建议检查导出结果。'],
     ],
     'extract-pages': [
-      ['如何从一本长 PDF 中抽出指定页？', '可勾选页面，也可按当前导出顺序输入 2-3, 5, 8 一次选中多页，再下载提取后的 PDF。'],
-      ['提取出的页面顺序如何确定？', '按照工作台当前显示的顺序导出。您也可以先拖动页面，再进行提取。'],
+      ['如何从一本长 PDF 中抽出指定页？', '可以勾选缩略图并提取，也可以输入 3，1－2 等多个页码范围，直接按输入顺序合并为一份 PDF 下载。'],
+      ['提取出的页面顺序如何确定？', '勾选后提取按工作台当前页序；直接按范围合并则使用输入顺序，重复或重叠页码只保留首次出现的页面。不会改动原始 PDF。'],
     ],
     'delete-pages': [
       ['删除页面会影响原始 PDF 吗？', '不会。删除只发生在浏览器的编辑副本中，下载后才会得到去除指定页面的新文件。'],

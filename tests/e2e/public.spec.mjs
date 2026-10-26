@@ -8,6 +8,25 @@ const slugs = ['', 'workspace/', 'merge-pdf/', 'split-pdf/', 'organize-pdf/',
  'rotate-pdf/', 'extract-pages/', 'delete-pages/', 'image-to-pdf/', 'watermark-pdf/', 'pdf-to-images/', 'compress-pdf/', 'pdf-to-txt/', 'pdf-to-markdown/', 'txt-to-pdf/', 'markdown-to-pdf/', 'add-page-numbers/', 'privacy/'];
 const indexablePaths = new Set(slugs.flatMap(slug => ['/' + slug, '/zh/' + slug]));
 
+test('bilingual extract SEO explains the two real ways to create one PDF', async ({ request }) => {
+  for (const [path, description, detail] of [
+    ['/extract-pages/', 'combine multiple typed page ranges into one PDF', 'Overlapping page numbers are included only once'],
+    ['/zh/extract-pages/', '按输入顺序合并成一份 PDF', '相同页码只保留一次'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(description);
+    expect(html).toContain(detail);
+    expect(html).toContain('rel="canonical"');
+    expect(html).toContain('hreflang="en"');
+    expect(html).toContain('hreflang="zh-CN"');
+    // Localized explanatory content must exist before React hydration.
+    expect(html).toContain(path.startsWith('/zh/')
+      ? '勾选后提取按工作台当前页序' : 'Checkbox extraction follows the current workspace order');
+  }
+});
+
 test('bilingual split SEO explains real nested bookmark limits without duplicate routes', async ({ request }) => {
   for (const [path, detail, warning] of [
     ['/split-pdf/', 'bookmark level 1, 2 or 3', 'default filenames still use page ranges'],

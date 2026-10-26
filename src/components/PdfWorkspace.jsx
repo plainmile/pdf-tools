@@ -9,7 +9,7 @@ import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges, splitChunkBatch, oddEvenSplitParts,
-  getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, splitRangesFromBookmarkStarts, bookmarkItemsAtLevel, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
+  getRangePages, pagePositionsForCombinedRanges, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, splitRangesFromBookmarkStarts, bookmarkItemsAtLevel, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
 function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview, onOpen, outputPosition, busy }) {
@@ -179,6 +179,14 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const watermark = { enabled: watermarkEnabled, text: watermarkText };
   const watermarkPreview = watermarkEnabled && watermarkText.trim() ? watermarkText.trim() : null;
   const selectedCount = selected.size;
+  // A direct combined extraction is distinct from checkbox selection: it uses
+  // the exact order of the typed ranges, and drops overlap duplicates once.
+  // Never alter selection or the source page order while previewing this plan.
+  const combinedRangePositions = useMemo(() => {
+    if (mode !== 'extract-pages' || !selectionRanges.trim() || !pages.length) return null;
+    try { return pagePositionsForCombinedRanges(selectionRanges, pages.length); }
+    catch { return null; }
+  }, [mode, selectionRanges, pages.length]);
   const bytesInMemory = useMemo(() => retainedSourcesBytes(sources), [sources]);
   const sourceLookup = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources]);
   const zoomPageIndex = pages.findIndex(page => page.id === previewPageId);
@@ -755,6 +763,21 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     if (!chosen.length) return withBusy(async () => { throw new Error(t.selectionNeeded); });
     return exportPages(chosen, `${outputBase}-selected-${chosen.length}-pages.pdf`, interpolate(t.extracted, { pages: chosen.length }));
   };
+  const exportCombinedRanges = () => {
+    if (busyRef.current || busy || !pages.length) return;
+    try {
+      // Validate the WHOLE plan before starting any page copy or download.
+      // The checkbox selection remains untouched, so the other Extract action
+      // always retains its documented current-workspace-order semantics.
+      const positions = pagePositionsForCombinedRanges(selectionRanges, pages.length);
+      const chosen = positions.map(position => pages[position - 1]);
+      return exportPages(chosen, `${outputBase}-combined-${chosen.length}-pages.pdf`,
+        interpolate(t.rangeCombineSaved, { pages: chosen.length }));
+    } catch (_invalidRanges) {
+      setNotice('');
+      setError(t.rangeSelectInvalid);
+    }
+  };
   const downloadSplit = () => withBusy(async () => {
     if (!pages.length) throw new Error(t.noFile);
     if (imageLayoutDirty) throw new Error(t.imageMustApply);
@@ -1274,7 +1297,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                 </div>
                 {focusedActionKeys && <p className="input-note focused-page-hint" data-testid="focused-page-hint">{focusedHint}</p>}
                 <details className="selection-range-panel" data-testid="selection-range-panel">
-                  <summary>{t.rangeSelectToggle}</summary>
+                  <summary>{mode === 'extract-pages' ? t.rangeSelectCombineToggle : t.rangeSelectToggle}</summary>
                   <form className="selection-range-form" onSubmit={applyPageRangeSelection}>
                     <label htmlFor="selection-ranges">{t.rangeSelectLabel}
                       <input id="selection-ranges" data-testid="selection-ranges" type="text"
@@ -1284,6 +1307,18 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     <button className="button button-secondary button-small" type="submit"
                       data-testid="selection-range-apply" disabled={busy || !selectionRanges.trim()}>{t.rangeSelectApply}</button>
                     <p className="input-note">{t.rangeSelectHint}</p>
+                    {mode === 'extract-pages' && <div className="range-combine-controls" data-testid="range-combine-controls">
+                      <p className="input-note">{t.rangeCombineHint}</p>
+                      {combinedRangePositions && <p className="input-note" role="status"
+                        data-testid="range-combine-preview">{interpolate(t.rangeCombinePreview, {
+                          pages: combinedRangePositions.length,
+                          positions: combinedRangePositions.slice(0, 10).join(', ') +
+                            (combinedRangePositions.length > 10 ? ', …' : ''),
+                        })}</p>}
+                      <button type="button" className="button button-primary button-small"
+                        data-testid="range-combine-download" onClick={exportCombinedRanges}
+                        disabled={busy || !selectionRanges.trim()}>{t.rangeCombineAction}</button>
+                    </div>}
                     <div className="selection-pattern-buttons" data-testid="selection-pattern-buttons"
                       role="group" aria-label={t.quickSelectionLabel}>
                       <button type="button" className="button button-secondary button-small"
