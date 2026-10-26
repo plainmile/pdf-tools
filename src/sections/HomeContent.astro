@@ -110,7 +110,11 @@ const desc = zh
         for (const card of cards) {
           const words = query.split(' ').filter(Boolean);
           const haystack = card.dataset.searchText;
-          const visible = words.every(word => haystack.includes(word));
+          // Directional phrases are order-sensitive: "JPG to PDF" must not
+          // accidentally return "PDF to JPG" via unordered word matching.
+          const directional = /(?:^|\\s)to(?:\\s|$)|转/.test(query);
+          const visible = directional ? haystack.includes(query) :
+            words.every(word => haystack.includes(word));
           card.hidden = !visible;
           if (visible) matches++;
         }
