@@ -167,6 +167,7 @@ main { flex: 1; }
 .error-page { padding-top: 90px; padding-bottom: 110px; }
 .error-page h1 { font-size: 65px; margin-bottom: 10px; }
 .error-page p { color: var(--muted); margin-bottom: 24px; }
+.error-links { display: flex; flex-wrap: wrap; gap: 12px; }
 /* Real editing workspace */
 .pdf-workspace { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
 .workspace-bar { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 16px 21px; min-height: 65px; border-bottom: 1px solid var(--border); }
