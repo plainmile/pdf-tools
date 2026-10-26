@@ -1297,7 +1297,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                 </div>
                 {focusedActionKeys && <p className="input-note focused-page-hint" data-testid="focused-page-hint">{focusedHint}</p>}
                 <details className="selection-range-panel" data-testid="selection-range-panel">
-                  <summary>{t.rangeSelectToggle}</summary>
+                  <summary>{mode === 'extract-pages' ? t.rangeSelectCombineToggle : t.rangeSelectToggle}</summary>
                   <form className="selection-range-form" onSubmit={applyPageRangeSelection}>
                     <label htmlFor="selection-ranges">{t.rangeSelectLabel}
                       <input id="selection-ranges" data-testid="selection-ranges" type="text"
