@@ -112,7 +112,12 @@ function PdfFirstPagePreview({ bytes, pageCount, t, locale, pageNumber = 1, supp
       pdfPage = await pdfState.document.getPage(pageNumber);
       if (closed) { pdfPage.cleanup(); return; }
       const base = pdfPage.getViewport({ scale: 1 });
-      const viewport = pdfPage.getViewport({ scale: Math.min(1, 550 / base.width) });
+      // Bound BOTH axes. A very tall receipt can be only 80 pt wide but
+      // 12,000 pt high; width-only scaling can allocate a >20,000px canvas
+      // on Retina/iOS. This is only a display preview: export bytes and
+      // original PDF page dimensions are never changed.
+      const fit = Math.min(1, 550 / base.width, 700 / base.height);
+      const viewport = pdfPage.getViewport({ scale: fit });
       const density = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.ceil(viewport.width * density);
       canvas.height = Math.ceil(viewport.height * density);

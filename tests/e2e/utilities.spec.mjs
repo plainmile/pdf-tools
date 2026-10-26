@@ -914,6 +914,46 @@ test('image conversion exposes cancel and a ZIP packaging stage', async ({ page 
   await expect(page.getByTestId('utility-next-step').getByRole('link')).toHaveAttribute('href', '/#all-tools');
 });
 
+test('very tall PDF page has a bounded generated preview but unchanged exported dimensions', async ({ page }) => {
+  // A narrow receipt/poster is valid PDF input. The previous width-only
+  // preview used a 12,000px CSS canvas (up to 24,000 backing pixels on 2x
+  // screens), even though the page itself should never be resized.
+  const source = await PDFDocument.create();
+  source.addPage([100, 12_000]).drawText('TALL RECEIPT', { x: 10, y: 11_900, size: 12 });
+  const bytes = Buffer.from(await source.save());
+  for (const locale of ['en', 'zh']) {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto(locale === 'zh' ? '/zh/add-page-numbers/' : '/add-page-numbers/');
+    await upload(page, bytes);
+    await page.getByTestId('utility-run').click();
+    await expect(page.getByTestId('numbered-pdf-result')).toBeVisible({ timeout: 20000 });
+    const preview = page.getByTestId('utility-pdf-preview');
+    await expect(preview).toHaveAttribute('data-rendered-page', '1', { timeout: 20000 });
+    const dimensions = await preview.locator('canvas').evaluate(canvas => ({
+      backingWidth: canvas.width,
+      backingHeight: canvas.height,
+      cssWidth: Number.parseFloat(canvas.style.width),
+      cssHeight: canvas.height / (Math.min(window.devicePixelRatio || 1, 2)),
+    }));
+    expect(dimensions.backingWidth).toBeGreaterThan(0);
+    expect(dimensions.backingHeight).toBeGreaterThan(0);
+    expect(dimensions.backingWidth).toBeLessThanOrEqual(1102);
+    expect(dimensions.backingHeight).toBeLessThanOrEqual(1402);
+    expect(dimensions.cssWidth).toBeLessThanOrEqual(550);
+    expect(dimensions.cssHeight).toBeLessThanOrEqual(701);
+    const download = await getDownload(page, () => page.getByTestId('numbered-pdf-download').click(), 20000);
+    const exported = await PDFDocument.load(download.bytes, { updateMetadata: false });
+    expect(exported.getPageCount()).toBe(1);
+    expect(exported.getPage(0).getWidth()).toBe(100);
+    expect(exported.getPage(0).getHeight()).toBe(12_000);
+    const viewport = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      width: document.documentElement.clientWidth,
+    }));
+    expect(viewport.scroll).toBeLessThanOrEqual(viewport.width + 2);
+  }
+});
+
 test('page number tool warns that overlay can overlap content', async ({ page }) => {
   await page.goto('/zh/add-page-numbers/');
   await expect(page.getByTestId('page-overlap-warning')).toContainText('可能遮挡页脚');
