@@ -18,6 +18,11 @@ test('bilingual extract SEO explains the two real ways to create one PDF', async
     const html = await response.text();
     expect(html).toContain(description);
     expect(html).toContain(detail);
+    // Real validation behavior and accurate limits must be crawlable without
+    // client-side React hydration, not an unsupported SEO promise.
+    expect(html).toContain(path.startsWith('/zh/')
+      ? '倒序或越界的范围会在导出前提示'
+      : 'Invalid or reversed ranges are flagged before download');
     expect(html).toContain('rel="canonical"');
     expect(html).toContain('hreflang="en"');
     expect(html).toContain('hreflang="zh-CN"');
