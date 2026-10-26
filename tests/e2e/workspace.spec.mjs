@@ -2039,6 +2039,7 @@ test('bookmark split reads actual PDF outline, preserves manual ranges and expor
   await page.getByTestId('bookmark-scan').click();
   await expect(page.getByTestId('bookmark-preview')).toContainText('3 output ranges');
   await expect(page.getByTestId('bookmark-preview')).toContainText('ignored 0');
+  await expect(page.getByTestId('bookmark-ranges-preview')).toContainText('1-3, 4-6, 7-9');
   await expect(page.getByTestId('split-bookmark-panel')).toContainText('Chapter One');
 
   await page.locator('#ranges-input').fill('1-2, 3-9');
