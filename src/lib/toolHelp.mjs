@@ -30,8 +30,8 @@ export const toolHelp = {
       ['Does rotating reduce image resolution?', 'Page rotation changes the PDF page orientation without intentionally converting its content to images. Always check important exports.'],
     ],
     'extract-pages': [
-      ['Can I take selected pages out of a long document?', 'Yes. Tick thumbnails or enter output-page ranges such as 2-3, 5, 8 to select pages in one step, then export only that selection.'],
-      ['Do extracted pages keep their order?', 'Yes. They follow the order shown in the current workspace. You can reorder pages before extracting them.'],
+      ['Can I take selected pages out of a long document?', 'Yes. Tick thumbnails to extract in workspace order, or enter ranges such as 3, 1-2 and choose Export ranges as one PDF to combine them in the typed order.'],
+      ['Do extracted pages keep their order?', 'Checkbox extraction follows the current workspace order. Direct range export follows the order you type and ignores repeated/overlapping page numbers after their first occurrence. Neither changes the original PDF.'],
     ],
     'delete-pages': [
       ['Are removed pages deleted from my original PDF?', 'No. Removal affects the current browser workspace only. The downloaded PDF contains the pages you kept.'],
