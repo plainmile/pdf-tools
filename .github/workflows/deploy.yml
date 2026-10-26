@@ -231,7 +231,9 @@ jobs:
               cd /tmp/live-tests
               npm init -y >/dev/null
               npm install --no-audit --no-fund @playwright/test@1.55.0 pdf-lib@1.17.1 jszip@3.10.1
-              npx playwright test --reporter=list || {
+              # One retry is PUBLIC-only: PR/main Docker CI still runs with zero
+              # retries. A repeatable product failure must still roll back.
+              npx playwright test --reporter=list --retries=1 || {
                 cp -r test-results /artifacts/ || true
                 exit 1
               }
