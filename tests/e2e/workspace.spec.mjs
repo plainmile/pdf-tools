@@ -2002,6 +2002,102 @@ test('Chinese custom download name affects split ZIP but does not change page id
   expect(second.getPages().map(p => p.getWidth())).toEqual([302,303]);
 });
 
+async function makeChapterBookmarkPdf(pageWidths, chapters) {
+  const source = await PDFDocument.create();
+  const refs = pageWidths.map(width => source.addPage([width, 420]).ref);
+  const outline = source.context.obj({ Type: PDFName.of('Outlines'), Count: chapters.length });
+  const rootRef = source.context.register(outline);
+  const links = chapters.map(([title, pageIndex]) => {
+    const item = source.context.obj({
+      Title: PDFHexString.fromText(title), Parent: rootRef,
+      Dest: [refs[pageIndex], PDFName.of('Fit')],
+    });
+    return { item, ref: source.context.register(item) };
+  });
+  links.forEach(({ item }, i) => {
+    if (i > 0) item.set(PDFName.of('Prev'), links[i - 1].ref);
+    if (i + 1 < links.length) item.set(PDFName.of('Next'), links[i + 1].ref);
+  });
+  outline.set(PDFName.of('First'), links[0].ref);
+  outline.set(PDFName.of('Last'), links.at(-1).ref);
+  source.catalog.set(PDFName.of('Outlines'), rootRef);
+  return Buffer.from(await source.save());
+}
+
+test('bookmark split reads actual PDF outline, preserves manual ranges and exports correct chapters', async ({ page }) => {
+  const book = await makeChapterBookmarkPdf(
+    [300, 301, 302, 303, 304, 305, 306, 307, 308],
+    [['Intro', 0], ['Chapter One', 3], ['Appendix', 6], ['Duplicate destination', 6]],
+  );
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'chapter-book.pdf', mimeType: 'application/pdf', buffer: book,
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(9);
+  await page.getByTestId('split-bookmark-panel').locator('summary').click();
+  await expect(page.getByTestId('bookmark-scan')).toBeEnabled();
+  await page.getByTestId('bookmark-scan').click();
+  await expect(page.getByTestId('bookmark-preview')).toContainText('3 output ranges');
+  await expect(page.getByTestId('bookmark-preview')).toContainText('ignored 0');
+  await expect(page.getByTestId('split-bookmark-panel')).toContainText('Chapter One');
+
+  await page.locator('#ranges-input').fill('1-2, 3-9');
+  await page.getByTestId('bookmark-apply').click();
+  await expect(page.getByTestId('bookmark-confirm')).toBeVisible();
+  await page.getByTestId('bookmark-keep').click();
+  await expect(page.locator('#ranges-input')).toHaveValue('1-2, 3-9');
+  await page.getByTestId('bookmark-apply').click();
+  await page.getByTestId('bookmark-confirm-replace').click();
+  await expect(page.locator('#ranges-input')).toHaveValue('1-3, 4-6, 7-9');
+  await expect(page.getByTestId('split-output-preview')).toContainText('3');
+  await expect(page.getByTestId('split-coverage-complete')).toContainText('9 total');
+
+  const saved = await captured(page, () => page.locator('.split-download').click());
+  expect(saved.name).toBe('chapter-book-split.zip');
+  const zip = await JSZip.loadAsync(saved.bytes);
+  const names = Object.keys(zip.files).sort();
+  expect(names).toEqual([
+    'part-01-pages-1-3.pdf', 'part-02-pages-4-6.pdf', 'part-03-pages-7-9.pdf',
+  ]);
+  for (let index = 0; index < names.length; index++) {
+    const pdf = await PDFDocument.load(await zip.file(names[index]).async('uint8array'));
+    expect(pdf.getPages().map(p => p.getWidth())).toEqual(
+      [300 + index * 3, 301 + index * 3, 302 + index * 3],
+    );
+  }
+  // Bookmarks identify ORIGINAL page positions, so after reorder a suggestion
+  // would be wrong. Do not allow a stale, already-scanned plan to be reused.
+  await page.getByRole('tab', { name: 'Organize' }).click();
+  await page.getByTestId('reverse-all-pages').click();
+  await page.getByRole('tab', { name: 'Split' }).click();
+  await page.getByTestId('split-bookmark-panel').locator('summary').click();
+  await expect(page.getByTestId('bookmark-scan')).toBeDisabled();
+  await expect(page.getByTestId('bookmark-preview')).toHaveCount(0);
+});
+
+test('bookmark split clearly handles no outline and provides Chinese local guidance', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'no-outline.pdf', mimeType: 'application/pdf',
+    buffer: await makePdf([300, 301, 302]),
+  });
+  await page.getByTestId('split-bookmark-panel').locator('summary').click();
+  await expect(page.getByTestId('bookmark-scan')).toBeDisabled();
+  await expect(page.getByTestId('bookmark-availability')).toContainText('需要一份含内置书签');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'chapters.pdf', mimeType: 'application/pdf',
+    buffer: await makeChapterBookmarkPdf([320, 321], [['Only', 0], ['Second', 1]]),
+  });
+  // Multiple active PDFs: no chance to interpret one file's bookmark pages
+  // as the current concatenated output positions.
+  await expect(page.getByTestId('bookmark-scan')).toBeDisabled();
+  const dims = await page.evaluate(() => ({
+    content: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth,
+  }));
+  expect(dims.content).toBeLessThanOrEqual(dims.viewport + 2);
+});
+
 test('untouched PDF keeps bookmarks; edited PDF warns when chapter navigation is lost', async ({ page }) => {
   const source = await PDFDocument.create();
   const first = source.addPage([430, 600]);
