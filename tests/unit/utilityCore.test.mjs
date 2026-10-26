@@ -88,6 +88,8 @@ test('compression reports actual savings; a larger result must not count as savi
 test('image page selection handles ranges and no duplicate pages', () => {
   assert.deepEqual(requestedPages('', 4), [1, 2, 3, 4]);
   assert.deepEqual(requestedPages('2-3,1,2', 4), [2, 3, 1]);
+  assert.deepEqual(requestedPages('2-,1,4-', 4), [2, 3, 4, 1]);
+  assert.deepEqual(requestedPages('４－', 4), [4]);
   assert.throws(() => requestedPages('4-2', 4), /reversed/);
   assert.throws(() => requestedPages('100', 4), /outside/);
 });
@@ -581,12 +583,17 @@ test('image conversion selects any 60 pages from a 500-page book, not only first
   assert.equal(selected.at(-1), 360);
   assert.equal(enforceImageBatchLimit(selected.length), true);
   assert.throws(() => enforceImageBatchLimit(requestedPages('1-61', 500).length), /60 pages/);
+  assert.deepEqual(requestedPages('441-', 500), Array.from({ length: 60 }, (_, i) => 441 + i));
+  assert.throws(() => enforceImageBatchLimit(requestedPages('440-', 500).length), /60 pages/);
 });
 
 test('PDF image ZIP filename labels preserve localized and nonconsecutive output-page identities', () => {
   assert.equal(imagePageSelectionLabel('３０１－３０６', 500), '301-306');
   assert.equal(imagePageSelectionLabel('２－３，５、７', 10), '2-3_5_7');
   assert.equal(imagePageSelectionLabel('3,1', 20), '3_1');
+  assert.equal(imagePageSelectionLabel('5-', 8), '5-8');
+  assert.equal(imagePageSelectionLabel('３－，１－２', 5), '3-5_1-2');
+  assert.equal(imagePageSelectionLabel('5-,5-', 8), '5-8');
   // ZIP names describe what was actually rendered, not duplicated input.
   assert.equal(imagePageSelectionLabel('1-3,2-4', 8), '1-3_4');
   assert.equal(imagePageSelectionLabel('3,1-2,3', 8), '3_1-2');
