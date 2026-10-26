@@ -11,11 +11,11 @@ const bySlug = Object.fromEntries(tools.map((tool) => [tool.slug, tool]));
 const zh = locale === 'zh';
 const labels = zh ? {
   frequent: '常用工具', search: '搜索工具', placeholder: '搜索：合并、压缩、水印、图片…',
-  clear: '清除', noResults: '没有匹配的工具，请换一个关键词。',
+  clear: '清除', noResults: '没有匹配的工具，请换一个关键词。', results: '找到 {count} 个工具。',
   categories: '工具分类', open: '打开工具', count: '个工具', countSingular: '个工具',
 } : {
   frequent: 'Popular tools', search: 'Find a PDF tool', placeholder: 'Search merge, compress, watermark, image…',
-  clear: 'Clear', noResults: 'No tools match that search. Try a different term.',
+  clear: 'Clear', noResults: 'No tools match that search. Try a different term.', results: '{count} matching tools.',
   categories: 'Tool categories', open: 'Open tool', count: 'tools', countSingular: 'tool',
 };
 const title = zh ? '免费 PDF 合并、拆分、转换及页面整理工具 - PlainMile' : 'Free PDF Merge, Split, Convert and Page Organizer - PlainMile';
@@ -60,7 +60,8 @@ const desc = zh
         <input id="tool-search" type="search" data-tool-search autocomplete="off" placeholder={labels.placeholder} />
         <button type="button" data-tool-clear>{labels.clear}</button>
       </div>
-      <p class="tool-empty" data-tool-empty role="status" hidden>{labels.noResults}</p>
+      <p class="tool-empty" data-tool-empty hidden>{labels.noResults}</p>
+      <p class="tool-search-status" data-tool-results role="status" aria-live="polite" aria-atomic="true" hidden></p>
     </div>
     <nav class="category-jump" data-category-jump aria-label={labels.categories}>
       {toolGroups.map((group) => <a data-category-link href={'#group-' + group.id}>{zh ? group.zh : group.en}</a>)}
@@ -98,7 +99,8 @@ const desc = zh
       const catalog = document.querySelector('[data-tool-catalog]');
       const clear = document.querySelector('[data-tool-clear]');
       const empty = document.querySelector('[data-tool-empty]');
-      if (!search || !catalog || !clear || !empty) return;
+      const results = document.querySelector('[data-tool-results]');
+      if (!search || !catalog || !clear || !empty || !results) return;
       const cards = [...catalog.querySelectorAll('[data-tool-card]')];
       const groups = [...catalog.querySelectorAll('[data-tool-group]')];
       const categoryNav = document.querySelector('[data-category-jump]');
@@ -131,6 +133,10 @@ const desc = zh
         }
         if (categoryNav) categoryNav.hidden = visibleGroups === 0;
         empty.hidden = matches !== 0;
+        // Do not announce all tools on initial load; only actual searches.
+        // One atomic live region conveys either the match count or no-results.
+        results.hidden = !query;
+        results.textContent = query ? (matches === 0 ? labels.noResults : labels.results.replace('{count}', String(matches))) : '';
         clear.disabled = !query;
       };
       search.addEventListener('input', update);
