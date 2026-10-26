@@ -162,6 +162,12 @@ test('split progress has useful bilingual crawlable SSR content and accurate app
       ? 'ZIP 打包另行显示'
       : 'ZIP packaging is displayed separately');
     expect(html, path).toContain(locale === 'zh' ? '/zh/extract-pages/' : '/extract-pages/');
+    expect(html, path).toContain(locale === 'zh'
+      ? '能按 PDF 的章节书签自动拆分吗？'
+      : 'Can I split a PDF at chapter bookmarks?');
+    expect(html, path).toContain(locale === 'zh'
+      ? '未改变原始页序'
+      : 'original order');
     expect(html, path).toContain('application/ld+json');
     expect(html, path).toContain('WebApplication');
     expect(html, path).toContain('BreadcrumbList');
