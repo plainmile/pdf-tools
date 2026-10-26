@@ -1310,7 +1310,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                         onChange={event => { setSelectionRanges(event.target.value); setError(""); setNotice(""); }} />
                     </label>
                     <button className="button button-secondary button-small" type="submit"
-                      data-testid="selection-range-apply" disabled={busy || !selectionRanges.trim()}>{t.rangeSelectApply}</button>
+                      data-testid="selection-range-apply" disabled={busy || !selectionRanges.trim() || invalidCombinedRange}>{t.rangeSelectApply}</button>
                     <p className="input-note">{t.rangeSelectHint}</p>
                     {mode === 'extract-pages' && <div className="range-combine-controls" data-testid="range-combine-controls">
                       <p className="input-note" id="range-combine-hint">{t.rangeCombineHint}</p>
