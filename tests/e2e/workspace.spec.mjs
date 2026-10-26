@@ -2157,7 +2157,7 @@ test('Chinese mobile bookmark level reports absent subchapters without overwriti
   await page.locator('#ranges-input').fill('2-3');
   await page.getByTestId('bookmark-level').selectOption('3');
   await page.getByTestId('bookmark-scan').click();
-  await expect(page.getByRole('alert')).toContainText('所选书签层级没有可用的章节拆分点');
+  await expect(page.locator('.notice-error')).toContainText('所选书签层级没有可用的章节拆分点');
   await expect(page.locator('#ranges-input')).toHaveValue('2-3');
   await expect(page.getByTestId('bookmark-apply')).toHaveCount(0);
   await page.getByTestId('bookmark-level').selectOption('1');
