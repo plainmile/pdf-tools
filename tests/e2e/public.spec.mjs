@@ -8,6 +8,25 @@ const slugs = ['', 'workspace/', 'merge-pdf/', 'split-pdf/', 'organize-pdf/',
  'rotate-pdf/', 'extract-pages/', 'delete-pages/', 'image-to-pdf/', 'watermark-pdf/', 'pdf-to-images/', 'compress-pdf/', 'pdf-to-txt/', 'pdf-to-markdown/', 'txt-to-pdf/', 'markdown-to-pdf/', 'add-page-numbers/', 'privacy/'];
 const indexablePaths = new Set(slugs.flatMap(slug => ['/' + slug, '/zh/' + slug]));
 
+test('bilingual split SEO explains real nested bookmark limits without duplicate routes', async ({ request }) => {
+  for (const [path, detail, warning] of [
+    ['/split-pdf/', 'bookmark level 1, 2 or 3', 'default filenames still use page ranges'],
+    ['/zh/split-pdf/', '第 1、2 或 3 级章节', '默认仍按页码命名'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(detail);
+    expect(html).toContain(warning);
+    expect(html).toContain('rel="canonical"');
+    expect(html).toContain('hreflang="en"');
+    expect(html).toContain('hreflang="zh-CN"');
+    // The unhydrated HTML must explain real capability and limitations,
+    // rather than relying on client-only selects for search content.
+    expect(html).toContain(path.startsWith('/zh/') ? '导出的 PDF 不保留原书签导航' : 'Exported PDFs do not retain the original clickable bookmarks');
+  }
+});
+
 test('live sitemap, robots, routes, PDF worker, 404', async ({ request }) => {
  const robots = await request.get('/robots.txt');
  expect(robots.status()).toBe(200);
