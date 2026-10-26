@@ -12,7 +12,7 @@ export const toolHelp = {
       ['Will merging upload private documents?', 'No. Files are processed locally in the browser and are not sent to a PDF conversion server.'],
     ],
     'split-pdf': [
-      ['Can I split a PDF into custom page ranges?', 'Yes. Enter ranges such as 1-3, 4-6; each range generates a separate PDF. For one combined PDF, use Extract PDF Pages and enter ranges in the desired combined order.'],
+      ['Can I split a PDF into custom page ranges?', 'Yes. Enter ranges such as 1-3, 4-6; each range generates a separate PDF. Type 15- to include page 15 through the final PDF page (an omitted start such as -15 is not accepted). For one combined PDF, use Extract PDF Pages and enter ranges in the desired combined order.'],
       ['Can I split odd and even pages into two PDFs?', 'Yes. Choose Split into odd-page and even-page PDFs to get two PDFs in one ZIP. Odd and even refer to the current export page order, not the original scanned page numbers.'],
       ['Can I split a PDF by chapters or subchapters?', 'Yes. For one PDF in its complete original page order, choose bookmark level 1, 2 or 3 and preview the exact chapter boundaries before applying. Up to 50 output PDFs are supported; missing levels or invalid destinations do not invent chapters. You can optionally add sanitized chapter titles to ZIP filenames, but this is off by default. Exported PDFs do not retain the original clickable bookmarks.'],
       ['Can I choose split points by looking at the pages?', 'Yes. Expand Choose split points by clicking pages, then click Cut after this page under a preview. Click again to remove a cut. It uses your current page order; manually entered custom ranges are protected from accidental replacement.'],
@@ -30,7 +30,7 @@ export const toolHelp = {
       ['Does rotating reduce image resolution?', 'Page rotation changes the PDF page orientation without intentionally converting its content to images. Always check important exports.'],
     ],
     'extract-pages': [
-      ['Can I take selected pages out of a long document?', 'Yes. Tick thumbnails to extract in workspace order, or enter ranges such as 3, 1-2 and choose Export ranges as one PDF to combine them in the typed order.'],
+      ['Can I take selected pages out of a long document?', 'Yes. Tick thumbnails to extract in workspace order, or enter ranges such as 3, 1-2 and choose Export ranges as one PDF to combine them in the typed order. For all remaining pages, enter 15- to select page 15 through the final output page.'],
       ['Do extracted pages keep their order?', 'Checkbox extraction follows the current workspace order. Direct range export follows the order you type and ignores repeated/overlapping page numbers after their first occurrence. Invalid or reversed ranges are flagged before download and cannot be exported. Neither changes the original PDF.'],
     ],
     'delete-pages': [
@@ -42,7 +42,7 @@ export const toolHelp = {
       ['Can I add Chinese text as a watermark?', 'Yes. Custom Chinese and English text is rendered locally onto exported PDF pages.'],
     ],
     'pdf-to-images': [
-      ['Can I export pages 301 to 360 from a book?', 'Yes. Open a PDF of up to 1,000 pages and choose a page range. You can export up to 60 images per batch. Invalid, reversed and oversized selections are shown before conversion rather than starting an unusable export.'],
+      ['Can I export pages 301 to 360 from a book?', 'Yes. Open a PDF of up to 1,000 pages and choose a page range. Type 301- for page 301 through the end, provided it selects no more than 60 pages; larger selections require smaller batches. You can export up to 60 images per batch. Invalid, reversed and oversized selections are shown before conversion rather than starting an unusable export.'],
       ['Does PNG or JPG keep selectable text?', 'No. PNG and JPG are images of the rendered pages, so their text cannot be selected as PDF text.'],
       ['Do repeated or overlapping page ranges export a page twice?', 'No. Each PDF page is rendered once in the order it first appears in your selection. The ZIP name reflects the pages actually exported; non-ascending output files use order-number prefixes.'],
       ['Does this extract the original photos embedded inside a PDF?', 'No. This converts whole PDF pages into new JPG or PNG images, including any text or graphics on those pages. It does not separately extract embedded photos or preserve their original image data.'],
@@ -93,7 +93,7 @@ export const toolHelp = {
       ['合并时会上传合同等隐私文件吗？', '不会。文件直接在您的浏览器中处理，不上传到转换服务器。'],
     ],
     'split-pdf': [
-      ['可以按自定义范围拆分吗？', '可以。输入 1-3、4-6 这样的页码范围，每个范围单独生成一份 PDF；需要合并成一份 PDF 时请使用「提取 PDF 页面」，直接按所需顺序输入页码范围。'],
+      ['可以按自定义范围拆分吗？', '可以。输入 1-3、4-6 这样的页码范围，每个范围单独生成一份 PDF；输入 15- 表示从第 15 页一直到文档末页（不支持省略起点的 -15）。需要合并成一份 PDF 时请使用「提取 PDF 页面」，直接按所需顺序输入页码范围。'],
       ['能把奇数页、偶数页分别保存吗？', '可以。选择「按奇偶页分别生成 PDF」，会把当前页序的奇数位、偶数位页面分别生成两份 PDF，并打包为一个 ZIP；不是依据原文件印刷页码。'],
       ['能按 PDF 的章节和子章节书签拆分吗？', '可以，前提是单份 PDF 保留了完整原始页序并且带有内置书签。选择第 1、2 或 3 级书签，先预览并确认；不存在的层级不会虚构拆分点，单次最多 50 份。ZIP 文件名可主动选择使用经过清理的章节标题，默认关闭。导出的 PDF 不保留原书签导航，也不能通过扫描文字识别章节。'],
       ['可以看着页面缩略图选择拆分位置吗？', '可以。展开「按页面预览设置拆分点」，在缩略图下选择「在此页后拆分」，再次点击可取消。拆分按当前页面顺序进行；手工指定的特殊范围不会被意外覆盖。'],
@@ -111,7 +111,7 @@ export const toolHelp = {
       ['旋转会降低清晰度吗？', '旋转修改的是 PDF 页面的方向，并不会刻意将页面图片化。重要文档仍建议检查导出结果。'],
     ],
     'extract-pages': [
-      ['如何从一本长 PDF 中抽出指定页？', '可以勾选缩略图并提取，也可以输入 3，1－2 等多个页码范围，直接按输入顺序合并为一份 PDF 下载。'],
+      ['如何从一本长 PDF 中抽出指定页？', '可以勾选缩略图并提取，也可以输入 3，1－2 等多个页码范围，直接按输入顺序合并为一份 PDF 下载。输入 15- 表示选取当前导出页序的第 15 页直到最后一页。'],
       ['提取出的页面顺序如何确定？', '勾选后提取按工作台当前页序；直接按范围合并则使用输入顺序，重复或重叠页码只保留首次出现的页面。倒序或越界的范围会在导出前提示，不能直接下载。不会改动原始 PDF。'],
     ],
     'delete-pages': [
@@ -123,7 +123,7 @@ export const toolHelp = {
       ['支持中文水印吗？', '支持。中英文自定义文字会在浏览器本地绘制到导出的 PDF 页面。'],
     ],
     'pdf-to-images': [
-      ['可以把一本书的第 301 至 360 页导出为图片吗？', '可以。支持打开最多 1000 页的 PDF，每次选择并导出最多 60 页图片。范围反向、页码越界或一次选择超过 60 页时，会在转换前提示修改。'],
+      ['可以把一本书的第 301 至 360 页导出为图片吗？', '可以。支持打开最多 1000 页的 PDF。输入 301- 可选择第 301 页至文档末页，但如果超过每批 60 张图片的限制，仍需分批导出。范围反向、页码越界或一次选择超过 60 页时，会在转换前提示修改。'],
       ['转换成 PNG 或 JPG 后还能复制文字吗？', '不能。PNG 和 JPG 是页面的图片，不包含原 PDF 的可选择文字。'],
       ['页码范围重复或重叠，会导出重复图片吗？', '不会。同一 PDF 页面只在首次出现的位置导出一次，并保留自定义顺序。ZIP 名称对应实际导出的页面；倒序或交错的图片文件名前会加顺序前缀。'],
       ['能从 PDF 中单独提取原始照片吗？', '不能。这里是把整个 PDF 页面重新渲染为 JPG 或 PNG，包含页面上的文字和图形；并非单独提取 PDF 内嵌照片，也不保留原始图片数据。'],
