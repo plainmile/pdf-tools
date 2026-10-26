@@ -1304,7 +1304,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <form className="selection-range-form" onSubmit={applyPageRangeSelection}>
                     <label htmlFor="selection-ranges">{t.rangeSelectLabel}
                       <input id="selection-ranges" data-testid="selection-ranges" type="text"
-                        placeholder="1-3, 5, 8-12" value={selectionRanges} disabled={busy}
+                        placeholder="1-3, 5, 8-" value={selectionRanges} disabled={busy}
                         aria-invalid={invalidCombinedRange ? "true" : undefined}
                         aria-describedby={mode === "extract-pages" ? "range-combine-hint" : undefined}
                         onChange={event => { setSelectionRanges(event.target.value); setError(""); setNotice(""); }} />
@@ -1520,7 +1520,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                 <div className="split-fields">
                   <label className="option-radio"><input type="radio" name="split-method" checked={splitMode === 'ranges'} disabled={busy} onChange={() => { setSplitMode('ranges'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); }} />{t.byRanges}</label>
                   <label className="input-label" htmlFor="ranges-input">{t.pageRanges}</label>
-                  <input id="ranges-input" value={ranges} onChange={(event) => { setRanges(event.target.value); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); }} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7" />
+                  <input id="ranges-input" value={ranges} onChange={(event) => { setRanges(event.target.value); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); }} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7-" />
                   <p className="input-note">{t.rangeHint}</p>
                   <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); }} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>

@@ -211,13 +211,18 @@ export function parsePageRanges(input, pageCount, maxRanges = 50) {
     .replace(/[\uFF0C\u3001\uFF1B;]/g, ',')
     .replace(/[\u2010-\u2015\u2212]/g, '-');
   const parts = normalized.split(',').map((part) => part.trim());
-  if (!parts.length || parts.some((part) => !part)) throw new Error('Use a range such as 1-3, 4-6.');
+  if (!parts.length || parts.some((part) => !part)) throw new Error('Use a range such as 1-3, 4-6 or 15-.');
   if (parts.length > maxRanges) throw new Error(`A maximum of ${maxRanges} ranges is supported.`);
   return parts.map((part) => {
-    const match = /^(\d+)(?:\s*-\s*(\d+))?$/.exec(part);
+    // The trailing dash is a deliberate "through the final page" marker,
+    // common in book-length PDFs: 15- means 15 through pageCount. Reject
+    // end-only/negative ranges, multiple dashes and reversed/out-of-bounds
+    // positions exactly as before. Keep all returned ranges fully resolved
+    // so split, selection, extract and image ZIP outputs share one meaning.
+    const match = /^(\d+)(?:\s*-\s*(\d*))?$/.exec(part);
     if (!match) throw new Error(`Invalid page range: ${part}`);
     const start = Number(match[1]);
-    const end = match[2] ? Number(match[2]) : start;
+    const end = match[2] === undefined ? start : match[2] === '' ? pageCount : Number(match[2]);
     if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1 || end < start || end > pageCount) {
       throw new Error(`Range ${part} is outside pages 1-${pageCount}, or reversed.`);
     }

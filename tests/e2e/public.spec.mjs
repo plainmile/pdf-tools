@@ -57,6 +57,28 @@ test('bilingual image export SEO explains real range behavior and whole-page ren
   }
 });
 
+test('six bilingual PDF routes explain the real trailing-dash range semantics without JS', async ({ request }) => {
+  for (const [path, wording] of [
+    ['/split-pdf/', 'Type 15- to include page 15 through the final PDF page'],
+    ['/zh/split-pdf/', '输入 15- 表示从第 15 页一直到文档末页'],
+    ['/extract-pages/', 'For all remaining pages, enter 15-'],
+    ['/zh/extract-pages/', '输入 15- 表示选取当前导出页序的第 15 页直到最后一页'],
+    ['/pdf-to-images/', 'Type 301- for page 301 through the end'],
+    ['/zh/pdf-to-images/', '输入 301- 可选择第 301 页至文档末页'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    expect(html, path).toContain(wording);
+    expect(html, path).toContain('rel="canonical"');
+    expect(html, path).toContain('hreflang="en"');
+    expect(html, path).toContain('hreflang="zh-CN"');
+    expect(html, path).toContain('hreflang="x-default"');
+    // These are visible how-to answers, not unsupported FAQ rich-result claims.
+    expect(html).not.toContain('"@type":"FAQPage"');
+  }
+});
+
 test('both numbering pages explain real output bounds in prerendered SEO content', async ({ request }) => {
   for (const [path, wording] of [
     ['/add-page-numbers/', 'final printed page number would exceed 99999'],
