@@ -41,6 +41,8 @@ test('live sitemap, robots, routes, PDF worker, 404', async ({ request }) => {
  expect(missingHtml).not.toMatch(/rel="canonical"|hreflang="(?:en|zh-CN|x-default)"/);
  expect(missingHtml).not.toContain('/zh/404');
  expect(missingHtml).toContain('Back to PDF tools');
+ expect(missingHtml).toContain('href="/zh/"');
+ expect(missingHtml).toContain('返回中文工具首页');
 });
 
 test('SEO and AI answer-readiness audit of 36 live URLs', async ({ page }) => {
