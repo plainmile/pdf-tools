@@ -353,6 +353,7 @@ test('Chinese 375px direct range export accepts fullwidth input and rejects reve
   await expect(page.getByTestId('selection-ranges')).toHaveAttribute('aria-invalid', 'true');
   await expect(page.getByTestId('range-combine-invalid')).toContainText('选择页码无效');
   await expect(page.getByTestId('range-combine-download')).toBeDisabled();
+  await expect(page.getByTestId('selection-range-apply')).toBeDisabled();
   expect(downloads).toEqual([]);
   // Correcting the plan immediately restores the actionable export control.
   await page.getByTestId('selection-ranges').fill('2-4');
