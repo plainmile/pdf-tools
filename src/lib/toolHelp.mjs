@@ -44,6 +44,8 @@ export const toolHelp = {
     'pdf-to-images': [
       ['Can I export pages 301 to 360 from a book?', 'Yes. Open a PDF of up to 1,000 pages and choose a page range. You can export up to 60 images per batch. Invalid, reversed and oversized selections are shown before conversion rather than starting an unusable export.'],
       ['Does PNG or JPG keep selectable text?', 'No. PNG and JPG are images of the rendered pages, so their text cannot be selected as PDF text.'],
+      ['Do repeated or overlapping page ranges export a page twice?', 'No. Each PDF page is rendered once in the order it first appears in your selection. The ZIP name reflects the pages actually exported; non-ascending output files use order-number prefixes.'],
+      ['Does this extract the original photos embedded inside a PDF?', 'No. This converts whole PDF pages into new JPG or PNG images, including any text or graphics on those pages. It does not separately extract embedded photos or preserve their original image data.'],
     ],
     'compress-pdf': [
       ['Will compressed pages still contain selectable text?', 'No. This tool re-renders pages as JPEG images; searchable text, clickable links, forms and signatures may be lost. Keep your original PDF.'],
@@ -123,6 +125,8 @@ export const toolHelp = {
     'pdf-to-images': [
       ['可以把一本书的第 301 至 360 页导出为图片吗？', '可以。支持打开最多 1000 页的 PDF，每次选择并导出最多 60 页图片。范围反向、页码越界或一次选择超过 60 页时，会在转换前提示修改。'],
       ['转换成 PNG 或 JPG 后还能复制文字吗？', '不能。PNG 和 JPG 是页面的图片，不包含原 PDF 的可选择文字。'],
+      ['页码范围重复或重叠，会导出重复图片吗？', '不会。同一 PDF 页面只在首次出现的位置导出一次，并保留自定义顺序。ZIP 名称对应实际导出的页面；倒序或交错的图片文件名前会加顺序前缀。'],
+      ['能从 PDF 中单独提取原始照片吗？', '不能。这里是把整个 PDF 页面重新渲染为 JPG 或 PNG，包含页面上的文字和图形；并非单独提取 PDF 内嵌照片，也不保留原始图片数据。'],
     ],
     'compress-pdf': [
       ['压缩后的 PDF 还能搜索和复制文字吗？', '不能保证。当前压缩会将页面重新渲染为 JPEG 图片，可能丢失可搜索文本、链接、表单和签名。请保留原文件。'],

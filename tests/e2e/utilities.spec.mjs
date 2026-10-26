@@ -114,6 +114,41 @@ test('PDF-to-images prevents reversed/out-of-bounds ranges before conversion and
   }
 });
 
+test('PDF-to-images overlapping ranges produce unique images and truthful ZIP names in both languages', async ({ page }) => {
+  await page.goto('/pdf-to-images/');
+  await upload(page, await fixturePdf('Unique image pages', 8));
+  const range = page.getByTestId('utility-page-ranges');
+  const convert = page.getByTestId('utility-run');
+  await expect(page.locator('.utility-helper')).toContainText('Repeated or overlapping page numbers are exported only once.');
+  await range.fill('1-3,2-4');
+  const first = await getDownload(page, () => convert.click(), 30000);
+  expect(first.name).toMatch(/fixture-pages-1-3_4\.zip$/);
+  const firstZip = await JSZip.loadAsync(first.bytes);
+  expect(Object.keys(firstZip.files).sort()).toEqual([
+    'page-001.jpg', 'page-002.jpg', 'page-003.jpg', 'page-004.jpg',
+  ]);
+
+  // First-appearance order is respected, including a repeated leading page.
+  await range.fill('3,1-2,3');
+  const second = await getDownload(page, () => convert.click(), 30000);
+  expect(second.name).toMatch(/fixture-pages-3_1-2\.zip$/);
+  const secondZip = await JSZip.loadAsync(second.bytes);
+  expect(Object.keys(secondZip.files).sort()).toEqual([
+    'order-001-page-003.jpg', 'order-002-page-001.jpg', 'order-003-page-002.jpg',
+  ]);
+
+  await page.goto('/zh/pdf-to-images/');
+  await upload(page, await fixturePdf('Chinese dedup', 5));
+  await expect(page.locator('.utility-helper')).toContainText('重复或重叠页码只导出一次');
+  await page.getByTestId('utility-page-ranges').fill('２－３，３－４');
+  const localized = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+  expect(localized.name).toMatch(/fixture-pages-2-3_4\.zip$/);
+  const zhZip = await JSZip.loadAsync(localized.bytes);
+  expect(Object.keys(zhZip.files).sort()).toEqual([
+    'page-002.jpg', 'page-003.jpg', 'page-004.jpg',
+  ]);
+});
+
 test('Chinese book-length PDF image selection blocks >60 pages and blank all-pages export', async ({ page }) => {
   await page.goto('/zh/pdf-to-images/');
   await upload(page, await fixturePdf('65 pages', 65));
