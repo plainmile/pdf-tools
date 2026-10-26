@@ -209,7 +209,11 @@ jobs:
       # Reuse the SAME GitHub-hosted Runner after a successful netcup deployment,
       # so a separate public E2E workflow does not consume another Runner job.
       - name: Public browser E2E and SEO against deployed site
-        timeout-minutes: 10
+        # Public HTTPS can have transient worker or navigation failures. Retry
+        # individual failed tests once in a fresh browser context, but retain
+        # the exact same full document/SEO regression suite and fail closed if
+        # the retry also fails. A normal full suite takes close to ten minutes.
+        timeout-minutes: 15
         run: |
           set -euo pipefail
           mkdir -p /tmp/plainmile-public-e2e
