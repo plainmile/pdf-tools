@@ -195,7 +195,11 @@ test('JavaScript-disabled PDF tools give a useful bilingual fallback without hid
       ? '请启用 JavaScript 后刷新页面'
       : 'Enable JavaScript and reload this page');
     await expect(noJsPage.locator('main h1'), path).toHaveCount(1);
-    await expect(noJsPage.locator('main'), path).toContainText(locale === 'zh' ? '文件不会上传服务器' : 'Your documents are not uploaded');
+    // Chromium's innerText for a parent can omit <noscript> text even when
+    // the noscript child is visibly rendered. Assert on the visible element.
+    await expect(message, path).toContainText(locale === 'zh'
+      ? '文件不会上传服务器' : 'Your documents are not uploaded');
+    await expect(noJsPage.locator('.tool-explanation'), path).toBeVisible();
    }
   }
  } finally { await context.close(); }
