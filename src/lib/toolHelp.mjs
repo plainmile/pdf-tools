@@ -12,7 +12,7 @@ export const toolHelp = {
       ['Will merging upload private documents?', 'No. Files are processed locally in the browser and are not sent to a PDF conversion server.'],
     ],
     'split-pdf': [
-      ['Can I split a PDF into custom page ranges?', 'Yes. Enter ranges such as 1-3, 4-6; each range generates a separate PDF. For one combined PDF, use Extract PDF Pages and select the pages to keep.'],
+      ['Can I split a PDF into custom page ranges?', 'Yes. Enter ranges such as 1-3, 4-6; each range generates a separate PDF. For one combined PDF, use Extract PDF Pages and enter ranges in the desired combined order.'],
       ['Can I split odd and even pages into two PDFs?', 'Yes. Choose Split into odd-page and even-page PDFs to get two PDFs in one ZIP. Odd and even refer to the current export page order, not the original scanned page numbers.'],
       ['Can I split a PDF by chapters or subchapters?', 'Yes. For one PDF in its complete original page order, choose bookmark level 1, 2 or 3 and preview the exact chapter boundaries before applying. Up to 50 output PDFs are supported; missing levels or invalid destinations do not invent chapters. You can optionally add sanitized chapter titles to ZIP filenames, but this is off by default. Exported PDFs do not retain the original clickable bookmarks.'],
       ['Can I choose split points by looking at the pages?', 'Yes. Expand Choose split points by clicking pages, then click Cut after this page under a preview. Click again to remove a cut. It uses your current page order; manually entered custom ranges are protected from accidental replacement.'],
