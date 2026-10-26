@@ -235,6 +235,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setBookmarkReplaceConfirm(false);
     setAppliedBookmarkPlan(null);
     setBookmarkUseTitles(false);
+    setBookmarkLevel(1);
   }, [bookmarkSourceKey]);
   const pristineOutput = pages.length > 0 && Boolean(pristinePdfBytes(sources, pages, watermark));
   // Only a full Export PDF marks these particular edits as safely downloaded.
@@ -971,7 +972,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setPageView('order'); setCollapsedSources(new Set());
     setLastDownloadedRevision(null);
     setRanges(''); setChunkSize(''); setSplitBatchIndex(0); setSplitMode('ranges'); setSplitVisualJumpInput(''); setPendingVisualCut(null);
-    setBookmarkDraft(null); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); setBookmarkReplaceConfirm(false);
+    setBookmarkDraft(null); setBookmarkLevel(1); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); setBookmarkReplaceConfirm(false);
     setSelectionRanges(''); setMoveTargetInput(''); setMovePlacement('before'); setDownloadNameInput(''); setJumpInput(''); setPendingJump(null);
     // A fresh image-to-PDF workspace must not inherit a previous crop choice.
     setImageLayout({ ...IMAGE_PDF_LAYOUT_DEFAULT });
@@ -1479,7 +1480,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <label className="input-label" htmlFor="ranges-input">{t.pageRanges}</label>
                   <input id="ranges-input" value={ranges} onChange={(event) => { setRanges(event.target.value); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); }} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7" />
                   <p className="input-note">{t.rangeHint}</p>
-                  <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); }} />{t.every}</label>
+                  <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); }} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
                   <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} placeholder="5"
                     onChange={(event) => { setChunkSize(event.target.value); setSplitBatchIndex(0); }}
@@ -1488,7 +1489,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     <button type="button" className="button button-secondary button-small"
                       data-testid="split-each-page" aria-pressed={splitMode === 'chunks' && Number(chunkSize) === 1}
                       disabled={busy}
-                      onClick={() => { setSplitMode('chunks'); setChunkSize('1'); setSplitBatchIndex(0); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setError(''); setNotice(''); }}>
+                      onClick={() => { setSplitMode('chunks'); setChunkSize('1'); setSplitBatchIndex(0); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); setError(''); setNotice(''); }}>
                       {t.eachPagePreset}
                     </button>
                     {pages.length > 50 && <p className="input-note" data-testid="split-each-page-limit">
@@ -1530,7 +1531,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <label className="option-radio option-divider">
                     <input type="radio" name="split-method" value="parity" checked={splitMode === 'parity'}
                       disabled={busy || pages.length < 2}
-                      onChange={() => { setSplitMode('parity'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setError(''); setNotice(''); }} />
+                      onChange={() => { setSplitMode('parity'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); setError(''); setNotice(''); }} />
                     {t.byOddEven}
                   </label>
                   <p className="input-note" data-testid="split-odd-even-hint">{t.oddEvenHint}</p>
