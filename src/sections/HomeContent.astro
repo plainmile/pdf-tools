@@ -136,7 +136,7 @@ const desc = zh
         // Do not announce all tools on initial load; only actual searches.
         // One atomic live region conveys either the match count or no-results.
         results.hidden = !query;
-        results.textContent = query ? (matches === 0 ? labels.noResults : labels.results.replace('{count}', String(matches))) : '';
+        results.textContent = query ? labels.results.replace('{count}', String(matches)) : '';
         clear.disabled = !query;
       };
       search.addEventListener('input', update);
