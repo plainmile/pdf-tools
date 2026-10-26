@@ -305,8 +305,16 @@ test('multiple typed ranges export one real PDF in typed order without replacing
   ]);
   await expect(page.getByTestId('page-tile')).toHaveCount(5);
   await page.getByRole('checkbox', { name: 'Select page 4' }).check();
-  await page.getByTestId('selection-range-panel').locator('summary').click();
+  const rangePanel = page.getByTestId('selection-range-panel');
+  await expect(rangePanel).toHaveAttribute('open', ''); // Main task must be discoverable on Extract.
+  await expect(page.getByTestId('range-combine-download')).toBeDisabled();
+  // Users can still hide and reveal the advanced range section.
+  await rangePanel.locator('summary').click();
+  await expect(rangePanel).not.toHaveAttribute('open');
+  await rangePanel.locator('summary').click();
+  await expect(rangePanel).toHaveAttribute('open', '');
   await page.getByTestId('selection-ranges').fill('5, 2-3, 5, 1');
+  await expect(page.getByTestId('range-combine-download')).toBeEnabled();
   const preview = page.getByTestId('range-combine-preview');
   await expect(preview).toContainText('4 page(s) in this PDF');
   await expect(preview).toContainText('5, 2, 3, 1');
@@ -331,7 +339,7 @@ test('Chinese 375px direct range export accepts fullwidth input and rejects reve
     name: '书页.pdf', mimeType: 'application/pdf', buffer: await makePdf([301, 302, 303, 304, 305]),
   });
   await expect(page.getByTestId('page-tile')).toHaveCount(5);
-  await page.getByTestId('selection-range-panel').locator('summary').click();
+  await expect(page.getByTestId('selection-range-panel')).toHaveAttribute('open', '');
   await page.getByTestId('selection-ranges').fill('５，１－２，５');
   await expect(page.getByTestId('range-combine-preview')).toContainText('5, 1, 2');
   const saved = await captured(page, () => page.getByTestId('range-combine-download').click());
@@ -342,11 +350,17 @@ test('Chinese 375px direct range export accepts fullwidth input and rejects reve
   page.on('download', item => downloads.push(item.suggestedFilename()));
   await page.getByTestId('selection-ranges').fill('５－２');
   await expect(page.getByTestId('range-combine-preview')).toHaveCount(0);
-  await page.getByTestId('range-combine-download').click();
-  await expect(page.getByRole('alert')).toContainText('选择页码无效');
+  await expect(page.getByTestId('selection-ranges')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByTestId('range-combine-invalid')).toContainText('选择页码无效');
+  await expect(page.getByTestId('range-combine-download')).toBeDisabled();
   expect(downloads).toEqual([]);
+  // Correcting the plan immediately restores the actionable export control.
+  await page.getByTestId('selection-ranges').fill('2-4');
+  await expect(page.getByTestId('range-combine-invalid')).toHaveCount(0);
+  await expect(page.getByTestId('selection-ranges')).not.toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByTestId('range-combine-download')).toBeEnabled();
   await expect(page.getByTestId('page-tile')).toHaveCount(5);
-  await expect(page.getByTestId('selection-ranges')).toHaveValue('５－２');
+  await expect(page.getByTestId('selection-ranges')).toHaveValue('2-4');
   const sizes = await page.evaluate(() => ({
     scroll: document.documentElement.scrollWidth,
     width: document.documentElement.clientWidth,
@@ -360,7 +374,7 @@ test('select pages by output ranges then extract real nonconsecutive pages', asy
     name: 'numbers.pdf', mimeType: 'application/pdf', buffer: await makePdf([301, 302, 303, 304, 305, 306]),
   });
   await expect(page.getByTestId('page-tile')).toHaveCount(6);
-  await page.getByTestId('selection-range-panel').locator('summary').click();
+  await expect(page.getByTestId('selection-range-panel')).toHaveAttribute('open', '');
   await page.getByTestId('selection-ranges').fill('2-3, 5, 5');
   await page.getByTestId('selection-range-apply').click();
   await expect(page.locator('.selection-info strong')).toHaveText('3 pages selected');
