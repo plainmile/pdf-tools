@@ -27,7 +27,13 @@ test('live sitemap, robots, routes, PDF worker, 404', async ({ request }) => {
   expect(allURLs).toContain(domain + '/zh/' + slug);
  }
  expect(new Set(allURLs).size, 'sitemap duplicate URLs').toBe(allURLs.length);
- expect(allURLs.some(url => /\/404(?:\/|$)/.test(url)), '404 must not appear in sitemap').toBe(false);
+ expect(allURLs.some(url => /\/404(?:\/|\.html|$)/.test(url)), '404 must not appear in sitemap').toBe(false);
+ expect(allURLs.length, 'sitemap must list only our 36 indexable EN/ZH pages').toBe(indexablePaths.size);
+ for (const url of allURLs) {
+  const address = new URL(url);
+  expect(address.origin, 'sitemap URL must use the official origin').toBe(domain);
+  expect(indexablePaths.has(address.pathname), 'unexpected sitemap URL: ' + url).toBe(true);
+ }
  const worker = await request.get('/pdfjs/pdf.worker.min.mjs');
  expect(worker.status()).toBe(200);
  expect(worker.headers()['content-type']).toMatch(/javascript/i);
