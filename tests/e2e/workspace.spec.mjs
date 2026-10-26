@@ -396,8 +396,11 @@ test('Chinese touch-width range selection uses export order and rejects reversed
   await page.getByTestId('selection-range-apply').click();
   await expect(page.locator('.selection-info strong')).toContainText('3 页已选中');
   await page.getByTestId('selection-ranges').fill('5-1');
-  await page.getByTestId('selection-range-apply').click();
-  await expect(page.getByRole('alert')).toContainText('选择页码无效');
+  // Invalid input is now blocked before Apply rather than relying on the
+  // user to click a doomed action; the previous checkbox selection survives.
+  await expect(page.getByTestId('selection-ranges')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByTestId('selection-range-invalid')).toContainText('原有选中页面未改变');
+  await expect(page.getByTestId('selection-range-apply')).toBeDisabled();
   await expect(page.locator('.selection-info strong')).toContainText('3 页已选中');
   await page.getByRole('button', { name: '删除页面' }).click();
   const saved = await downloadPdf(page, () => page.getByRole('button', { name: '导出 PDF' }).click());
