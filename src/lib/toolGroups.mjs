@@ -10,6 +10,31 @@ export const toolGroups = [
   { id: 'improve', en: 'Adjust and optimize', zh: '调整和优化 PDF',
     slugs: ['compress-pdf', 'watermark-pdf', 'add-page-numbers'] },
 ];
+
+/**
+ * On-site finder synonyms for tasks the existing pages actually support.
+ * Search hints are UI-only; never create thin alias routes or duplicate SEO
+ * landing pages for "JPG to PDF" versus the canonical Images to PDF tool.
+ */
+export const toolSearchAliases = Object.freeze({
+  'workspace': ['edit pdf pages', 'pdf page editor', '编辑pdf页面'],
+  'merge-pdf': ['combine pdf', 'join pdf', '合并pdf'],
+  'split-pdf': ['separate pdf', 'split pdf pages', '拆分pdf'],
+  'organize-pdf': ['rearrange pdf', 'reorder pdf', 'pdf排序'],
+  'rotate-pdf': ['rotate pdf pages', 'pdf旋转'],
+  'extract-pages': ['extract pdf pages', 'pdf提取页面'],
+  'delete-pages': ['remove pdf pages', 'pdf删除页面'],
+  'watermark-pdf': ['pdf watermark', 'pdf加水印'],
+  'pdf-to-images': ['pdf to jpg', 'pdf to jpeg', 'pdf to png', 'pdf to image', 'pdf to images', 'pdf转jpg', 'pdf转jpeg', 'pdf转png', 'pdf转图片'],
+  'compress-pdf': ['reduce pdf size', '压缩pdf'],
+  'pdf-to-txt': ['pdf to text', 'pdf to txt', 'pdf转txt', 'pdf转文字'],
+  'pdf-to-markdown': ['pdf to md', 'pdf to markdown', 'pdf转md'],
+  'txt-to-pdf': ['text to pdf', 'txt to pdf', 'txt转pdf'],
+  'markdown-to-pdf': ['md to pdf', 'markdown to pdf', 'md转pdf'],
+  'add-page-numbers': ['number pdf pages', 'page numbers', 'pdf页码', '添加页码'],
+  'image-to-pdf': ['jpg to pdf', 'jpeg to pdf', 'png to pdf', 'webp to pdf', 'bmp to pdf', 'avif to pdf', 'image to pdf', 'photo to pdf', '图片转pdf', '照片转pdf', 'jpg转pdf', 'png转pdf'],
+});
+
 export const featuredToolSlugs = ['merge-pdf', 'split-pdf', 'compress-pdf', 'pdf-to-images'];
 export const toolSymbols = {
   workspace: '▦', 'merge-pdf': '⇄', 'split-pdf': '↗',
