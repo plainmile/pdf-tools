@@ -587,6 +587,12 @@ test('PDF image ZIP filename labels preserve localized and nonconsecutive output
   assert.equal(imagePageSelectionLabel('３０１－３０６', 500), '301-306');
   assert.equal(imagePageSelectionLabel('２－３，５、７', 10), '2-3_5_7');
   assert.equal(imagePageSelectionLabel('3,1', 20), '3_1');
+  // ZIP names describe what was actually rendered, not duplicated input.
+  assert.equal(imagePageSelectionLabel('1-3,2-4', 8), '1-3_4');
+  assert.equal(imagePageSelectionLabel('3,1-2,3', 8), '3_1-2');
+  assert.equal(imagePageSelectionLabel('1-3,1-3', 8), '1-3');
+  assert.equal(imagePageSelectionLabel('２－３，３－４', 8), '2-3_4');
+  assert.equal(imagePageSelectionLabel('1,3,1-5', 8), '1_3_2_4-5');
   assert.equal(imagePageSelectionLabel('', 10), '');
   const longList = Array.from({ length: 60 }, (_, n) => n * 2 + 1).join(',');
   const label = imagePageSelectionLabel(longList, 125);
