@@ -105,7 +105,8 @@ const desc = zh
       const categoryLinks = new Map([...(categoryNav?.querySelectorAll('[data-category-link]') || [])]
         .map(link => [link.getAttribute('href')?.slice(1), link]));
       const update = () => {
-        const query = search.value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+        const query = search.value.normalize('NFKC').trim().replace(/\s+/g, ' ')
+          .replace(/\s*转\s*/g, '转').toLocaleLowerCase();
         let matches = 0;
         for (const card of cards) {
           const words = query.split(' ').filter(Boolean);
