@@ -6,6 +6,7 @@ const domain = 'https://pdf.plainmile.com';
 const screenshotDir = process.env.LIVE_SCREENSHOT_DIR || '';
 const slugs = ['', 'workspace/', 'merge-pdf/', 'split-pdf/', 'organize-pdf/',
  'rotate-pdf/', 'extract-pages/', 'delete-pages/', 'image-to-pdf/', 'watermark-pdf/', 'pdf-to-images/', 'compress-pdf/', 'pdf-to-txt/', 'pdf-to-markdown/', 'txt-to-pdf/', 'markdown-to-pdf/', 'add-page-numbers/', 'privacy/'];
+const indexablePaths = new Set(slugs.flatMap(slug => ['/' + slug, '/zh/' + slug]));
 
 test('live sitemap, robots, routes, PDF worker, 404', async ({ request }) => {
  const robots = await request.get('/robots.txt');
@@ -25,21 +26,37 @@ test('live sitemap, robots, routes, PDF worker, 404', async ({ request }) => {
   expect(allURLs).toContain(domain + '/' + slug);
   expect(allURLs).toContain(domain + '/zh/' + slug);
  }
+ expect(new Set(allURLs).size, 'sitemap duplicate URLs').toBe(allURLs.length);
+ expect(allURLs.some(url => /\/404(?:\/|$)/.test(url)), '404 must not appear in sitemap').toBe(false);
  const worker = await request.get('/pdfjs/pdf.worker.min.mjs');
  expect(worker.status()).toBe(200);
  expect(worker.headers()['content-type']).toMatch(/javascript/i);
  expect((await worker.body()).byteLength).toBeGreaterThan(100000);
- expect((await request.get('/__qa_missing_20261022_9485')).status()).toBe(404);
+ const missing = await request.get('/__qa_missing_20261022_9485');
+ expect(missing.status()).toBe(404);
+ const missingHtml = await missing.text();
+ expect(missingHtml).toMatch(/name="robots"\s+content="noindex, nofollow"/);
+ // No translated 404 exists at /zh/404; keep missing routes out of hreflang
+ // and canonical, and give visitors a bilingual link to the actual homepage.
+ expect(missingHtml).not.toMatch(/rel="canonical"|hreflang="(?:en|zh-CN|x-default)"/);
+ expect(missingHtml).not.toContain('/zh/404');
+ expect(missingHtml).toContain('Back to PDF tools');
 });
 
 test('SEO and AI answer-readiness audit of 36 live URLs', async ({ page }) => {
- const seenTitles = new Set(), audit = [];
+ const seenTitles = new Set(), seenDescriptions = new Set(), audit = [];
  for (const locale of ['en', 'zh']) {
   for (const slug of slugs) {
    const path = locale === 'zh' ? '/zh/' + slug : '/' + slug;
    const response = await page.goto(path, {waitUntil:'domcontentloaded'});
    expect(response?.status(), path).toBe(200);
-   const meta = await page.evaluate(() => ({
+   const meta = await page.evaluate(() => {
+    const schemas = [...document.querySelectorAll('script[type="application/ld+json"]')]
+      .flatMap(element => {
+       const data = JSON.parse(element.textContent || 'null');
+       return Array.isArray(data) ? data : [data];
+      }).filter(Boolean);
+    return {
     lang: document.documentElement.lang,
     title: document.title,
     description: document.querySelector('meta[name="description"]')?.content || '',
@@ -55,7 +72,17 @@ test('SEO and AI answer-readiness audit of 36 live URLs', async ({ page }) => {
     officialSiteHref: document.querySelector('footer a[data-official-site]')?.href || '',
     officialSiteRel: document.querySelector('footer a[data-official-site]')?.rel || '',
     officialSiteText: document.querySelector('footer a[data-official-site]')?.textContent?.trim() || '',
-   }));
+    schemas: schemas.map(schema => ({
+      type: schema['@type'], name: schema.name, description: schema.description,
+      url: schema.url, inLanguage: schema.inLanguage,
+      breadcrumbItems: schema.itemListElement?.map(entry => entry.item),
+    })),
+    localLinks: [...document.querySelectorAll('a[href]')]
+      .map(anchor => new URL(anchor.href))
+      .filter(link => link.origin === location.origin)
+      .map(link => link.pathname),
+    };
+   });
    expect(meta.lang,path).toBe(locale==='en'?'en':'zh-CN');
    expect(meta.title.length,path).toBeGreaterThan(15);
    expect(meta.description.length,path).toBeGreaterThan(locale === 'zh' ? 20 : 35);
@@ -70,14 +97,36 @@ test('SEO and AI answer-readiness audit of 36 live URLs', async ({ page }) => {
    expect(meta.officialSiteHref,path+' official project link').toBe(domain+'/');
    expect(meta.officialSiteText,path+' visible credit').toContain('pdf.plainmile.com');
    expect(meta.officialSiteRel,path+' template outbound link').toMatch(/\bnofollow\b/);
-   if (slug !== 'privacy/') expect(meta.jsonLdCount, path + ': structured data').toBeGreaterThan(0);
-   expect(seenTitles.has(meta.title), 'Duplicate: '+meta.title).toBe(false);
+   for (const localPath of meta.localLinks) {
+    expect(indexablePaths.has(localPath), path + ': broken internal link to ' + localPath).toBe(true);
+   }
+   expect(seenTitles.has(meta.title), 'Duplicate title: '+meta.title).toBe(false);
+   expect(seenDescriptions.has(meta.description), 'Duplicate description: '+meta.description).toBe(false);
    seenTitles.add(meta.title);
+   seenDescriptions.add(meta.description);
+   const expectedLanguage = locale === 'zh' ? 'zh-CN' : 'en';
+   const localHome = domain + (locale === 'zh' ? '/zh/' : '/');
+   if (slug === '') {
+    const site = meta.schemas.find(schema => schema.type === 'WebSite');
+    expect(site, path + ': WebSite schema').toBeTruthy();
+    expect(site.url).toBe(meta.canonical);
+    expect(site.inLanguage).toBe(expectedLanguage);
+   } else if (slug !== 'privacy/') {
+    const app = meta.schemas.find(schema => schema.type === 'WebApplication');
+    const crumbs = meta.schemas.find(schema => schema.type === 'BreadcrumbList');
+    expect(app, path + ': WebApplication schema').toBeTruthy();
+    expect(crumbs, path + ': BreadcrumbList schema').toBeTruthy();
+    expect(app.url).toBe(meta.canonical);
+    expect(app.inLanguage).toBe(expectedLanguage);
+    expect(app.description).toBe(meta.description);
+    expect(crumbs.breadcrumbItems).toEqual([localHome, meta.canonical]);
+   }
+   if (slug !== 'privacy/') expect(meta.jsonLdCount, path + ': structured data').toBeGreaterThan(0);
    audit.push({path,...meta});
   }
  }
  console.log('SEO_PUBLIC_AUDIT ' + JSON.stringify({
-  pages:audit.length,uniqueTitles:seenTitles.size,
+  pages:audit.length,uniqueTitles:seenTitles.size,uniqueDescriptions:seenDescriptions.size,
   pagesWithJsonLd:audit.filter(row=>row.jsonLdCount>0).length,
   note:'Structured data is optional. AEO/GEO indexing and citations cannot be guaranteed.'
  }));
