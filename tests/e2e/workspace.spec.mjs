@@ -2080,11 +2080,12 @@ test('bookmark split reads actual PDF outline, preserves manual ranges and expor
 test('bookmark split clearly handles no outline and provides Chinese local guidance', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/zh/split-pdf/');
-  await expect(page.locator('.split-intro')).toContainText('章节书签');
   await page.getByTestId('file-input').setInputFiles({
     name: 'no-outline.pdf', mimeType: 'application/pdf',
     buffer: await makePdf([300, 301, 302]),
   });
+  await expect(page.locator('.file-count')).toContainText('3 页');
+  await expect(page.locator('.split-intro')).toContainText('章节书签');
   await page.getByTestId('split-bookmark-panel').locator('summary').click();
   await expect(page.getByTestId('bookmark-scan')).toBeDisabled();
   await expect(page.getByTestId('bookmark-availability')).toContainText('需要一份含内置书签');
