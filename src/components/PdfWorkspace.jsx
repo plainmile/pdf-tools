@@ -412,8 +412,15 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     if (!bookmarkSource) throw new Error(t.bookmarkUnavailable);
     setBookmarkDraft(null);
     setBookmarkReplaceConfirm(false);
-    const document = await getPreviewDoc(bookmarkSource);
-    const outline = await document.getOutline();
+    let document;
+    let outline;
+    try {
+      document = await getPreviewDoc(bookmarkSource);
+      outline = await document.getOutline();
+    } catch (_invalidOutline) {
+      setError(t.bookmarkReadFailed);
+      return;
+    }
     if (!Array.isArray(outline) || !outline.length) {
       setError(t.bookmarkNoBreaks);
       return;
@@ -454,7 +461,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     try {
       previewRanges = splitRangesFromBookmarkStarts(starts, pages.length);
     } catch (_invalidOutline) {
-      setError(starts.length > 49 ? t.bookmarkTooMany : t.bookmarkNoBreaks);
+      const validUniqueBreaks = new Set(starts.filter(start => start > 1)).size;
+      setError(validUniqueBreaks >= 50 ? t.bookmarkTooMany : t.bookmarkNoBreaks);
       return;
     }
     const parts = parsePageRanges(previewRanges, pages.length);
@@ -1494,6 +1502,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     {bookmarkSource && bookmarkDraft?.sourceId === bookmarkSource.id && <>
                       <p className="utility-note" data-testid="bookmark-preview" role="status">
                         {interpolate(t.bookmarkFound, { files: bookmarkDraft.files, ignored: bookmarkDraft.ignored })}
+                      </p>
+                      <p className="utility-note bookmark-ranges-preview" data-testid="bookmark-ranges-preview">
+                        {t.bookmarkProposedRanges}: <code>{bookmarkDraft.ranges}</code>
                       </p>
                       <ol className="split-bookmark-examples">{bookmarkDraft.examples.map((item, index) =>
                         <li key={index}>{interpolate(t.bookmarkExample, { page: item.page })} — {item.title}</li>)}</ol>
