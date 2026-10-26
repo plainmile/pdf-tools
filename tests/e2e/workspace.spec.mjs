@@ -320,7 +320,7 @@ test('multiple typed ranges export one real PDF in typed order without replacing
   await expect(page.getByTestId('page-tile')).toHaveCount(5);
   const selected = await downloadPdf(page, () => page.getByRole('button', { name: 'Extract selected pages' }).click());
   expect(selected.getPages().map(p => p.getWidth())).toEqual([401]);
-  const whole = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  const whole = await downloadPdf(page, () => page.getByRole('button', { name: 'Export all pages' }).click());
   expect(whole.getPages().map(p => p.getWidth())).toEqual([301, 302, 303, 401, 500]);
 });
 
