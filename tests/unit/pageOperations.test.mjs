@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, parsePageRanges,
-  chunkPageRanges, splitChunkBatch, splitSinglePageBatch, oddEvenSplitParts, getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, commitHistory, makeHistoryState, undoHistory, redoHistory,
+  chunkPageRanges, splitChunkBatch, splitSinglePageBatch, oddEvenSplitParts, getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, splitRangesFromBookmarkStarts, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
   reversePages, sortPagesByFilename, interleaveDuplexPages, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges, pageIdsForParity, invertPageIdSelection,
 } from '../../src/lib/pageOperations.mjs';
@@ -120,6 +120,33 @@ test('split explicit ranges and preserve workspace page order', () => {
 
 test('split into fixed-size chunks', () => {
   assert.deepEqual(chunkPageRanges(7, 3), [{start:1,end:3},{start:4,end:6},{start:7,end:7}]);
+});
+
+test('bookmark destinations create complete chapter ranges with covers, duplicates and out-of-order starts', () => {
+  const asParts = (starts, count) => parsePageRanges(splitRangesFromBookmarkStarts(starts, count), count);
+  assert.deepEqual(asParts([8, 3, 3, 1, 12, 8], 15), [
+    { start: 1, end: 2 }, { start: 3, end: 7 },
+    { start: 8, end: 11 }, { start: 12, end: 15 },
+  ]);
+  assert.deepEqual(asParts([5], 8), [{ start: 1, end: 4 }, { start: 5, end: 8 }]);
+  assert.deepEqual(asParts([1, 4], 4), [{ start: 1, end: 3 }, { start: 4, end: 4 }]);
+  const book = asParts([1, 101, 201, 301, 401, 501], 600);
+  assert.equal(splitCoversAllPagesExactlyOnce(book, 600), true);
+  assert.equal(book.length, 6);
+  assert.equal(book[book.length - 1].end, 600);
+});
+
+test('bookmark splitting rejects malformed destinations and over 50 output chapters', () => {
+  for (const starts of [null, '3', [0, 3], [1.5], [NaN], [601], [1, '5'], []]) {
+    assert.throws(() => splitRangesFromBookmarkStarts(starts, 600));
+  }
+  for (const count of [0, 1, 601, NaN, 2.5]) {
+    assert.throws(() => splitRangesFromBookmarkStarts([2], count));
+  }
+  assert.throws(() => splitRangesFromBookmarkStarts([1], 600), /chapter breaks/);
+  assert.throws(() => splitRangesFromBookmarkStarts([1, 2], 600, 1), /Invalid/);
+  assert.throws(() => splitRangesFromBookmarkStarts(Array.from({ length: 51 }, (_, i) => i + 2), 600), /maximum/i);
+  assert.deepEqual(splitRangesFromBookmarkStarts([1, 51], 100), '1-50, 51-100');
 });
 
 test('odd/even split creates two complete disjoint PDFs in CURRENT output order', () => {
