@@ -186,10 +186,11 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const rangeInputPlan = useMemo(() => {
     if (!selectionRanges.trim() || !pages.length) return { invalid: false, positions: null };
     try {
-      const positions = mode === 'extract-pages'
-        ? pagePositionsForCombinedRanges(selectionRanges, pages.length)
-        : (parsePageRanges(selectionRanges, pages.length), null);
-      return { invalid: false, positions };
+      if (mode === 'extract-pages') {
+        return { invalid: false, positions: pagePositionsForCombinedRanges(selectionRanges, pages.length) };
+      }
+      parsePageRanges(selectionRanges, pages.length);
+      return { invalid: false, positions: null };
     } catch { return { invalid: true, positions: null }; }
   }, [mode, selectionRanges, pages.length]);
   const invalidSelectionRange = rangeInputPlan.invalid;
