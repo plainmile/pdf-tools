@@ -233,19 +233,37 @@ export function imageExportFilenames(selected, pageCount, format = 'jpg') {
   return filenames.map((name, index) => `order-${String(index + 1).padStart(3, '0')}-${name}`);
 }
 
-/** A deterministic ASCII download label for user-chosen page ranges, even
- * when the accepted input used Chinese punctuation or fullwidth digits.
- * Long noncontiguous lists get a truthful compact selection label.
+/** Deterministic ZIP label for the pages ACTUALLY exported. Keep each
+ * user's original range boundary and order, but omit repeated page positions:
+ * "1-3,2-4" exports 1,2,3,4 and labels its ZIP "1-3_4", never "1-3_2-4".
+ * The short-label fallback also counts unique output images, not requested
+ * positions. Do not change the established labels for non-overlapping inputs.
  */
 export function imagePageSelectionLabel(input, count) {
   if (!input?.trim()) return '';
   const ranges = parsePageRanges(input, count, UTILITY_LIMITS.maxImagePagesPerRun);
-  const label = ranges.map(({ start, end }) =>
+  const seen = new Set();
+  const segments = [];
+  for (const range of ranges) {
+    let first = null;
+    let last = null;
+    for (let page = range.start; page <= range.end; page++) {
+      if (seen.has(page)) {
+        if (first !== null) segments.push({ start: first, end: last });
+        first = last = null;
+        continue;
+      }
+      seen.add(page);
+      if (first === null) first = page;
+      last = page;
+    }
+    if (first !== null) segments.push({ start: first, end: last });
+  }
+  const label = segments.map(({ start, end }) =>
     start === end ? String(start) : `${start}-${end}`).join('_');
   if (label.length <= 45) return label;
-  const selected = requestedPages(input, count);
-  const first = selected[0], last = selected[selected.length - 1];
-  return `selection-first${first}-last${last}-${selected.length}pages`;
+  const selected = [...seen];
+  return `selection-first${selected[0]}-last${selected.at(-1)}-${selected.length}pages`;
 }
 
 /** Decode imported text without silently replacing damaged characters.
