@@ -28,6 +28,13 @@ const href = (path) => langPath(path, locale);
     {utilitySlugs.includes(tool.slug)
       ? <PdfUtility client:only="react" locale={locale} mode={tool.slug} />
       : <PdfWorkspace client:only="react" locale={locale} mode={tool.slug} />}
+    <noscript>
+      <p class="tool-js-required" data-testid="tool-js-required">
+        {locale === 'zh'
+          ? '此工具需要 JavaScript 才能在浏览器本地处理文件。请启用 JavaScript 后刷新页面；文件不会上传服务器。'
+          : 'This tool needs JavaScript to process files locally in your browser. Enable JavaScript and reload this page. Your documents are not uploaded.'}
+      </p>
+    </noscript>
   </section>
   <section class="site-container tool-explanation">
     <div class="explanation-intro">
