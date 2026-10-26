@@ -170,6 +170,27 @@ export function compressionStats(original, candidate) {
   if (!Number.isFinite(original) || original <= 0 || !Number.isFinite(candidate) || candidate <= 0) throw new Error('Invalid file sizes.');
   return { original, candidate, bytesSaved: Math.max(original - candidate, 0), percent: Math.round((1 - candidate / original) * 1000) / 10, smaller: candidate < original };
 }
+/**
+ * Fast, pure preflight for the page-numbering form. The actual PDF export
+ * independently validates these same bounds after parsing PDF bytes; keeping
+ * this check browser-local prevents a long book from starting an impossible
+ * conversion and preserves an existing generated preview.
+ *
+ * Returns a reason code instead of a translated string for bilingual UI.
+ * Empty number fields are invalid (Number('') would otherwise become 0).
+ */
+export function validateNumberingPlan(startInput, firstPageInput, pageCount) {
+  const start = Number(startInput);
+  const firstPage = Number(firstPageInput);
+  if (!String(startInput ?? '').trim() || !Number.isSafeInteger(start) ||
+      start < 1 || start > 99999) return 'start';
+  if (!Number.isSafeInteger(pageCount) || pageCount < 1 ||
+      !String(firstPageInput ?? '').trim() || !Number.isSafeInteger(firstPage) ||
+      firstPage < 1 || firstPage > pageCount) return 'first';
+  if (start + pageCount - firstPage > 99999) return 'overflow';
+  return null;
+}
+
 export function requestedPages(input, count) {
   if (!input || !input.trim()) return Array.from({ length: count }, (_, i) => i + 1);
   const output = [];
