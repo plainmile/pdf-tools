@@ -61,7 +61,7 @@ const desc = zh
         <button type="button" data-tool-clear>{labels.clear}</button>
       </div>
       <p class="tool-empty" data-tool-empty hidden>{labels.noResults}</p>
-      <p class="tool-search-status" data-tool-results role="status" aria-live="polite" aria-atomic="true" hidden></p>
+      <p class="tool-search-status" data-tool-results data-count-template={labels.results} role="status" aria-live="polite" aria-atomic="true" hidden></p>
     </div>
     <nav class="category-jump" data-category-jump aria-label={labels.categories}>
       {toolGroups.map((group) => <a data-category-link href={'#group-' + group.id}>{zh ? group.zh : group.en}</a>)}
@@ -136,7 +136,7 @@ const desc = zh
         // Do not announce all tools on initial load; only actual searches.
         // One atomic live region conveys either the match count or no-results.
         results.hidden = !query;
-        results.textContent = query ? labels.results.replace('{count}', String(matches)) : '';
+        results.textContent = query ? results.dataset.countTemplate.replace('{count}', String(matches)) : '';
         clear.disabled = !query;
       };
       search.addEventListener('input', update);
