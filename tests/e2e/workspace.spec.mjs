@@ -2077,6 +2077,55 @@ test('bookmark split reads actual PDF outline, preserves manual ranges and expor
   await expect(page.getByTestId('bookmark-preview')).toHaveCount(0);
 });
 
+test('bookmark overwrite confirmation is invalidated by newer edits or mode switches and preserves focus', async ({ page }) => {
+  const chapterPdf = await makeChapterBookmarkPdf(
+    [300, 301, 302, 303, 304, 305],
+    [['Intro', 0], ['Chapter One', 2], ['Chapter Two', 4]],
+  );
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'replace-safe.pdf', mimeType: 'application/pdf', buffer: chapterPdf,
+  });
+  await expect(page.locator('.file-count')).toContainText('6 pages');
+  await page.getByTestId('split-bookmark-panel').locator('summary').click();
+  await page.getByTestId('bookmark-scan').click();
+  await expect(page.getByTestId('bookmark-ranges-preview')).toContainText('1-2, 3-4, 5-6');
+
+  const ranges = page.locator('#ranges-input');
+  const confirm = page.getByTestId('bookmark-confirm');
+  await ranges.fill('1-2, 3-6');
+  await page.getByTestId('bookmark-apply').click();
+  await expect(confirm).toBeVisible();
+  await expect(confirm).toBeFocused();
+
+  // The user edits the custom plan AFTER the previous confirmation appeared.
+  // That confirmation must not remain armed for a different set of ranges.
+  await ranges.fill('1-4, 5-6');
+  await expect(confirm).toHaveCount(0);
+  await expect(ranges).toHaveValue('1-4, 5-6');
+
+  await page.getByTestId('bookmark-apply').click();
+  await expect(confirm).toBeFocused();
+  await page.getByTestId('bookmark-keep').click();
+  await expect(confirm).toHaveCount(0);
+  await expect(page.getByTestId('bookmark-apply')).toBeFocused();
+  await expect(ranges).toHaveValue('1-4, 5-6');
+
+  // Switching method must cancel an old confirmation too. Returning to
+  // manual ranges requires a fresh consent to overwrite the user's text.
+  await page.getByTestId('bookmark-apply').click();
+  await expect(confirm).toBeVisible();
+  await page.locator('input[name="split-method"]').nth(1).check();
+  await expect(confirm).toHaveCount(0);
+  await expect(ranges).toHaveValue('1-4, 5-6');
+  await page.locator('input[name="split-method"]').first().check();
+  await page.getByTestId('bookmark-apply').click();
+  await expect(confirm).toBeFocused();
+  await page.getByTestId('bookmark-confirm-replace').click();
+  await expect(ranges).toHaveValue('1-2, 3-4, 5-6');
+  await expect(ranges).toBeFocused();
+});
+
 test('bookmark split clearly handles no outline and provides Chinese local guidance', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/zh/split-pdf/');
