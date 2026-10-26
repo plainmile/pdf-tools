@@ -32,18 +32,28 @@ test('bilingual extract SEO explains the two real ways to create one PDF', async
   }
 });
 
-test('bilingual image export SEO accurately explains page-range validation', async ({ request }) => {
-  for (const [path, wording] of [
-    ['/pdf-to-images/', 'Invalid, reversed and oversized selections are shown before conversion'],
-    ['/zh/pdf-to-images/', '范围反向、页码越界或一次选择超过 60 页时'],
+test('bilingual image export SEO explains real range behavior and whole-page rendering', async ({ request }) => {
+  for (const [path, validation, distinction, deduplication] of [
+    ['/pdf-to-images/', 'Invalid, reversed and oversized selections are shown before conversion',
+      'Each whole PDF page is rendered into a new image, not extracted as an original embedded photo.',
+      'Each PDF page is rendered once in the order it first appears in your selection.'],
+    ['/zh/pdf-to-images/', '范围反向、页码越界或一次选择超过 60 页时',
+      '将整个 PDF 页面重新渲染为 JPG 或 PNG，不是提取 PDF 内嵌原始照片。',
+      '同一 PDF 页面只在首次出现的位置导出一次'],
   ]) {
     const response = await request.get(path);
     expect(response.status(), path).toBe(200);
     const html = await response.text();
-    expect(html, path).toContain(wording);
+    // All relevant explanations must be present in the server-rendered HTML
+    // without JS hydration; do not claim a separate embedded-photo tool exists.
+    for (const wording of [validation, distinction, deduplication]) {
+      expect(html, path).toContain(wording);
+    }
     expect(html).toContain('rel="canonical"');
     expect(html).toContain('hreflang="en"');
     expect(html).toContain('hreflang="zh-CN"');
+    expect(html).toContain('hreflang="x-default"');
+    expect(html).not.toContain('"@type":"FAQPage"');
   }
 });
 
