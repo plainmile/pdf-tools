@@ -297,6 +297,63 @@ test('keyboard-accessible move buttons change the actual exported page order', a
   expect(output.getPages().map((p) => p.getWidth())).toEqual([310, 300, 320]);
 });
 
+test('multiple typed ranges export one real PDF in typed order without replacing checkbox selection', async ({ page }) => {
+  await page.goto('/extract-pages/');
+  await page.getByTestId('file-input').setInputFiles([
+    { name: 'first.pdf', mimeType: 'application/pdf', buffer: await makePdf([301, 302, 303]) },
+    { name: 'second.pdf', mimeType: 'application/pdf', buffer: await makePdf([401, 500]) },
+  ]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(5);
+  await page.getByRole('checkbox', { name: 'Select page 4' }).check();
+  await page.getByTestId('selection-range-panel').locator('summary').click();
+  await page.getByTestId('selection-ranges').fill('5, 2-3, 5, 1');
+  const preview = page.getByTestId('range-combine-preview');
+  await expect(preview).toContainText('4 page(s) in this PDF');
+  await expect(preview).toContainText('5, 2, 3, 1');
+  const saved = await captured(page, () => page.getByTestId('range-combine-download').click());
+  expect(saved.name).toBe('plainmile-2-files-combined-4-pages.pdf');
+  const combined = await PDFDocument.load(saved.bytes, { updateMetadata: false });
+  expect(combined.getPages().map(p => p.getWidth())).toEqual([500, 302, 303, 301]);
+  // A convenience download must not select new pages, reorder the source or
+  // overwrite an older manual selection used by the regular Extract button.
+  await expect(page.locator('.selection-info strong')).toContainText('1 page selected');
+  await expect(page.getByTestId('page-tile')).toHaveCount(5);
+  const selected = await downloadPdf(page, () => page.getByRole('button', { name: 'Extract selected pages' }).click());
+  expect(selected.getPages().map(p => p.getWidth())).toEqual([401]);
+  const whole = await downloadPdf(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(whole.getPages().map(p => p.getWidth())).toEqual([301, 302, 303, 401, 500]);
+});
+
+test('Chinese 375px direct range export accepts fullwidth input and rejects reversed ranges without a download', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/extract-pages/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: '书页.pdf', mimeType: 'application/pdf', buffer: await makePdf([301, 302, 303, 304, 305]),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(5);
+  await page.getByTestId('selection-range-panel').locator('summary').click();
+  await page.getByTestId('selection-ranges').fill('５，１－２，５');
+  await expect(page.getByTestId('range-combine-preview')).toContainText('5, 1, 2');
+  const saved = await captured(page, () => page.getByTestId('range-combine-download').click());
+  expect(saved.name).toMatch(/-combined-3-pages\.pdf$/);
+  const extracted = await PDFDocument.load(saved.bytes, { updateMetadata: false });
+  expect(extracted.getPages().map(p => p.getWidth())).toEqual([305, 301, 302]);
+  const downloads = [];
+  page.on('download', item => downloads.push(item.suggestedFilename()));
+  await page.getByTestId('selection-ranges').fill('５－２');
+  await expect(page.getByTestId('range-combine-preview')).toHaveCount(0);
+  await page.getByTestId('range-combine-download').click();
+  await expect(page.getByRole('alert')).toContainText('选择页码无效');
+  expect(downloads).toEqual([]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(5);
+  await expect(page.getByTestId('selection-ranges')).toHaveValue('５－２');
+  const sizes = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    width: document.documentElement.clientWidth,
+  }));
+  expect(sizes.scroll).toBeLessThanOrEqual(sizes.width + 2);
+});
+
 test('select pages by output ranges then extract real nonconsecutive pages', async ({ page }) => {
   await page.goto('/extract-pages/');
   await page.getByTestId('file-input').setInputFiles({
