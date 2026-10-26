@@ -2024,6 +2024,151 @@ async function makeChapterBookmarkPdf(pageWidths, chapters) {
   return Buffer.from(await source.save());
 }
 
+// Construct a genuine PDF outline tree (not a mocked getOutline response),
+// including duplicate names, a Windows reserved device title, Unicode and a
+// path-like title. Child Count/First/Last links make PDF.js resolve levels 2/3.
+async function makeNestedChapterBookmarkPdf() {
+  const source = await PDFDocument.create();
+  const pageRefs = Array.from({ length: 12 }, (_, index) =>
+    source.addPage([300 + index, 420]).ref);
+  const root = source.context.obj({ Type: PDFName.of('Outlines'), Count: 3 });
+  const rootRef = source.context.register(root);
+  const addChildren = (parentRef, nodes) => {
+    if (!nodes.length) return;
+    const children = nodes.map(node => {
+      const item = source.context.obj({
+        Title: PDFHexString.fromText(node.title), Parent: parentRef,
+        Dest: [pageRefs[node.page], PDFName.of('Fit')],
+        ...(node.children?.length ? { Count: node.children.length } : {}),
+      });
+      return { node, item, ref: source.context.register(item) };
+    });
+    children.forEach(({ item }, i) => {
+      if (i) item.set(PDFName.of('Prev'), children[i - 1].ref);
+      if (i + 1 < children.length) item.set(PDFName.of('Next'), children[i + 1].ref);
+    });
+    const parent = source.context.lookup(parentRef);
+    parent.set(PDFName.of('First'), children[0].ref);
+    parent.set(PDFName.of('Last'), children.at(-1).ref);
+    for (const { node, ref } of children) addChildren(ref, node.children ?? []);
+  };
+  addChildren(rootRef, [
+    { title: 'Intro', page: 0 },
+    { title: 'Chapter One', page: 2, children: [
+      { title: 'Part A', page: 2, children: [
+        { title: 'A.1', page: 3 }, { title: 'A.2', page: 4 },
+      ] },
+      { title: 'CON', page: 4 }, { title: 'Part A', page: 6 },
+    ] },
+    { title: 'Chapter Two', page: 8, children: [
+      { title: '附录 / 2', page: 8 },
+      { title: '../', page: 10, children: [{ title: 'B.1', page: 10 }] },
+    ] },
+  ]);
+  source.catalog.set(PDFName.of('Outlines'), rootRef);
+  return Buffer.from(await source.save());
+}
+
+test('nested PDF chapter levels produce exact PDFs with optional safe, unique ZIP names', async ({ page }) => {
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'nested-outline.pdf', mimeType: 'application/pdf',
+    buffer: await makeNestedChapterBookmarkPdf(),
+  });
+  await expect(page.locator('.file-count')).toContainText('12 pages');
+  await page.getByTestId('split-bookmark-panel').locator('summary').click();
+
+  await expect(page.getByTestId('bookmark-level')).toHaveValue('1');
+  await page.getByTestId('bookmark-scan').click();
+  await expect(page.getByTestId('bookmark-preview')).toContainText('level 1');
+  await expect(page.getByTestId('bookmark-ranges-preview')).toContainText('1-2, 3-8, 9-12');
+
+  await page.getByTestId('bookmark-level').selectOption('2');
+  await expect(page.getByTestId('bookmark-preview')).toHaveCount(0);
+  await page.getByTestId('bookmark-scan').click();
+  await expect(page.getByTestId('bookmark-preview')).toContainText('level 2');
+  await expect(page.getByTestId('bookmark-ranges-preview')).toContainText('1-2, 3-4, 5-6, 7-8, 9-10, 11-12');
+  await page.getByTestId('bookmark-apply').click();
+  await expect(page.locator('#ranges-input')).toHaveValue('1-2, 3-4, 5-6, 7-8, 9-10, 11-12');
+  await expect(page.getByTestId('bookmark-use-titles')).not.toBeChecked();
+
+  // Backward-compatible default: no bookmark text in downloaded ZIP names.
+  const ordinary = await captured(page, () => page.locator('.split-download').click());
+  const ordinaryZip = await JSZip.loadAsync(ordinary.bytes);
+  expect(Object.keys(ordinaryZip.files)).toContain('part-03-pages-5-6.pdf');
+  expect(Object.keys(ordinaryZip.files).every(name => !name.includes('CON'))).toBe(true);
+  const ordinaryPart = await PDFDocument.load(await ordinaryZip.file('part-03-pages-5-6.pdf').async('uint8array'));
+  expect(ordinaryPart.getPages().map(p => p.getWidth())).toEqual([304, 305]);
+
+  await page.getByTestId('bookmark-use-titles').check();
+  const names = [
+    'part-01-pages-1-2.pdf', 'part-02-Part-A-pages-3-4.pdf',
+    'part-03-plainmile-CON-pages-5-6.pdf', 'part-04-Part-A-pages-7-8.pdf',
+    'part-05-附录-2-pages-9-10.pdf', 'part-06-pages-11-12.pdf',
+  ];
+  await expect(page.getByTestId('bookmark-zip-names')).toContainText(names[2]);
+  const named = await captured(page, () => page.locator('.split-download').click());
+  const zip = await JSZip.loadAsync(named.bytes);
+  expect(Object.keys(zip.files).sort()).toEqual([...names].sort());
+  for (let index = 0; index < names.length; index++) {
+    const pdf = await PDFDocument.load(await zip.file(names[index]).async('uint8array'));
+    expect(pdf.getPages().map(p => p.getWidth())).toEqual([300 + index * 2, 301 + index * 2]);
+  }
+
+  // Manual changes must lose the auto-derived names even if the source PDF
+  // and the previous bookmark scan are still present in this tab.
+  await page.locator('#ranges-input').fill('1-2, 3-12');
+  await expect(page.getByTestId('bookmark-use-titles')).toHaveCount(0);
+  const manual = await captured(page, () => page.locator('.split-download').click());
+  const manualZip = await JSZip.loadAsync(manual.bytes);
+  expect(Object.keys(manualZip.files).sort()).toEqual([
+    'part-01-pages-1-2.pdf', 'part-02-pages-3-12.pdf',
+  ]);
+
+  // Level 3 draws only from exact grandchildren, never from parent levels.
+  await page.getByTestId('bookmark-level').selectOption('3');
+  await expect(page.getByTestId('bookmark-preview')).toHaveCount(0);
+  await page.getByTestId('bookmark-scan').click();
+  await expect(page.getByTestId('bookmark-preview')).toContainText('level 3');
+  await expect(page.getByTestId('bookmark-ranges-preview')).toContainText('1-3, 4, 5-10, 11-12');
+  await page.getByTestId('bookmark-apply').click();
+  await expect(page.getByTestId('bookmark-confirm')).toBeFocused();
+  await page.getByTestId('bookmark-confirm-replace').click();
+  await expect(page.locator('#ranges-input')).toHaveValue('1-3, 4, 5-10, 11-12');
+  await expect(page.getByTestId('bookmark-use-titles')).not.toBeChecked();
+
+  await page.getByRole('tab', { name: 'Organize' }).click();
+  await page.getByTestId('reverse-all-pages').click();
+  await page.getByRole('tab', { name: 'Split' }).click();
+  await expect(page.getByTestId('bookmark-use-titles')).toHaveCount(0);
+  await expect(page.getByTestId('bookmark-scan')).toBeDisabled();
+});
+
+test('Chinese mobile bookmark level reports absent subchapters without overwriting ranges', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/split-pdf/');
+  const source = await makeChapterBookmarkPdf([300, 301, 302, 303], [
+    ['章节 1', 0], ['章节 2', 2],
+  ]);
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'one-level.pdf', mimeType: 'application/pdf', buffer: source,
+  });
+  await page.getByTestId('split-bookmark-panel').locator('summary').click();
+  await page.locator('#ranges-input').fill('2-3');
+  await page.getByTestId('bookmark-level').selectOption('3');
+  await page.getByTestId('bookmark-scan').click();
+  await expect(page.locator('.notice-error')).toContainText('所选书签层级没有可用的章节拆分点');
+  await expect(page.locator('#ranges-input')).toHaveValue('2-3');
+  await expect(page.getByTestId('bookmark-apply')).toHaveCount(0);
+  await page.getByTestId('bookmark-level').selectOption('1');
+  await page.getByTestId('bookmark-scan').click();
+  await expect(page.getByTestId('bookmark-preview')).toContainText('第 1 级书签');
+  await page.getByTestId('bookmark-apply').click();
+  await expect(page.getByTestId('bookmark-confirm')).toBeFocused();
+  await page.getByTestId('bookmark-keep').click();
+  await expect(page.locator('#ranges-input')).toHaveValue('2-3');
+});
+
 test('bookmark split reads actual PDF outline, preserves manual ranges and exports correct chapters', async ({ page }) => {
   const book = await makeChapterBookmarkPdf(
     [300, 301, 302, 303, 304, 305, 306, 307, 308],

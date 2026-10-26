@@ -8,6 +8,25 @@ const slugs = ['', 'workspace/', 'merge-pdf/', 'split-pdf/', 'organize-pdf/',
  'rotate-pdf/', 'extract-pages/', 'delete-pages/', 'image-to-pdf/', 'watermark-pdf/', 'pdf-to-images/', 'compress-pdf/', 'pdf-to-txt/', 'pdf-to-markdown/', 'txt-to-pdf/', 'markdown-to-pdf/', 'add-page-numbers/', 'privacy/'];
 const indexablePaths = new Set(slugs.flatMap(slug => ['/' + slug, '/zh/' + slug]));
 
+test('bilingual split SEO explains real nested bookmark limits without duplicate routes', async ({ request }) => {
+  for (const [path, detail, warning] of [
+    ['/split-pdf/', 'bookmark level 1, 2 or 3', 'default filenames still use page ranges'],
+    ['/zh/split-pdf/', '第 1、2 或 3 级章节', '默认仍按页码命名'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(detail);
+    expect(html).toContain(warning);
+    expect(html).toContain('rel="canonical"');
+    expect(html).toContain('hreflang="en"');
+    expect(html).toContain('hreflang="zh-CN"');
+    // The unhydrated HTML must explain real capability and limitations,
+    // rather than relying on client-only selects for search content.
+    expect(html).toContain(path.startsWith('/zh/') ? '导出的 PDF 不保留原书签导航' : 'Exported PDFs do not retain the original clickable bookmarks');
+  }
+});
+
 test('live sitemap, robots, routes, PDF worker, 404', async ({ request }) => {
  const robots = await request.get('/robots.txt');
  expect(robots.status()).toBe(200);
@@ -163,11 +182,11 @@ test('split progress has useful bilingual crawlable SSR content and accurate app
       : 'ZIP packaging is displayed separately');
     expect(html, path).toContain(locale === 'zh' ? '/zh/extract-pages/' : '/extract-pages/');
     expect(html, path).toContain(locale === 'zh'
-      ? '能按 PDF 的章节书签自动拆分吗？'
-      : 'Can I split a PDF at chapter bookmarks?');
+      ? '能按 PDF 的章节和子章节书签拆分吗？'
+      : 'Can I split a PDF by chapters or subchapters?');
     expect(html, path).toContain(locale === 'zh'
-      ? '未改变原始页序'
-      : 'original order');
+      ? '保留了完整原始页序'
+      : 'complete original page order');
     expect(html, path).toContain('application/ld+json');
     expect(html, path).toContain('WebApplication');
     expect(html, path).toContain('BreadcrumbList');

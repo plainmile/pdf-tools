@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, parsePageRanges,
-  chunkPageRanges, splitChunkBatch, splitSinglePageBatch, oddEvenSplitParts, getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, splitRangesFromBookmarkStarts, commitHistory, makeHistoryState, undoHistory, redoHistory,
+  chunkPageRanges, splitChunkBatch, splitSinglePageBatch, oddEvenSplitParts, getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, splitRangesFromBookmarkStarts, bookmarkItemsAtLevel, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
   reversePages, sortPagesByFilename, interleaveDuplexPages, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges, pageIdsForParity, invertPageIdSelection,
 } from '../../src/lib/pageOperations.mjs';
@@ -120,6 +120,29 @@ test('split explicit ranges and preserve workspace page order', () => {
 
 test('split into fixed-size chunks', () => {
   assert.deepEqual(chunkPageRanges(7, 3), [{start:1,end:3},{start:4,end:6},{start:7,end:7}]);
+});
+
+test('nested PDF outlines select only the chosen depth and bound cyclic or hostile inputs', () => {
+  const l3a = { title: 'A.1', items: [] };
+  const l3b = { title: 'B.1', items: [] };
+  const l2a = { title: 'A', items: [l3a] };
+  const l2b = { title: 'B', items: [l3b] };
+  const l1a = { title: 'Part I', items: [l2a, l2b] };
+  const l1b = { title: 'Part II', items: [] };
+  const outline = [l1a, l1b];
+  assert.deepEqual(bookmarkItemsAtLevel(outline, 1).map(x => x.title), ['Part I', 'Part II']);
+  assert.deepEqual(bookmarkItemsAtLevel(outline, 2).map(x => x.title), ['A', 'B']);
+  assert.deepEqual(bookmarkItemsAtLevel(outline, 3).map(x => x.title), ['A.1', 'B.1']);
+  assert.deepEqual(bookmarkItemsAtLevel([l1b], 3), []);
+  assert.throws(() => bookmarkItemsAtLevel(outline, 0), /Invalid/);
+  assert.throws(() => bookmarkItemsAtLevel(outline, 4), /Invalid/);
+  assert.throws(() => bookmarkItemsAtLevel('outline', 1), /Invalid/);
+  assert.throws(() => bookmarkItemsAtLevel(outline, 2, 2), /Too many/);
+  const recursive = { title: 'self' };
+  recursive.items = [recursive];
+  assert.deepEqual(bookmarkItemsAtLevel([recursive], 3), []);
+  const malicious = [{ title: 'root', items: Array.from({ length: 1001 }, (_, i) => ({ title: String(i) })) }];
+  assert.throws(() => bookmarkItemsAtLevel(malicious, 2), /Too many/);
 });
 
 test('bookmark destinations create complete chapter ranges with covers, duplicates and out-of-order starts', () => {
