@@ -84,8 +84,10 @@ test('numbered PDF pending preview survives changed options, invalid retries and
   // so that the last printed number exceeds the allowed maximum.
   await page.getByTestId('number-first-pdf-page').fill('3');
   await page.getByTestId('number-start').fill('99999');
-  await page.getByTestId('utility-run').click();
-  await expect(page.getByRole('alert')).toContainText('99999');
+  // Reject impossible settings before running PDF-lib; the old PDF is kept.
+  await expect(page.getByTestId('numbering-plan-error')).toContainText('exceed 99999');
+  await expect(page.getByTestId('number-start')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByTestId('utility-run')).toBeDisabled();
   await expect(page.getByTestId('numbered-result-stale')).toBeVisible();
   const originalNumbering = await download(page, () => page.getByTestId('numbered-pdf-download').click());
   expect((await PDFDocument.load(originalNumbering)).getPageCount()).toBe(4);

@@ -47,6 +47,22 @@ test('bilingual image export SEO accurately explains page-range validation', asy
   }
 });
 
+test('both numbering pages explain real output bounds in prerendered SEO content', async ({ request }) => {
+  for (const [path, wording] of [
+    ['/add-page-numbers/', 'final printed page number would exceed 99999'],
+    ['/zh/add-page-numbers/', '最终显示页码是否超过 99999'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    expect(html, path).toContain(wording);
+    expect(html).toContain('rel="canonical"');
+    expect(html).toContain('hreflang="en"');
+    expect(html).toContain('hreflang="zh-CN"');
+    expect(html).not.toContain('"@type":"FAQPage"');
+  }
+});
+
 test('bilingual split SEO explains real nested bookmark limits without duplicate routes', async ({ request }) => {
   for (const [path, detail, warning] of [
     ['/split-pdf/', 'bookmark level 1, 2 or 3', 'default filenames still use page ranges'],

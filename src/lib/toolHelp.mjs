@@ -68,6 +68,7 @@ export const toolHelp = {
     ],
     'add-page-numbers': [
       ['Can I number a 320-page PDF starting at 201?', 'Yes. Set 201 as the starting number; the first page displays 201 and page 320 displays 520.'],
+      ['How can I avoid numbering beyond the last page?', 'Choose the PDF page where numbering begins and the first printed number. The tool checks those settings before conversion, including whether the final printed page number would exceed 99999. Earlier cover pages stay unnumbered.'],
       ['Can I position page numbers at any corner?', 'Yes. Choose a top or bottom left, center or right position and one of three spacing presets. The original PDF page size is not changed.'],
       ['Can I check a page in the middle of a long PDF?', 'Yes. After generating the PDF, preview the first numbered page, last page or any PDF page number, including an unnumbered cover. Previewing does not alter the output or download it.'],
       ['Will a wide inset clip the page number?', 'No. The tool checks each page’s visible dimensions, even on rotated or cropped PDFs. If a number cannot fit, conversion stops and any earlier generated result remains available.'],
@@ -146,6 +147,7 @@ export const toolHelp = {
     ],
     'add-page-numbers': [
       ['320 页 PDF 能从第 201 页开始编号吗？', '可以。设置起始页码 201，第一页显示 201，最后一页显示 520。'],
+      ['如何避免页码超过末页或 99999？', '先选择从 PDF 第几页开始编号，再输入显示的起始数字。工具会在生成前检查起始位置和最终显示页码是否超过 99999；之前的封面等页面保持不编号。'],
       ['页码能放在左上角、右下角吗？', '可以。支持上、下两排各三个位置，并提供 12、24、40 点的页码边距。只调整数字位置，不改变原 PDF 的纸张大小。'],
       ['能检查几百页文档中间的某一页吗？', '可以。生成后可预览第一张编号页、最后一页，或输入任意 PDF 页码检查（包括未编号封面）。切换预览页不会重新生成或自动下载文件。'],
       ['边距太大会不会把数字画到页面外？', '不会。工具按实际显示页面尺寸检查，包含旋转和裁剪过的页面。空间不足会提示调整，之前生成的 PDF 不会被清除。'],
