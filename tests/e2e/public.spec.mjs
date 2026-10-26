@@ -182,11 +182,11 @@ test('split progress has useful bilingual crawlable SSR content and accurate app
       : 'ZIP packaging is displayed separately');
     expect(html, path).toContain(locale === 'zh' ? '/zh/extract-pages/' : '/extract-pages/');
     expect(html, path).toContain(locale === 'zh'
-      ? '能按 PDF 的章节书签自动拆分吗？'
-      : 'Can I split a PDF at chapter bookmarks?');
+      ? '能按 PDF 的章节和子章节书签拆分吗？'
+      : 'Can I split a PDF by chapters or subchapters?');
     expect(html, path).toContain(locale === 'zh'
-      ? '未改变原始页序'
-      : 'original order');
+      ? '保留了完整原始页序'
+      : 'complete original page order');
     expect(html, path).toContain('application/ld+json');
     expect(html, path).toContain('WebApplication');
     expect(html, path).toContain('BreadcrumbList');
