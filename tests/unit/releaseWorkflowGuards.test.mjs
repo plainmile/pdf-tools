@@ -110,6 +110,23 @@ test('production Compose deployment uses /opt/compose/pdf-tools and safely migra
   assert.match(agentPolicy, /must live in `\/opt\/compose\/pdf-tools\/`/);
 });
 
+test('public production QA retries transient browser failures at most once without weakening strict Docker CI', () => {
+  const deploy = readWorkflow('deploy.yml');
+  const ci = readWorkflow('ci.yml');
+  // The same deployed-site E2E suite remains mandatory; a failed repeat
+  // still causes deployment failure and the existing safe rollback.
+  const publicStep = deploy.split('- name: Public browser E2E and SEO against deployed site')[1]
+    .split('- name: Restore last healthy image if release checks fail')[0];
+  assert.match(publicStep, /timeout-minutes: 15/);
+  assert.match(publicStep, /PDF_BASE_URL=https:\/\/pdf\.plainmile\.com/);
+  assert.match(publicStep, /npx playwright test --reporter=list --retries=1/);
+  assert.match(publicStep, /cp -r test-results \/artifacts\//);
+  // Do not allow a retry to bypass E2E at merge time.
+  assert.match(ci, /npx playwright test --config=playwright\.cross-browser\.config\.mjs/);
+  assert.match(ci, /npx playwright test\s*\n/);
+  assert.doesNotMatch(ci, /--retries=/);
+});
+
 test('failed public E2E or unhealthy deploy rolls back only this service to a previously healthy SHA', () => {
   const yaml = readWorkflow('deploy.yml');
   const checkpoint = yaml.indexOf('id: checkpoint');
