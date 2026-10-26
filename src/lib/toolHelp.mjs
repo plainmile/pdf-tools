@@ -6,13 +6,14 @@ export const toolHelp = {
       ['Can I open a book with hundreds of pages?', 'Yes. The visual workspace accepts up to 600 pages and 200 MiB across files. Thumbnails load as you scroll. Large documents still need substantial device memory.'],
       ['Does the workspace change my original files?', 'No. Rotate, delete and reorder your copies in the browser, then download a new PDF. Your source documents stay untouched.'],
       ['Can I duplicate pages or add a blank separator?', 'Yes. Select pages and choose Duplicate selected to copy each right after its original. Insert blank page after one selected page, or at the end when none is selected. Each blank matches the adjacent page size.'],
+      ['What happens if I type an invalid page selection?', 'The workspace marks reversed, out-of-bounds or too many page ranges before you apply them, and disables Select pages. Your previously selected pages are not changed; fix the input and apply it to update the selection.'],
     ],
     'merge-pdf': [
       ['Can I interleave pages from different PDFs?', 'Yes. Add your PDFs, then drag individual pages between documents before exporting a single PDF.'],
       ['Will merging upload private documents?', 'No. Files are processed locally in the browser and are not sent to a PDF conversion server.'],
     ],
     'split-pdf': [
-      ['Can I split a PDF into custom page ranges?', 'Yes. Enter ranges such as 1-3, 4-6; each range generates a separate PDF. Type 15- to include page 15 through the final PDF page (an omitted start such as -15 is not accepted). For one combined PDF, use Extract PDF Pages and enter ranges in the desired combined order.'],
+      ['Can I split a PDF into custom page ranges?', 'Yes. Enter ranges such as 1-3, 4-6; each range generates a separate PDF. Type 15- to include page 15 through the final PDF page (an omitted start such as -15 is not accepted). For one combined PDF, use Extract PDF Pages and enter ranges in the desired combined order. Invalid ranges are flagged directly in the split field before download.'],
       ['Can I split odd and even pages into two PDFs?', 'Yes. Choose Split into odd-page and even-page PDFs to get two PDFs in one ZIP. Odd and even refer to the current export page order, not the original scanned page numbers.'],
       ['Can I split a PDF by chapters or subchapters?', 'Yes. For one PDF in its complete original page order, choose bookmark level 1, 2 or 3 and preview the exact chapter boundaries before applying. Up to 50 output PDFs are supported; missing levels or invalid destinations do not invent chapters. You can optionally add sanitized chapter titles to ZIP filenames, but this is off by default. Exported PDFs do not retain the original clickable bookmarks.'],
       ['Can I choose split points by looking at the pages?', 'Yes. Expand Choose split points by clicking pages, then click Cut after this page under a preview. Click again to remove a cut. It uses your current page order; manually entered custom ranges are protected from accidental replacement.'],
@@ -87,13 +88,14 @@ export const toolHelp = {
       ['能处理几百页的书吗？', '可以。可视化工作台最多支持 600 页、文件总计 200 MiB。缩略图随滚动按需加载，但大文档仍会占用较多设备内存。'],
       ['会修改原始 PDF 吗？', '不会。旋转、删除和调整顺序只影响浏览器中的工作副本；导出时会生成新的 PDF。'],
       ['能复制选中的页面或插入空白分隔页吗？', '可以。复制的页面紧跟原页面，插入空白页时，选择一页则插在其后，不选择则追加到末尾；空白页使用相邻页的尺寸。'],
+      ['输入了错误的选择页码会怎样？', '工作台会在应用前标记反向、越界或超过 50 段的页码范围，并禁用「选择页面」。之前已经选中的页面不会改变；修正输入后再应用即可。'],
     ],
     'merge-pdf': [
       ['可以将不同 PDF 中的页面交叉合并吗？', '可以。先添加多个 PDF，再拖动每一页到需要的位置，最后导出一个 PDF。'],
       ['合并时会上传合同等隐私文件吗？', '不会。文件直接在您的浏览器中处理，不上传到转换服务器。'],
     ],
     'split-pdf': [
-      ['可以按自定义范围拆分吗？', '可以。输入 1-3、4-6 这样的页码范围，每个范围单独生成一份 PDF；输入 15- 表示从第 15 页一直到文档末页（不支持省略起点的 -15）。需要合并成一份 PDF 时请使用「提取 PDF 页面」，直接按所需顺序输入页码范围。'],
+      ['可以按自定义范围拆分吗？', '可以。输入 1-3、4-6 这样的页码范围，每个范围单独生成一份 PDF；输入 15- 表示从第 15 页一直到文档末页（不支持省略起点的 -15）。需要合并成一份 PDF 时请使用「提取 PDF 页面」，直接按所需顺序输入页码范围。反向或越界的范围会在拆分输入框直接标记，禁止下载。'],
       ['能把奇数页、偶数页分别保存吗？', '可以。选择「按奇偶页分别生成 PDF」，会把当前页序的奇数位、偶数位页面分别生成两份 PDF，并打包为一个 ZIP；不是依据原文件印刷页码。'],
       ['能按 PDF 的章节和子章节书签拆分吗？', '可以，前提是单份 PDF 保留了完整原始页序并且带有内置书签。选择第 1、2 或 3 级书签，先预览并确认；不存在的层级不会虚构拆分点，单次最多 50 份。ZIP 文件名可主动选择使用经过清理的章节标题，默认关闭。导出的 PDF 不保留原书签导航，也不能通过扫描文字识别章节。'],
       ['可以看着页面缩略图选择拆分位置吗？', '可以。展开「按页面预览设置拆分点」，在缩略图下选择「在此页后拆分」，再次点击可取消。拆分按当前页面顺序进行；手工指定的特殊范围不会被意外覆盖。'],
