@@ -246,6 +246,31 @@ export function splitRangesFromCuts(cutPages, pageCount, maxParts = 50) {
   }).join(', ');
 }
 
+/**
+ * Interpret TOP-LEVEL PDF bookmark destinations as 1-based chapter starts.
+ * A bookmark pointing to page N places the cut AFTER page N-1. Preserve
+ * everything before the first chapter (cover, contents), even when no
+ * bookmark points to page 1. Duplicate starts never produce empty PDFs.
+ *
+ * The caller is responsible for resolving PDF.js destinations and proving
+ * the imported PDF still has its original, complete page order. This function
+ * is deliberately pure so generated ranges go through our existing split
+ * coverage and ZIP safety gates.
+ */
+export function splitRangesFromBookmarkStarts(starts, pageCount, maxParts = 50) {
+  if (!Array.isArray(starts) || !Number.isSafeInteger(pageCount) ||
+      pageCount < 2 || pageCount > 600 ||
+      !Number.isSafeInteger(maxParts) || maxParts < 2 || maxParts > 50 ||
+      starts.some(n => !Number.isSafeInteger(n) || n < 1 || n > pageCount)) {
+    throw new Error('Invalid PDF bookmark page destinations.');
+  }
+  const unique = [...new Set(starts)].sort((a, b) => a - b);
+  const cuts = unique.filter(page => page > 1).map(page => page - 1);
+  if (!cuts.length) throw new Error('No usable bookmark chapter breaks were found.');
+  // Keep all original pages. Never silently truncate a long outline.
+  return splitRangesFromCuts(cuts, pageCount, maxParts);
+}
+
 /** Visual cuts are meaningful only for a complete, consecutive partition.
  * An intentionally partial, overlapping or out-of-order typed range is NOT
  * silently rewritten by the visual editor; require explicit consent instead.
