@@ -3,13 +3,13 @@ import JSZip from 'jszip';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 import PageZoomDialog from './PageZoomDialog.jsx';
 import { LIMITS, composePdf, pristinePdfBytes, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId, createBlankPageSource, retainedSourceBytes, retainedSourcesBytes } from '../lib/pdfEngine.mjs';
-import { sanitizeFilename, workspaceFilenameStem } from '../lib/utilityCore.mjs';
+import { sanitizeFilename, workspaceFilenameStem, bookmarkSplitPartFilenames } from '../lib/utilityCore.mjs';
 import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLayout.mjs';
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges, splitChunkBatch, oddEvenSplitParts,
-  getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, splitRangesFromBookmarkStarts, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
+  getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, splitRangesFromBookmarkStarts, bookmarkItemsAtLevel, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
 function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview, onOpen, outputPosition, busy }) {
@@ -155,6 +155,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [splitBatchDownloads, setSplitBatchDownloads] = useState({ key: null, indices: [] });
   const [splitVisualJumpInput, setSplitVisualJumpInput] = useState('');
   const [bookmarkDraft, setBookmarkDraft] = useState(null);
+  const [bookmarkLevel, setBookmarkLevel] = useState(1);
+  const [appliedBookmarkPlan, setAppliedBookmarkPlan] = useState(null);
+  const [bookmarkUseTitles, setBookmarkUseTitles] = useState(false);
   const [bookmarkReplaceConfirm, setBookmarkReplaceConfirm] = useState(false);
   const [pendingVisualCut, setPendingVisualCut] = useState(null);
   const [visualSplitOpen, setVisualSplitOpen] = useState(false);
@@ -230,6 +233,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   useEffect(() => {
     setBookmarkDraft(null);
     setBookmarkReplaceConfirm(false);
+    setAppliedBookmarkPlan(null);
+    setBookmarkUseTitles(false);
   }, [bookmarkSourceKey]);
   const pristineOutput = pages.length > 0 && Boolean(pristinePdfBytes(sources, pages, watermark));
   // Only a full Export PDF marks these particular edits as safely downloaded.
@@ -280,6 +285,17 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     } catch (_error) { return null; }
   }, [pages.length, splitMode, ranges, chunkSizeNumber, chunkOutputCount, safeSplitBatchIndex, splitNeedsInput]);
   const splitEstimate = splitPlan?.parts.length ?? null;
+  // Titles only describe an explicitly applied bookmark-derived plan for
+  // this exact original PDF and exact current ranges. No names survive a
+  // manual range edit, page reorder, source change or different split mode.
+  const bookmarkFilenamePlan = bookmarkSource && appliedBookmarkPlan &&
+    appliedBookmarkPlan.sourceId === bookmarkSource.id &&
+    appliedBookmarkPlan.level === bookmarkLevel &&
+    splitMode === 'ranges' && appliedBookmarkPlan.ranges === ranges
+    ? appliedBookmarkPlan : null;
+  const bookmarkZipNames = bookmarkUseTitles && bookmarkFilenamePlan && splitPlan?.parts.length > 1
+    ? bookmarkSplitPartFilenames(splitPlan.parts, bookmarkFilenamePlan.chapters)
+    : null;
   const requestedSplitBatchIndices = splitBatchKey && splitBatchDownloads.key === splitBatchKey
     ? new Set(splitBatchDownloads.indices) : new Set();
   const nextUnrequestedSplitBatch = splitPlan?.batch
@@ -297,6 +313,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       setSplitMode('ranges');
       setPendingVisualCut(null);
       setBookmarkReplaceConfirm(false);
+      setAppliedBookmarkPlan(null);
+      setBookmarkUseTitles(false);
       setError(''); setNotice('');
     } catch (reason) {
       setError(/maximum of 50 ranges/i.test(String(reason?.message))
@@ -432,16 +450,24 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       setError(t.bookmarkNoBreaks);
       return;
     }
-    // Bound parsing on hostile/outlandishly long outlines. We only use
-    // TOP-LEVEL items; nested headings may subdivide chapters incorrectly.
-    if (outline.length > 250) {
+    // Only entries at the user's explicit depth are considered. A missing
+    // level must never silently fall back to the parent chapters.
+    let entries;
+    try {
+      entries = bookmarkItemsAtLevel(outline, bookmarkLevel);
+    } catch (_invalidOutline) {
       setError(t.bookmarkTooMany);
       return;
     }
+    if (!entries.length) {
+      setError(t.bookmarkNoBreaks);
+      return;
+    }
     const starts = [];
+    const chapters = [];
     const examples = [];
     let ignored = 0;
-    for (const entry of outline) {
+    for (const entry of entries) {
       let index = null;
       try {
         const dest = typeof entry.dest === 'string'
@@ -460,6 +486,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         continue;
       }
       starts.push(index + 1);
+      chapters.push({ page: index + 1, title: String(entry.title || '').slice(0, 100) });
       if (examples.length < 8) examples.push({
         page: index + 1, title: String(entry.title || '').slice(0, 80),
       });
@@ -474,13 +501,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     }
     const parts = parsePageRanges(previewRanges, pages.length);
     setBookmarkDraft({
-      sourceId: bookmarkSource.id, ranges: previewRanges,
-      files: parts.length, ignored, examples,
+      sourceId: bookmarkSource.id, level: bookmarkLevel, ranges: previewRanges,
+      files: parts.length, ignored, examples, chapters,
     });
     setNotice(interpolate(t.bookmarkFound, { files: parts.length, ignored }));
   });
   const applyBookmarkChapters = () => {
-    if (!bookmarkSource || !bookmarkDraft || bookmarkDraft.sourceId !== bookmarkSource.id || busy) return;
+    if (!bookmarkSource || !bookmarkDraft || bookmarkDraft.sourceId !== bookmarkSource.id || bookmarkDraft.level !== bookmarkLevel || busy) return;
     // Never overwrite deliberately typed, incomplete, overlapping or
     // reordered custom ranges without a separate, explicit confirmation.
     if (ranges.trim() && ranges.trim() !== bookmarkDraft.ranges && !bookmarkReplaceConfirm) {
@@ -489,6 +516,11 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     }
     setRanges(bookmarkDraft.ranges);
     setSplitMode('ranges');
+    setAppliedBookmarkPlan({
+      sourceId: bookmarkDraft.sourceId, level: bookmarkDraft.level,
+      ranges: bookmarkDraft.ranges, chapters: bookmarkDraft.chapters,
+    });
+    setBookmarkUseTitles(false);
     setPendingVisualCut(null);
     setBookmarkReplaceConfirm(false);
     setError('');
@@ -792,7 +824,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           ) : t.splitSingleSaved);
           return;
         }
-        zip.file(range.kind ? `${range.kind}-pages.pdf` : `part-${String(index + 1).padStart(2, '0')}-pages-${range.start}-${range.end}.pdf`, contents);
+        zip.file(range.kind ? `${range.kind}-pages.pdf` :
+          (bookmarkZipNames?.[index] ?? `part-${String(index + 1).padStart(2, '0')}-pages-${range.start}-${range.end}.pdf`), contents);
         await new Promise(resolve => setTimeout(resolve, 0));
       }
       if (controller.signal.aborted) throw new Error('Split cancelled.');
@@ -938,6 +971,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setPageView('order'); setCollapsedSources(new Set());
     setLastDownloadedRevision(null);
     setRanges(''); setChunkSize(''); setSplitBatchIndex(0); setSplitMode('ranges'); setSplitVisualJumpInput(''); setPendingVisualCut(null);
+    setBookmarkDraft(null); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); setBookmarkReplaceConfirm(false);
     setSelectionRanges(''); setMoveTargetInput(''); setMovePlacement('before'); setDownloadNameInput(''); setJumpInput(''); setPendingJump(null);
     // A fresh image-to-PDF workspace must not inherit a previous crop choice.
     setImageLayout({ ...IMAGE_PDF_LAYOUT_DEFAULT });
@@ -1443,7 +1477,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                 <div className="split-fields">
                   <label className="option-radio"><input type="radio" name="split-method" checked={splitMode === 'ranges'} disabled={busy} onChange={() => { setSplitMode('ranges'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); }} />{t.byRanges}</label>
                   <label className="input-label" htmlFor="ranges-input">{t.pageRanges}</label>
-                  <input id="ranges-input" value={ranges} onChange={(event) => { setRanges(event.target.value); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); }} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7" />
+                  <input id="ranges-input" value={ranges} onChange={(event) => { setRanges(event.target.value); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); }} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7" />
                   <p className="input-note">{t.rangeHint}</p>
                   <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); }} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
@@ -1503,13 +1537,26 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   {pages.length > 1 && <details className="split-bookmark-panel" data-testid="split-bookmark-panel">
                     <summary>{t.bookmarkTitle}</summary>
                     <p className="input-note">{t.bookmarkHint}</p>
+                    <label className="utility-field-label" htmlFor="bookmark-level">{t.bookmarkLevelLabel}</label>
+                    <select id="bookmark-level" data-testid="bookmark-level" value={bookmarkLevel}
+                      disabled={busy || !bookmarkSource}
+                      onChange={event => {
+                        setBookmarkLevel(Number(event.target.value));
+                        setBookmarkDraft(null); setBookmarkReplaceConfirm(false);
+                        setAppliedBookmarkPlan(null); setBookmarkUseTitles(false);
+                        setError(''); setNotice('');
+                      }}>
+                      <option value={1}>{t.bookmarkLevelOne}</option>
+                      <option value={2}>{t.bookmarkLevelTwo}</option>
+                      <option value={3}>{t.bookmarkLevelThree}</option>
+                    </select>
                     <p className="input-note" data-testid="bookmark-availability">
                       {bookmarkSource ? t.bookmarkAvailable : t.bookmarkUnavailable}
                     </p>
                     <button type="button" className="button button-secondary button-small"
                       data-testid="bookmark-scan" disabled={busy || !bookmarkSource}
                       onClick={inspectBookmarkChapters}>{t.bookmarkRead}</button>
-                    {bookmarkSource && bookmarkDraft?.sourceId === bookmarkSource.id && <>
+                    {bookmarkSource && bookmarkDraft?.sourceId === bookmarkSource.id && bookmarkDraft.level === bookmarkLevel && <>
                       <p className="utility-note" data-testid="bookmark-preview" role="status">
                         {interpolate(t.bookmarkFound, { files: bookmarkDraft.files, ignored: bookmarkDraft.ignored })}
                       </p>
@@ -1534,6 +1581,19 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                       {!bookmarkReplaceConfirm && <button type="button" className="button button-secondary button-small"
                         data-testid="bookmark-apply" disabled={busy} onClick={applyBookmarkChapters}>{t.bookmarkApply}</button>}
                     </>}
+                    {bookmarkFilenamePlan && splitPlan?.parts.length > 1 && <div className="bookmark-filename-options">
+                      <label className="option-radio">
+                        <input type="checkbox" data-testid="bookmark-use-titles" checked={bookmarkUseTitles}
+                          disabled={busy} onChange={event => setBookmarkUseTitles(event.target.checked)} />
+                        {t.bookmarkUseTitles}
+                      </label>
+                      <p className="input-note">{t.bookmarkUseTitlesHint}</p>
+                      {bookmarkZipNames && <ol data-testid="bookmark-zip-names" className="split-bookmark-examples">
+                        {bookmarkZipNames.slice(0, 8).map((name, index) =>
+                          <li key={index}><code>{name}</code></li>)}
+                        {bookmarkZipNames.length > 8 && <li>{interpolate(t.bookmarkMoreNames, { count: bookmarkZipNames.length - 8 })}</li>}
+                      </ol>}
+                    </div>}
                   </details>}
                   {pages.length > 1 && <details className="split-visual-panel" data-testid="visual-split-panel"
                     open={visualSplitOpen} onToggle={event => setVisualSplitOpen(event.currentTarget.open)}>
