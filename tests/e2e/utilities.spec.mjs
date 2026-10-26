@@ -138,7 +138,7 @@ test('PDF-to-images overlapping ranges produce unique images and truthful ZIP na
   ]);
 
   await page.goto('/zh/pdf-to-images/');
-  await upload(page, await fixturePdf('中文去重', 5));
+  await upload(page, await fixturePdf('Chinese dedup', 5));
   await expect(page.locator('.utility-helper')).toContainText('重复或重叠页码只导出一次');
   await page.getByTestId('utility-page-ranges').fill('２－３，３－４');
   const localized = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
