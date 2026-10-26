@@ -32,6 +32,21 @@ test('bilingual extract SEO explains the two real ways to create one PDF', async
   }
 });
 
+test('bilingual image export SEO accurately explains page-range validation', async ({ request }) => {
+  for (const [path, wording] of [
+    ['/pdf-to-images/', 'Invalid, reversed and oversized selections are shown before conversion'],
+    ['/zh/pdf-to-images/', '范围反向、页码越界或一次选择超过 60 页时'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    expect(html, path).toContain(wording);
+    expect(html).toContain('rel="canonical"');
+    expect(html).toContain('hreflang="en"');
+    expect(html).toContain('hreflang="zh-CN"');
+  }
+});
+
 test('bilingual split SEO explains real nested bookmark limits without duplicate routes', async ({ request }) => {
   for (const [path, detail, warning] of [
     ['/split-pdf/', 'bookmark level 1, 2 or 3', 'default filenames still use page ranges'],

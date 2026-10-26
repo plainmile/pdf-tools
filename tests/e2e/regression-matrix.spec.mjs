@@ -116,12 +116,18 @@ test('book-page selection error remains atomic across fullwidth Chinese input an
     name:'book.pdf',mimeType:'application/pdf',buffer:await fixture(Array.from({length:70},(_,i)=>320+i)),
   });
   await expect(page.getByTestId('utility-file-summary')).toContainText('70');
-  await page.getByTestId('utility-page-ranges').fill('６９－７１');
-  await page.getByTestId('utility-run').click();
-  await expect(page.locator('.notice-error')).toBeVisible();
+  const ranges = page.getByTestId('utility-page-ranges');
+  const run = page.getByTestId('utility-run');
+  await ranges.fill('６９－７１');
+  // Validation is now immediate, so an invalid plan cannot start a render.
+  await expect(ranges).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByTestId('image-range-error')).toContainText('1 至 70');
+  await expect(run).toBeDisabled();
   await expect(page.getByTestId('utility-file-summary')).toContainText('70');
-  await page.getByTestId('utility-page-ranges').fill('７０');
-  const result = await captured(page, () => page.getByTestId('utility-run').click());
+  await ranges.fill('７０');
+  await expect(page.getByTestId('image-range-error')).toHaveCount(0);
+  await expect(run).toBeEnabled();
+  const result = await captured(page, () => run.click());
   expect(result.name).toMatch(/page-070\.(jpg|png)$/);
   expect(result.bytes.length).toBeGreaterThan(100);
 });

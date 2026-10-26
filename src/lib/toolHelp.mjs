@@ -42,7 +42,7 @@ export const toolHelp = {
       ['Can I add Chinese text as a watermark?', 'Yes. Custom Chinese and English text is rendered locally onto exported PDF pages.'],
     ],
     'pdf-to-images': [
-      ['Can I export pages 301 to 360 from a book?', 'Yes. Open a PDF of up to 1,000 pages and choose a page range. You can export up to 60 images per batch.'],
+      ['Can I export pages 301 to 360 from a book?', 'Yes. Open a PDF of up to 1,000 pages and choose a page range. You can export up to 60 images per batch. Invalid, reversed and oversized selections are shown before conversion rather than starting an unusable export.'],
       ['Does PNG or JPG keep selectable text?', 'No. PNG and JPG are images of the rendered pages, so their text cannot be selected as PDF text.'],
     ],
     'compress-pdf': [
@@ -120,7 +120,7 @@ export const toolHelp = {
       ['支持中文水印吗？', '支持。中英文自定义文字会在浏览器本地绘制到导出的 PDF 页面。'],
     ],
     'pdf-to-images': [
-      ['可以把一本书的第 301 至 360 页导出为图片吗？', '可以。支持打开最多 1000 页的 PDF，每次选择并导出最多 60 页图片。'],
+      ['可以把一本书的第 301 至 360 页导出为图片吗？', '可以。支持打开最多 1000 页的 PDF，每次选择并导出最多 60 页图片。范围反向、页码越界或一次选择超过 60 页时，会在转换前提示修改。'],
       ['转换成 PNG 或 JPG 后还能复制文字吗？', '不能。PNG 和 JPG 是页面的图片，不包含原 PDF 的可选择文字。'],
     ],
     'compress-pdf': [
