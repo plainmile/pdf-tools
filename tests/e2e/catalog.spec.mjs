@@ -34,6 +34,29 @@ test('tool search filters only relevant tools and clear restores all options', a
   expect(groupCounts.reduce((sum, label) => sum + Number.parseInt(label, 10), 0)).toBe(16);
 });
 
+
+test('localized tool finder respects conversion direction and fullwidth aliases', async ({ page }) => {
+  await page.goto('/');
+  const search = page.getByRole('searchbox', { name: 'Find a PDF tool' });
+  await search.fill('JPG to PDF');
+  await expect(page.locator('[data-tool-card]:visible')).toHaveCount(1);
+  await expect(page.locator('a.tool-card[href="/image-to-pdf/"]')).toBeVisible();
+  await search.fill('PDF to JPG');
+  await expect(page.locator('[data-tool-card]:visible')).toHaveCount(1);
+  await expect(page.locator('a.tool-card[href="/pdf-to-images/"]')).toBeVisible();
+  await search.fill('  JPG   TO   PDF  ');
+  await expect(page.locator('a.tool-card[href="/image-to-pdf/"]')).toBeVisible();
+
+  await page.goto('/zh/');
+  const zhSearch = page.getByRole('searchbox', { name: '搜索工具' });
+  await zhSearch.fill('ＪＰＧ 转 ＰＤＦ');
+  await expect(page.locator('a.tool-card[href="/zh/image-to-pdf/"]')).toBeVisible();
+  await expect(page.locator('[data-tool-card]:visible')).toHaveCount(1);
+  await zhSearch.fill('PDF转JPG');
+  await expect(page.locator('a.tool-card[href="/zh/pdf-to-images/"]')).toBeVisible();
+  await expect(page.locator('[data-tool-card]:visible')).toHaveCount(1);
+});
+
 test('Chinese catalog search, categories and links work on mobile without overflow', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/zh/');

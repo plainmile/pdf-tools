@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 import { tools, getTool } from '../lib/tools.mjs';
 import { siteCopy, langPath } from '../lib/i18n.mjs';
-import { featuredToolSlugs, toolGroups, toolSymbols } from '../lib/toolGroups.mjs';
+import { featuredToolSlugs, toolGroups, toolSymbols, toolSearchAliases } from '../lib/toolGroups.mjs';
 import { websiteJsonLd } from '../lib/seo.mjs';
 const { locale = 'en' } = Astro.props;
 const p = siteCopy[locale].home;
@@ -76,7 +76,7 @@ const desc = zh
             {group.slugs.map((slug) => {
               const tool = getTool(bySlug[slug], locale);
               return <a class="tool-card" data-tool-card="true"
-                data-search-text={[tool.title, tool.short, tool.description, slug].join(' ').toLocaleLowerCase()}
+                data-search-text={[tool.title, tool.short, tool.description, slug, ...(toolSearchAliases[slug] || [])].join(' ').normalize('NFKC').toLocaleLowerCase()}
                 href={href('/' + slug + '/')}
                 aria-label={tool.title + ' — ' + labels.open}>
                 <span class="catalog-icon" aria-hidden="true">{toolSymbols[slug]}</span>
@@ -105,10 +105,17 @@ const desc = zh
       const categoryLinks = new Map([...(categoryNav?.querySelectorAll('[data-category-link]') || [])]
         .map(link => [link.getAttribute('href')?.slice(1), link]));
       const update = () => {
-        const query = search.value.trim().toLocaleLowerCase();
+        const query = search.value.normalize('NFKC').trim().replace(/\s+/g, ' ')
+          .replace(/\s*转\s*/g, '转').toLocaleLowerCase();
         let matches = 0;
         for (const card of cards) {
-          const visible = !query || card.dataset.searchText.includes(query);
+          const words = query.split(' ').filter(Boolean);
+          const haystack = card.dataset.searchText;
+          // Directional phrases are order-sensitive: "JPG to PDF" must not
+          // accidentally return "PDF to JPG" via unordered word matching.
+          const directional = /(?:^|\s)to(?:\s|$)|转/.test(query);
+          const visible = directional ? haystack.includes(query) :
+            words.every(word => haystack.includes(word));
           card.hidden = !visible;
           if (visible) matches++;
         }
