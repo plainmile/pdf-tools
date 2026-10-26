@@ -87,6 +87,54 @@ test('two-column PDF text extraction has explicit row, left and right orders and
   expect(viewport.scroll).toBeLessThanOrEqual(viewport.width+2);
 });
 
+
+test('PDF-to-images prevents reversed/out-of-bounds ranges before conversion and recovers to a real ZIP', async ({ page }) => {
+  await page.goto('/pdf-to-images/');
+  await upload(page, await fixturePdf('Range validation', 8));
+  const range = page.getByTestId('utility-page-ranges');
+  const convert = page.getByTestId('utility-run');
+  await range.fill('6-2');
+  await expect(range).toHaveAttribute('aria-invalid', 'true');
+  await expect(range).toHaveAttribute('aria-describedby', 'image-range-error');
+  await expect(page.getByTestId('image-range-error')).toContainText('1 to 8');
+  await expect(convert).toBeDisabled();
+  await range.fill('9');
+  await expect(convert).toBeDisabled();
+  await range.fill('3,1');
+  await expect(range).toHaveAttribute('aria-invalid', 'false');
+  await expect(page.getByTestId('image-range-error')).toHaveCount(0);
+  await expect(convert).toBeEnabled();
+  const result = await getDownload(page, () => convert.click(), 30000);
+  expect(result.name).toMatch(/fixture-pages-3_1\.zip$/);
+  const zip = await JSZip.loadAsync(result.bytes);
+  expect(Object.keys(zip.files).sort()).toEqual(['order-001-page-003.jpg', 'order-002-page-001.jpg']);
+  for (const entry of Object.values(zip.files)) {
+    const image = await entry.async('uint8array');
+    expect(Array.from(image.slice(0, 3))).toEqual([0xff, 0xd8, 0xff]);
+  }
+});
+
+test('Chinese book-length PDF image selection blocks >60 pages and blank all-pages export', async ({ page }) => {
+  await page.goto('/zh/pdf-to-images/');
+  await upload(page, await fixturePdf('65 pages', 65));
+  const range = page.getByTestId('utility-page-ranges');
+  const convert = page.getByTestId('utility-run');
+  await expect(range).toHaveValue('1-60');
+  await expect(convert).toBeEnabled();
+  await range.fill('1-61');
+  await expect(page.getByTestId('image-range-error')).toContainText('最多选择 60 页');
+  await expect(convert).toBeDisabled();
+  await range.fill('');
+  await expect(page.getByTestId('image-range-error')).toContainText('最多选择 60 页');
+  await expect(convert).toBeDisabled();
+  await range.fill('６１－６５');
+  await expect(page.getByTestId('image-range-error')).toHaveCount(0);
+  await expect(convert).toBeEnabled();
+  await range.fill('６５－６１');
+  await expect(page.getByTestId('image-range-error')).toContainText('不能反向');
+  await expect(convert).toBeDisabled();
+});
+
 test('localized image page range downloads named ZIP containing the correct images', async ({ page }) => {
   await page.goto('/zh/pdf-to-images/');
   await upload(page, await fixturePdf('Localized range source', 8));
