@@ -1090,6 +1090,42 @@ test('repeated malformed emphasis never stalls export or drops following text', 
   expect(extracted.bytes.toString('utf8')).toContain('After markers: Safe and code*x');
 });
 
+test('failed generated-PDF previews can retry without losing the undownloaded PDF in English and Chinese', async ({ page }) => {
+  // An actual canvas failure reproduces a preview-only crash without touching
+  // user bytes, exporting an invalid PDF, or blocking a future download.
+  await page.addInitScript(() => {
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    let failPreviewOnce = true;
+    HTMLCanvasElement.prototype.getContext = function (type, ...args) {
+      if (type === '2d' && this.getAttribute('role') === 'img' && failPreviewOnce) {
+        failPreviewOnce = false;
+        return null;
+      }
+      return getContext.call(this, type, ...args);
+    };
+  });
+  for (const locale of ['en', 'zh']) {
+    await page.goto(locale === 'zh' ? '/zh/markdown-to-pdf/' : '/markdown-to-pdf/');
+    await page.getByTestId('utility-text').fill('Recoverable preview PDF. Save the file after retry.');
+    await page.getByTestId('utility-run').click();
+    await expect(page.getByTestId('text-pdf-result')).toBeVisible();
+    const retry = page.getByTestId('utility-pdf-preview-retry');
+    await expect(retry).toBeVisible();
+    await expect(retry).toHaveText(locale === 'zh' ? '重新尝试预览' : 'Retry preview');
+    await expect(page.getByTestId('utility-pdf-preview')).toContainText(
+      locale === 'zh' ? '仍可下载 PDF' : 'you can still download the PDF');
+    await retry.click();
+    await expect(page.getByTestId('utility-pdf-preview')).toHaveAttribute('data-rendered-page', '1');
+    await expect.poll(() => page.getByTestId('utility-pdf-preview').locator('canvas')
+      .evaluate(canvas => canvas.width), { timeout: 20000 }).toBeGreaterThan(0);
+    await expect(retry).toHaveCount(0);
+    const saved = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
+    const downloaded = await PDFDocument.load(saved.bytes, { updateMetadata: false });
+    expect(downloaded.getPageCount()).toBe(1);
+    expect(saved.name).toMatch(/\.pdf$/);
+  }
+});
+
 test('Markdown technical comparisons survive an actual PDF download and TXT round-trip', async ({ page }) => {
   await page.goto('/markdown-to-pdf/');
   await page.getByTestId('utility-text').fill('Logic: a < 3 && b > 2\nBounds: x <= 40 && y >= 8\n**Safe** <strong>HTML</strong> text');

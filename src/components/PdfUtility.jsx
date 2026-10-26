@@ -15,7 +15,7 @@ const COPY = {
     original: 'Original', result: 'Result', saved: 'Saved', increased: 'Size increase', unchanged: 'No change', noSaving: 'No size reduction. This file was not downloaded; try a lower resolution or keep the original.',
     compressionReady: 'The output is smaller. Check text sharpness before using it.', compressionResultStale: 'This is the previous result, made with a different compression level. You can still download it, or run again with the new setting.', compressionRetryKept: 'The new attempt did not reduce file size. The numbers and download below still belong to your previous successful result.', previewCompressed: 'Preview compressed page 1', hidePreview: 'Hide preview',
     noSavingEarly: 'Stopped early: JPEG data already exceeds the original size. Keep the original or lower the resolution.',
-    compressionLowerBound: 'At least', previewAction: 'Generate PDF preview', previewTitle: 'Generated PDF preview', previewFirst: 'Previewing page 1 of {pages}', previewFailed: 'Preview unavailable; you can still download the PDF.', downloadPdf: 'Download PDF',
+    compressionLowerBound: 'At least', previewAction: 'Generate PDF preview', previewTitle: 'Generated PDF preview', previewFirst: 'Previewing page 1 of {pages}', previewFailed: 'Preview unavailable; you can still download the PDF.', previewRetry: 'Retry preview', downloadPdf: 'Download PDF',
     textWarning: 'Extracts existing selectable PDF text and common filled text/dropdown form fields, not OCR. Columns, tables and complex forms may need review.',
     textOrderLabel: 'Text reading order', textOrderRows: 'By rows (single-column documents and tables)', textOrderLeft: 'Two columns: left first', textOrderRight: 'Two columns: right first', textOrderHint: 'For newspapers and side-by-side articles. Full-width headings, tables and complex layouts can still need manual review.', textOrderStale: 'This download uses your previous reading order. Convert again to apply the new selection.',
     missingTextPages: 'Important: {missing} of {total} pages have no selectable text (pages {pages}). Those pages may be blank or scanned images. Their content was not extracted; OCR would be required for scanned text. Check your original PDF.',
@@ -42,7 +42,7 @@ const COPY = {
     original: '原文件', result: '输出文件', saved: '节省', increased: '体积增加', unchanged: '无变化', noSaving: '未缩小文件，因此没有自动下载。可尝试降低清晰度，或保留原文件。',
     compressionReady: '输出文件确实更小。请先核对文字清晰度。', compressionResultStale: '这是之前压缩强度生成的结果。您仍可下载，或按当前设置重新处理。', compressionRetryKept: '新一轮处理未能缩小文件。下方的大小比较和下载按钮仍对应上一次成功的压缩结果。', previewCompressed: '预览压缩后的首页', hidePreview: '收起预览',
     noSavingEarly: '已提前停止：JPEG 数据已不小于原文件，继续转换也不能节省空间。请保留原文件或降低清晰度。',
-    compressionLowerBound: '至少', previewAction: '生成 PDF 预览', previewTitle: '生成的 PDF 预览', previewFirst: '第 1 页预览（共 {pages} 页）', previewFailed: '无法生成预览，但仍可下载 PDF。', downloadPdf: '下载 PDF',
+    compressionLowerBound: '至少', previewAction: '生成 PDF 预览', previewTitle: '生成的 PDF 预览', previewFirst: '第 1 页预览（共 {pages} 页）', previewFailed: '无法生成预览，但仍可下载 PDF。', previewRetry: '重新尝试预览', downloadPdf: '下载 PDF',
     textWarning: '提取 PDF 中已有的可选择文字，以及常见的已填写文本框和下拉框内容，不具备 OCR。多栏、表格及复杂表单仍需核对。',
     textOrderLabel: '文字阅读顺序', textOrderRows: '按行读取（单栏文档、表格）', textOrderLeft: '双栏：先左栏后右栏', textOrderRight: '双栏：先右栏后左栏', textOrderHint: '适用于报纸、双栏论文等。跨栏标题、表格和复杂版式仍需人工核对。', textOrderStale: '当前结果使用之前的阅读顺序。请重新转换以应用新设置。',
     missingTextPages: '重要提示：共 {total} 页中有 {missing} 页未检测到可选择文字（第 {pages} 页）。这些页可能是空白页或扫描图片，其内容未被提取；扫描文字需要 OCR。请对照原始 PDF 核查。',
@@ -67,6 +67,7 @@ function PdfFirstPagePreview({ bytes, pageCount, t, locale, pageNumber = 1, supp
   const [failed, setFailed] = useState(false);
   const [pdfState, setPdfState] = useState(null);
   const [renderedPage, setRenderedPage] = useState(null);
+  const [retryVersion, setRetryVersion] = useState(0);
 
   // One generated PDF = one PDF.js loading task. Merely browsing page 2,
   // page 300, or the last page must NOT copy/parse the entire 100 MB PDF
@@ -93,7 +94,7 @@ function PdfFirstPagePreview({ bytes, pageCount, t, locale, pageNumber = 1, supp
       disposed = true;
       if (loadingTask) void loadingTask.destroy().catch(() => {});
     };
-  }, [bytes]);
+  }, [bytes, retryVersion]);
 
   // Each page render is short-lived, even though the document is reused.
   // Fast page switches cancel the previous render; a late getPage response
@@ -140,7 +141,16 @@ function PdfFirstPagePreview({ bytes, pageCount, t, locale, pageNumber = 1, supp
     <p className="utility-note">{pageNumber === 1 ? t.previewFirst.replace('{pages}', pageCount) : (locale === 'zh' ? `预览第 ${pageNumber} / ${pageCount} 页` : `Preview page ${pageNumber} of ${pageCount}`)}</p>
     <canvas ref={canvasRef} role="img" aria-label={locale === 'zh' ? (pageNumber === 1 ? 'PDF 首页预览' : `PDF 第 ${pageNumber} 页预览`) : (pageNumber === 1 ? 'PDF first page preview' : `PDF page ${pageNumber} preview`)}
       style={{ maxWidth: '100%', height: 'auto', display: failed ? 'none' : 'block' }} />
-    {failed && <p className="utility-note">{t.previewFailed}</p>}
+    {failed && <div className="utility-preview-failed" role="status">
+      <p className="utility-note">{t.previewFailed}</p>
+      <button type="button" className="button button-secondary button-small"
+        data-testid="utility-pdf-preview-retry" onClick={() => {
+          // Retry only the preview worker, never regenerate or discard the
+          // PDF bytes that the user can already download.
+          setFailed(false);
+          setRetryVersion(value => value + 1);
+        }}>{t.previewRetry}</button>
+    </div>}
   </div>;
 }
 
