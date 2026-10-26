@@ -22,7 +22,9 @@ test('open-ended split ranges produce exact PDF parts and reject missing starts'
     name: 'open-ended.pdf', mimeType: 'application/pdf',
     buffer: await syntheticPdf([301, 302, 303, 304, 305, 306]),
   });
-  await expect(page.getByTestId('page-tile')).toHaveCount(6);
+  // Split opens on its own tab, so page tiles from the Organize panel
+  // are intentionally not mounted. Assert the real loaded-page summary.
+  await expect(page.locator('.file-count')).toContainText('6 pages');
   const ranges = page.locator('#ranges-input');
   await expect(page.getByText('The trailing dash means through the last page', { exact: false })).toBeVisible();
 
