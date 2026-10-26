@@ -57,6 +57,7 @@
 
 - Prefer modest typography, crisp office-style surfaces, practical grouped tools and clear primary actions over gradients, fictional success metrics, stock illustrations or AI-marketing copy.
 - The static HTML catalog must render all 16 genuine tools (four intuitive categories) even when JavaScript is unavailable. Search only filters the already-visible HTML; keep keyboard, mobile and bilingual labels usable.
+- Every real tool page must provide a localized, visible `<noscript>` explanation when its client-only React editor cannot run. Keep indexable titles, descriptions, how-to content, real FAQs and internal links prerendered in HTML; never turn blank JS islands into soft 404s or claim editing works without JavaScript.
 - On phone-width layouts, editable search, page-range, file-name and converter text/select controls must compute to at least 16px to prevent involuntary iOS Safari input-focus zoom. Keep pinch zoom enabled, native file pickers/checkboxes untouched, desktop typography unchanged, and verify 375px screens do not overflow.
 - Page-specific useful answers must be true to current implementations, including page limits, rasterized/uncopyable Unicode PDF text and lossy PDF compression. Avoid overclaiming or duplicating generic copy.
 - Keep SEO canonical and reciprocal EN/zh-CN hreflang, sitemap/robots, unique titles and descriptions, one H1 and accurate visible JSON-LD (WebSite, WebApplication, BreadcrumbList) in both languages. Do not add Review/FAQPage rich-result markup unless genuine eligibility and content permit it.
