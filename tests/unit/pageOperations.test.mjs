@@ -112,6 +112,20 @@ test('delete selected pages without mutating originals', () => {
   assert.equal(pages.length, 3);
 });
 
+test('combined ranges honor typed order, remove overlaps and preserve source refs', () => {
+  assert.deepEqual(pagePositionsForCombinedRanges('３，１－２、３', 3), [3, 1, 2]);
+  assert.deepEqual(pagePositionsForCombinedRanges('2-3, 1-2', 3), [2, 3, 1]);
+  assert.deepEqual(pagePositionsForCombinedRanges('1-3', 3).map(n => pages[n - 1].id), ['a', 'b', 'c']);
+  assert.deepEqual(pages.map(p => p.id), ['a', 'b', 'c']);
+  for (const bad of ['', ' ', '2-1', '0', '4', '1,,2', '1,', 'not a range', null, 3]) {
+    assert.throws(() => pagePositionsForCombinedRanges(bad, 3), 'invalid selection: ' + String(bad));
+  }
+  const fiftyOneRanges = Array.from({ length: 51 }, () => '1').join(',');
+  assert.throws(() => pagePositionsForCombinedRanges(fiftyOneRanges, 3), /maximum of 50/);
+  assert.equal(pagePositionsForCombinedRanges('1-600', 600).length, 600);
+  assert.throws(() => pagePositionsForCombinedRanges('1-601', 601), /At most 600/);
+});
+
 test('split explicit ranges and preserve workspace page order', () => {
   const ranges = parsePageRanges('1-2, 3', pages.length);
   assert.deepEqual(ranges, [{start:1,end:2}, {start:3,end:3}]);
