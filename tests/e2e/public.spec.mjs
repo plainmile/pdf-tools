@@ -32,6 +32,26 @@ test('bilingual extract SEO explains the two real ways to create one PDF', async
   }
 });
 
+test('bilingual workspace and split SEO explain real preflight and recoverable selection', async ({ request }) => {
+  for (const [path, claim] of [
+    ['/workspace/', 'Your previously selected pages are not changed'],
+    ['/zh/workspace/', '之前已经选中的页面不会改变'],
+    ['/split-pdf/', 'Invalid ranges are flagged directly in the split field before download'],
+    ['/zh/split-pdf/', '反向或越界的范围会在拆分输入框直接标记'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    // These assertions check server-rendered, task-specific guidance; no
+    // JavaScript, misleading FAQPage schema or duplicate alias URL is needed.
+    expect(html, path).toContain(claim);
+    expect(html).toContain('rel="canonical"');
+    expect(html).toContain('hreflang="en"');
+    expect(html).toContain('hreflang="zh-CN"');
+    expect(html).not.toContain('"@type":"FAQPage"');
+  }
+});
+
 test('bilingual image export SEO explains real range behavior and whole-page rendering', async ({ request }) => {
   for (const [path, validation, distinction, deduplication] of [
     ['/pdf-to-images/', 'Invalid, reversed and oversized selections are shown before conversion',
