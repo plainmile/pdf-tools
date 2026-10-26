@@ -246,8 +246,41 @@ export function splitRangesFromCuts(cutPages, pageCount, maxParts = 50) {
   }).join(', ');
 }
 
+/** Select one exact PDF outline depth, never mix parent chapter titles with
+ * subchapters from another level. The PDF.js outline is a tree of {items}.
+ * A malicious or cyclic outline must not freeze the browser. A level without
+ * matching entries stays empty rather than silently reverting to level 1.
+ */
+export function bookmarkItemsAtLevel(outline, level = 1, maxVisited = 1000) {
+  if (!Array.isArray(outline) || ![1, 2, 3].includes(level) ||
+      !Number.isSafeInteger(maxVisited) || maxVisited < 1 || maxVisited > 1000) {
+    throw new Error('Invalid PDF bookmark level or outline.');
+  }
+  const stack = outline.map(item => ({ item, depth: 1 })).reverse();
+  const visited = new Set();
+  const result = [];
+  while (stack.length) {
+    const { item, depth } = stack.pop();
+    if (!item || typeof item !== 'object' || visited.has(item)) continue;
+    visited.add(item);
+    if (visited.size > maxVisited) throw new Error('Too many PDF bookmark entries.');
+    if (depth === level) {
+      result.push(item);
+      if (result.length > 250) throw new Error('Too many PDF bookmark entries.');
+    } else if (depth < level && Array.isArray(item.items)) {
+      // Reverse push preserves document outline order for identical page starts.
+      for (let i = item.items.length - 1; i >= 0; i--) {
+        stack.push({ item: item.items[i], depth: depth + 1 });
+      }
+      if (stack.length > maxVisited) throw new Error('Too many PDF bookmark entries.');
+    }
+  }
+  return result;
+}
+
 /**
- * Interpret TOP-LEVEL PDF bookmark destinations as 1-based chapter starts.
+ * Interpret PDF bookmark destinations from ONE selected depth as 1-based
+ * chapter starts.
  * A bookmark pointing to page N places the cut AFTER page N-1. Preserve
  * everything before the first chapter (cover, contents), even when no
  * bookmark points to page 1. Duplicate starts never produce empty PDFs.
