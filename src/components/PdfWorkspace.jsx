@@ -179,17 +179,28 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const watermark = { enabled: watermarkEnabled, text: watermarkText };
   const watermarkPreview = watermarkEnabled && watermarkText.trim() ? watermarkText.trim() : null;
   const selectedCount = selected.size;
-  // A direct combined extraction is distinct from checkbox selection: it uses
-  // the exact order of the typed ranges, and drops overlap duplicates once.
-  // Never alter selection or the source page order while previewing this plan.
-  const combinedRangePositions = useMemo(() => {
-    if (mode !== 'extract-pages' || !selectionRanges.trim() || !pages.length) return null;
-    try { return pagePositionsForCombinedRanges(selectionRanges, pages.length); }
-    catch { return null; }
+  // Every workspace page-selection form uses the SAME strict parser as
+  // extraction. Invalid, reversed, out-of-bounds or >50-range plans must be
+  // shown inline BEFORE Apply, not only after a failed click. Keep the current
+  // checkbox selection untouched until the user explicitly applies the plan.
+  const rangeInputPlan = useMemo(() => {
+    if (!selectionRanges.trim() || !pages.length) return { invalid: false, positions: null };
+    try {
+      const positions = mode === 'extract-pages'
+        ? pagePositionsForCombinedRanges(selectionRanges, pages.length)
+        : (parsePageRanges(selectionRanges, pages.length), null);
+      return { invalid: false, positions };
+    } catch { return { invalid: true, positions: null }; }
   }, [mode, selectionRanges, pages.length]);
-  // Never leave an actionable "Export" button under a visibly invalid plan.
-  // Parsing remains the single source of truth for page order and range bounds.
-  const invalidCombinedRange = mode === 'extract-pages' && Boolean(selectionRanges.trim()) && !combinedRangePositions;
+  const invalidSelectionRange = rangeInputPlan.invalid;
+  // Direct combined extraction follows typed order. Checkbox selection follows
+  // the current page order; neither should modify the other before confirmation.
+  const combinedRangePositions = mode === 'extract-pages' ? rangeInputPlan.positions : null;
+  const rangeDescriptionIds = [
+    'selection-range-hint',
+    mode === 'extract-pages' ? 'range-combine-hint' : null,
+    invalidSelectionRange ? (mode === 'extract-pages' ? 'range-combine-invalid' : 'selection-range-invalid') : null,
+  ].filter(Boolean).join(' ');
   const bytesInMemory = useMemo(() => retainedSourcesBytes(sources), [sources]);
   const sourceLookup = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources]);
   const zoomPageIndex = pages.findIndex(page => page.id === previewPageId);
@@ -297,6 +308,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     } catch (_error) { return null; }
   }, [pages.length, splitMode, ranges, chunkSizeNumber, chunkOutputCount, safeSplitBatchIndex, splitNeedsInput]);
   const splitEstimate = splitPlan?.parts.length ?? null;
+  // An invalid split plan already disables downloads; also identify the
+  // offending input to screen readers and to users before they click.
+  const invalidSplitRange = splitMode === 'ranges' && pages.length > 0 &&
+    Boolean(ranges.trim()) && !splitPlan;
+  const invalidChunkSize = splitMode === 'chunks' && pages.length > 0 &&
+    Boolean(chunkSize.trim()) && !splitPlan;
   // Titles only describe an explicitly applied bookmark-derived plan for
   // this exact original PDF and exact current ranges. No names survive a
   // manual range edit, page reorder, source change or different split mode.
@@ -1305,17 +1322,21 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     <label htmlFor="selection-ranges">{t.rangeSelectLabel}
                       <input id="selection-ranges" data-testid="selection-ranges" type="text"
                         placeholder="1-3, 5, 8-" value={selectionRanges} disabled={busy}
-                        aria-invalid={invalidCombinedRange ? "true" : undefined}
-                        aria-describedby={mode === "extract-pages" ? "range-combine-hint" : undefined}
+                        aria-invalid={invalidSelectionRange ? "true" : undefined}
+                        aria-describedby={rangeDescriptionIds}
                         onChange={event => { setSelectionRanges(event.target.value); setError(""); setNotice(""); }} />
                     </label>
                     <button className="button button-secondary button-small" type="submit"
-                      data-testid="selection-range-apply" disabled={busy || !selectionRanges.trim() || invalidCombinedRange}>{t.rangeSelectApply}</button>
-                    <p className="input-note">{t.rangeSelectHint}</p>
+                      data-testid="selection-range-apply" disabled={busy || !selectionRanges.trim() || invalidSelectionRange}>{t.rangeSelectApply}</button>
+                    <p className="input-note" id="selection-range-hint">{t.rangeSelectHint}</p>
+                    {invalidSelectionRange && mode !== 'extract-pages' && <p className="input-note range-selection-invalid"
+                      id="selection-range-invalid" data-testid="selection-range-invalid" role="status">
+                      {t.rangeSelectInvalidInline}
+                    </p>}
                     {mode === 'extract-pages' && <div className="range-combine-controls" data-testid="range-combine-controls">
                       <p className="input-note" id="range-combine-hint">{t.rangeCombineHint}</p>
-                      {invalidCombinedRange && <p className="input-note range-combine-invalid"
-                        data-testid="range-combine-invalid" role="status">{t.rangeSelectInvalid}</p>}
+                      {invalidSelectionRange && <p className="input-note range-combine-invalid"
+                        id="range-combine-invalid" data-testid="range-combine-invalid" role="status">{t.rangeSelectInvalid}</p>}
                       {combinedRangePositions && <p className="input-note" role="status"
                         data-testid="range-combine-preview">{interpolate(t.rangeCombinePreview, {
                           pages: combinedRangePositions.length,
@@ -1520,13 +1541,15 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                 <div className="split-fields">
                   <label className="option-radio"><input type="radio" name="split-method" checked={splitMode === 'ranges'} disabled={busy} onChange={() => { setSplitMode('ranges'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); }} />{t.byRanges}</label>
                   <label className="input-label" htmlFor="ranges-input">{t.pageRanges}</label>
-                  <input id="ranges-input" value={ranges} onChange={(event) => { setRanges(event.target.value); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); }} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7-" />
-                  <p className="input-note">{t.rangeHint}</p>
+                  <input id="ranges-input" value={ranges} onChange={(event) => { setRanges(event.target.value); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); }} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7-"
+                    aria-invalid={invalidSplitRange ? 'true' : undefined} aria-describedby="split-range-hint split-estimate" />
+                  <p className="input-note" id="split-range-hint">{t.rangeHint}</p>
                   <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); }} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
                   <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} placeholder="5"
                     onChange={(event) => { setChunkSize(event.target.value); setSplitBatchIndex(0); }}
-                    disabled={splitMode !== 'chunks' || busy} />
+                    disabled={splitMode !== 'chunks' || busy}
+                    aria-invalid={invalidChunkSize ? 'true' : undefined} aria-describedby="split-estimate" />
                   <div className="split-quick-action">
                     <button type="button" className="button button-secondary button-small"
                       data-testid="split-each-page" aria-pressed={splitMode === 'chunks' && Number(chunkSize) === 1}
@@ -1704,7 +1727,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                       })}
                     </div>}
                   </details>}
-                  <div className="split-estimate" aria-live="polite">{splitEstimate === null
+                  <div className="split-estimate" id="split-estimate" aria-live="polite">{splitEstimate === null
                     ? (splitMode === 'parity' && pages.length < 2 ? t.oddEvenNeedTwo
                       : splitNeedsInput ? (splitMode === 'ranges' ? t.enterSplitRanges : t.enterSplitSize) : t.invalidRange)
                     : interpolate(splitPlan?.batch ? t.splitBatchEstimate : t.estimate, { files: splitEstimate })}</div>
