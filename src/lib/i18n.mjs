@@ -142,7 +142,7 @@ export const workspaceCopy = {
     watermarkLabel: '添加文字水印（可选）', watermarkTextLabel: '水印文字', watermarkPlaceholder: '例如：内部资料',
     watermarkHelp: '导出时在每页添加居中斜向的浅色水印，缩略图为近似预览。',
     watermarkNeedsText: '请填写水印内容；不需要时可关闭水印开关。',
-    app: 'PDF 页面工作台', local: '文件仅在本机处理', exportAllPages: '导出全部页面', morePageActions: '更多页面操作', focusRotateHint: '选中方向不正确的页面，再点击向左或向右旋转；其他页面不会改变。', focusDeleteHint: '选中需要删除的页面后点击删除，导出前仍可撤销恢复。', focusExtractHint: '选择需要单独保存的页面，再点击提取。只有需要完整文档时才使用“导出全部页面”。', organize: '整理页面', split: '拆分文件', add: '添加文件', export: '导出 PDF', working: '正在处理…',
+    app: 'PDF 页面工作台', local: '文件仅在本机处理', exportAllPages: '导出全部页面', morePageActions: '更多页面操作', focusRotateHint: '选中方向不正确的页面，再点击向左或向右旋转；其他页面不会改变。', focusDeleteHint: '选中需要删除的页面后点击删除，导出前仍可撤销恢复。', focusExtractHint: '勾选缩略图后点击「提取页面」，按工作台页序导出；也可在下方输入多个页码范围，按输入顺序直接合并导出一份 PDF。', organize: '整理页面', split: '拆分文件', add: '添加文件', export: '导出 PDF', working: '正在处理…',
     dropTitle: '将 PDF 或图片拖入此处', dropSub: '也可以从您的设备中选择文件', choose: '选择 PDF 或图片', opening: '正在读取…',
     limits: 'PDF、JPG、BMP、静态 PNG、静态 WebP、静态 AVIF · 最多 20 个文件 · 单文件 100 MB · 共 600 页', private: '文件始终留在您的设备上。', reset: '清空工作台，重新开始',
     page: '页', pages: '页', file: '个文件', files: '个文件', from: '来自', selected: '页已选中', undo: '撤销', redo: '重做', clear: '清空', clearConfirmTitle: '确定清空 PDF 工作台？', clearConfirmDescription: '这会永久清除所有已加载文件、页面编辑及撤销历史。是否继续？', cancelClear: '继续编辑', confirmClear: '确认全部清空', reimportConfirmTitle: '确定丢弃最后的撤销历史？', reimportConfirmMessage: '即将使用 {files} 个已验证的新文件开始全新工作台。原来已删除的页面目前仍可撤销恢复；继续会永久清除这些页面与旧的撤销历史。', reimportKeep: '保留原页面以便恢复', reimportReplace: '确认开始新工作台',
