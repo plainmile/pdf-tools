@@ -187,6 +187,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     try { return pagePositionsForCombinedRanges(selectionRanges, pages.length); }
     catch { return null; }
   }, [mode, selectionRanges, pages.length]);
+  // Never leave an actionable "Export" button under a visibly invalid plan.
+  // Parsing remains the single source of truth for page order and range bounds.
+  const invalidCombinedRange = mode === 'extract-pages' && Boolean(selectionRanges.trim()) && !combinedRangePositions;
   const bytesInMemory = useMemo(() => retainedSourcesBytes(sources), [sources]);
   const sourceLookup = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources]);
   const zoomPageIndex = pages.findIndex(page => page.id === previewPageId);
@@ -1296,19 +1299,23 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   </div>
                 </div>
                 {focusedActionKeys && <p className="input-note focused-page-hint" data-testid="focused-page-hint">{focusedHint}</p>}
-                <details className="selection-range-panel" data-testid="selection-range-panel">
+                <details className="selection-range-panel" data-testid="selection-range-panel" open={mode === "extract-pages"}>
                   <summary>{mode === 'extract-pages' ? t.rangeSelectCombineToggle : t.rangeSelectToggle}</summary>
                   <form className="selection-range-form" onSubmit={applyPageRangeSelection}>
                     <label htmlFor="selection-ranges">{t.rangeSelectLabel}
                       <input id="selection-ranges" data-testid="selection-ranges" type="text"
                         placeholder="1-3, 5, 8-12" value={selectionRanges} disabled={busy}
-                        onChange={event => setSelectionRanges(event.target.value)} />
+                        aria-invalid={invalidCombinedRange ? "true" : undefined}
+                        aria-describedby={mode === "extract-pages" ? "range-combine-hint" : undefined}
+                        onChange={event => { setSelectionRanges(event.target.value); setError(""); setNotice(""); }} />
                     </label>
                     <button className="button button-secondary button-small" type="submit"
-                      data-testid="selection-range-apply" disabled={busy || !selectionRanges.trim()}>{t.rangeSelectApply}</button>
+                      data-testid="selection-range-apply" disabled={busy || !selectionRanges.trim() || invalidCombinedRange}>{t.rangeSelectApply}</button>
                     <p className="input-note">{t.rangeSelectHint}</p>
                     {mode === 'extract-pages' && <div className="range-combine-controls" data-testid="range-combine-controls">
-                      <p className="input-note">{t.rangeCombineHint}</p>
+                      <p className="input-note" id="range-combine-hint">{t.rangeCombineHint}</p>
+                      {invalidCombinedRange && <p className="input-note range-combine-invalid"
+                        data-testid="range-combine-invalid" role="status">{t.rangeSelectInvalid}</p>}
                       {combinedRangePositions && <p className="input-note" role="status"
                         data-testid="range-combine-preview">{interpolate(t.rangeCombinePreview, {
                           pages: combinedRangePositions.length,
@@ -1317,7 +1324,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                         })}</p>}
                       <button type="button" className="button button-primary button-small"
                         data-testid="range-combine-download" onClick={exportCombinedRanges}
-                        disabled={busy || !selectionRanges.trim()}>{t.rangeCombineAction}</button>
+                        disabled={busy || !combinedRangePositions}>{t.rangeCombineAction}</button>
                     </div>}
                     <div className="selection-pattern-buttons" data-testid="selection-pattern-buttons"
                       role="group" aria-label={t.quickSelectionLabel}>
