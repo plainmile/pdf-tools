@@ -113,6 +113,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const layoutAbortRef = useRef(null);
   const importAbortRef = useRef(null);
   const visualConfirmRef = useRef(null);
+  const bookmarkConfirmRef = useRef(null);
   const [sources, setSources] = useState([]);
   const [history, setHistory] = useState(() => makeHistoryState());
   const [selected, setSelected] = useState(() => new Set());
@@ -163,6 +164,11 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   useEffect(() => {
     if (pendingVisualCut !== null) visualConfirmRef.current?.focus();
   }, [pendingVisualCut]);
+  // When an inline overwrite confirmation replaces its Apply button, keep
+  // keyboard focus on the confirmation instead of losing it to the page body.
+  useEffect(() => {
+    if (bookmarkReplaceConfirm) bookmarkConfirmRef.current?.focus();
+  }, [bookmarkReplaceConfirm]);
   const [exportSettingsOpen, setExportSettingsOpen] = useState(mode === 'watermark-pdf');
   const [watermarkEnabled, setWatermarkEnabled] = useState(false);
   const [watermarkText, setWatermarkText] = useState('');
@@ -290,6 +296,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       setRanges(cutPositions.length ? splitRangesFromCuts(cutPositions, pages.length) : '');
       setSplitMode('ranges');
       setPendingVisualCut(null);
+      setBookmarkReplaceConfirm(false);
       setError(''); setNotice('');
     } catch (reason) {
       setError(/maximum of 50 ranges/i.test(String(reason?.message))
@@ -486,6 +493,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setBookmarkReplaceConfirm(false);
     setError('');
     setNotice(interpolate(t.bookmarkApplied, { files: bookmarkDraft.files }));
+    // The now-hidden confirmation button cannot retain keyboard focus.
+    // Move to the actual output range field that was just populated.
+    requestAnimationFrame(() => document.getElementById('ranges-input')?.focus());
   };
 
   const resetSelection = () => { setSelected(new Set()); lastSelectedIndex.current = null; lastGroupedSelection.current = null; };
@@ -1431,11 +1441,11 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
               <section className="split-panel" aria-label={t.splitTitle} role="tabpanel" id="workspace-panel-split" aria-labelledby="workspace-tab-split">
                 <div className="split-intro"><div className="split-graphic" aria-hidden="true">1–3 <span>→</span> 4–6</div><h3>{t.splitTitle}</h3><p>{t.splitHint}</p></div>
                 <div className="split-fields">
-                  <label className="option-radio"><input type="radio" name="split-method" checked={splitMode === 'ranges'} disabled={busy} onChange={() => { setSplitMode('ranges'); setPendingVisualCut(null); }} />{t.byRanges}</label>
+                  <label className="option-radio"><input type="radio" name="split-method" checked={splitMode === 'ranges'} disabled={busy} onChange={() => { setSplitMode('ranges'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); }} />{t.byRanges}</label>
                   <label className="input-label" htmlFor="ranges-input">{t.pageRanges}</label>
-                  <input id="ranges-input" value={ranges} onChange={(event) => { setRanges(event.target.value); setPendingVisualCut(null); }} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7" />
+                  <input id="ranges-input" value={ranges} onChange={(event) => { setRanges(event.target.value); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); }} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7" />
                   <p className="input-note">{t.rangeHint}</p>
-                  <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); }} />{t.every}</label>
+                  <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); }} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
                   <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} placeholder="5"
                     onChange={(event) => { setChunkSize(event.target.value); setSplitBatchIndex(0); }}
@@ -1444,7 +1454,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     <button type="button" className="button button-secondary button-small"
                       data-testid="split-each-page" aria-pressed={splitMode === 'chunks' && Number(chunkSize) === 1}
                       disabled={busy}
-                      onClick={() => { setSplitMode('chunks'); setChunkSize('1'); setSplitBatchIndex(0); setPendingVisualCut(null); setError(''); setNotice(''); }}>
+                      onClick={() => { setSplitMode('chunks'); setChunkSize('1'); setSplitBatchIndex(0); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setError(''); setNotice(''); }}>
                       {t.eachPagePreset}
                     </button>
                     {pages.length > 50 && <p className="input-note" data-testid="split-each-page-limit">
@@ -1486,7 +1496,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <label className="option-radio option-divider">
                     <input type="radio" name="split-method" value="parity" checked={splitMode === 'parity'}
                       disabled={busy || pages.length < 2}
-                      onChange={() => { setSplitMode('parity'); setPendingVisualCut(null); setError(''); setNotice(''); }} />
+                      onChange={() => { setSplitMode('parity'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setError(''); setNotice(''); }} />
                     {t.byOddEven}
                   </label>
                   <p className="input-note" data-testid="split-odd-even-hint">{t.oddEvenHint}</p>
@@ -1508,11 +1518,15 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                       </p>
                       <ol className="split-bookmark-examples">{bookmarkDraft.examples.map((item, index) =>
                         <li key={index}>{interpolate(t.bookmarkExample, { page: item.page })} — {item.title}</li>)}</ol>
-                      {bookmarkReplaceConfirm && <div className="workspace-clear-confirm" data-testid="bookmark-confirm">
+                      {bookmarkReplaceConfirm && <div className="workspace-clear-confirm" data-testid="bookmark-confirm"
+                        ref={bookmarkConfirmRef} tabIndex={-1} role="group" aria-label={t.bookmarkReplaceWarning}>
                         <p>{t.bookmarkReplaceWarning}</p>
                         <div className="workspace-clear-buttons">
                           <button type="button" className="button button-secondary button-small"
-                            data-testid="bookmark-keep" onClick={() => setBookmarkReplaceConfirm(false)}>{t.bookmarkKeep}</button>
+                            data-testid="bookmark-keep" onClick={() => {
+                              setBookmarkReplaceConfirm(false);
+                              requestAnimationFrame(() => document.querySelector('[data-testid="bookmark-apply"]')?.focus());
+                            }}>{t.bookmarkKeep}</button>
                           <button type="button" className="button button-secondary button-small"
                             data-testid="bookmark-confirm-replace" onClick={applyBookmarkChapters}>{t.bookmarkReplace}</button>
                         </div>
