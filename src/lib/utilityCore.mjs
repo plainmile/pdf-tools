@@ -745,6 +745,32 @@ export function workspaceFilenameStem(input, fallback = '') {
   return WINDOWS_RESERVED_DEVICE_STEM.test(stem)
     ? `plainmile-${stem}` : stem;
 }
+/** Deterministic ZIP entry names for a *confirmed* bookmark-derived split.
+ * A fixed ordinal and the real output page range ensure uniqueness, even
+ * when the PDF contains duplicate, malicious or empty bookmark titles.
+ * The caller must confirm the current page order and range plan still match.
+ */
+export function bookmarkSplitPartFilenames(parts, chapters) {
+  if (!Array.isArray(parts) || !parts.length || parts.length > 50 ||
+      !Array.isArray(chapters)) {
+    throw new Error('Invalid bookmark split filenames.');
+  }
+  const titles = new Map();
+  for (const chapter of chapters) {
+    if (!Number.isSafeInteger(chapter?.page) || chapter.page < 1 ||
+        typeof chapter.title !== 'string') continue;
+    if (!titles.has(chapter.page)) titles.set(chapter.page, chapter.title);
+  }
+  return parts.map((part, index) => {
+    if (!Number.isSafeInteger(part?.start) || !Number.isSafeInteger(part?.end) ||
+        part.start < 1 || part.end < part.start || part.end > 600) {
+      throw new Error('Invalid bookmark output range.');
+    }
+    const title = workspaceFilenameStem(titles.get(part.start) ?? '', '').slice(0, 48);
+    return `part-${String(index + 1).padStart(2, '0')}${title ? '-' + title : ''}-pages-${part.start}-${part.end}.pdf`;
+  });
+}
+
 export function sanitizeFilename(filename) {
   const stem = (filename || 'document').replace(/\.[^.]+$/, '')
     .replace(/[^\p{L}\p{N}._-]+/gu, '-').slice(0, 70)
