@@ -26,7 +26,9 @@ test('open-ended split ranges produce exact PDF parts and reject missing starts'
   // are intentionally not mounted. Assert the real loaded-page summary.
   await expect(page.locator('.file-count')).toContainText('6 pages');
   const ranges = page.locator('#ranges-input');
-  await expect(page.getByText('The trailing dash means through the last page', { exact: false })).toBeVisible();
+  // The hint and the empty-plan status both mention the dash; scope the
+  // check to the actual form hint to avoid a strict-locator ambiguity.
+  await expect(page.locator('.split-fields .input-note').first()).toContainText('The trailing dash means through the last page');
 
   await ranges.fill('-3');
   await expect(page.locator('.split-download')).toBeDisabled();
