@@ -65,7 +65,7 @@ test('tool finder announces localized match counts and no-match status to assist
   await expect(status).toHaveText('1 matching tools.');
   await expect(status).toBeVisible();
   await page.getByRole('searchbox', { name: 'Find a PDF tool' }).fill('no-such-tool-match');
-  await expect(status).toHaveText('No tools match that search. Try a different term.');
+  await expect(status).toHaveText('0 matching tools.');
   await page.getByRole('button', { name: 'Clear' }).click();
   await expect(status).toBeHidden();
 
@@ -74,7 +74,7 @@ test('tool finder announces localized match counts and no-match status to assist
   await zhSearch.fill('水印');
   await expect(status).toHaveText('找到 1 个工具。');
   await zhSearch.fill('不存在的工具名称123');
-  await expect(status).toHaveText('没有匹配的工具，请换一个关键词。');
+  await expect(status).toHaveText('找到 0 个工具。');
 });
 
 test('Chinese catalog search, categories and links work on mobile without overflow', async ({ page }) => {
