@@ -365,9 +365,13 @@ main { flex: 1; }
 .input-note { color: var(--subtle); font-size: 11px; line-height: 1.6; margin: 8px 0 0; }
 /* Visual splitting uses the same lazy PDF.js page thumbnails as Organize.
    Cut actions are real buttons; the separate preview button only opens zoom. */
-.split-visual-panel { min-width: 0; margin: 18px 0 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); padding: 11px; }
-.split-visual-panel > summary { cursor: pointer; font-size: 13px; font-weight: 650; line-height: 1.5; }
-.split-visual-panel .input-note { margin: 7px 0 11px; }
+.split-visual-panel, .split-bookmark-panel { min-width: 0; margin: 18px 0 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); padding: 11px; }
+.split-visual-panel > summary, .split-bookmark-panel > summary { cursor: pointer; font-size: 13px; font-weight: 650; line-height: 1.5; }
+.split-visual-panel .input-note, .split-bookmark-panel .input-note { margin: 7px 0 11px; }
+.split-bookmark-examples { font-size: 12px; color: var(--muted); margin: 8px 0; padding-left: 24px; max-height: 175px; overflow-y: auto; overflow-wrap: anywhere; }
+.split-bookmark-panel .utility-note { overflow-wrap: anywhere; }
+.split-bookmark-panel .bookmark-ranges-preview code { font-size: 12px; white-space: normal; overflow-wrap: anywhere; }
+.split-bookmark-panel .workspace-clear-confirm { margin: 10px 0; }
 .split-visual-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(125px,1fr)); gap: 10px; max-height: 470px; min-width: 0; overflow-y: auto; padding: 9px 3px 4px; }
 .split-visual-tile { display: flex; flex-direction: column; min-width: 0; padding: 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--panel); }
 .split-visual-tile.is-cut { border-color: var(--accent); }

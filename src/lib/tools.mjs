@@ -17,9 +17,9 @@ export const tools = [
   {
     slug: 'split-pdf', title: 'Split PDF', short: 'Separate into smaller files',
     headline: 'Split a PDF into just the sections you need.',
-    description: 'Split PDF pages by ranges, every N pages, or into separate odd/even PDF files. Single results download as PDF; multiple results as ZIP, without uploads.',
-    details: 'Enter ranges such as 1-3, 4-6 (one output PDF per range), choose a fixed number of pages per PDF, or split odd/even page positions into two PDFs. All modes follow the current page order. For long PDFs, a page counter shows copied output pages before the separate ZIP packaging step; cancellation leaves no partial download.',
-    steps: ['Add your PDF', 'Choose ranges, every N pages, or odd/even splitting', 'Download a PDF or ZIP'],
+    description: 'Split PDF files by page ranges, every N pages, odd/even pages or existing PDF chapter bookmarks. Single results download as PDF; multiple files as ZIP, without uploads.',
+    details: 'Choose page ranges, fixed pages per file, or odd/even output pages. If one original PDF has top-level chapter bookmarks and its page order is unchanged, you can preview bookmark-derived split points before applying them. Each custom range becomes a separate PDF; generated ZIP files contain the results. Long-document progress and cancellation are supported, entirely in your browser.',
+    steps: ['Add a PDF', 'Choose ranges, a page count, odd/even pages or original bookmark chapters', 'Review and download a PDF or ZIP'],
   },
   {
     slug: 'organize-pdf', title: 'Organize PDF', short: 'Reorder by thumbnail',

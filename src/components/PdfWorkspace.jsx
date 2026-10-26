@@ -9,7 +9,7 @@ import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, duplicatePages, insertPageAfter, parsePageRanges, pageIdsForRanges, chunkPageRanges, splitChunkBatch, oddEvenSplitParts,
-  getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
+  getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, splitRangesFromBookmarkStarts, reversePages, sortPagesByFilename, interleaveDuplexPages, groupPagesBySource, pageIdsForParity, invertPageIdSelection, makeHistoryState, commitHistory, undoHistory, redoHistory, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
 } from '../lib/pageOperations.mjs';
 
 function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPreview, onOpen, outputPosition, busy }) {
@@ -153,6 +153,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [splitBatchIndex, setSplitBatchIndex] = useState(0);
   const [splitBatchDownloads, setSplitBatchDownloads] = useState({ key: null, indices: [] });
   const [splitVisualJumpInput, setSplitVisualJumpInput] = useState('');
+  const [bookmarkDraft, setBookmarkDraft] = useState(null);
+  const [bookmarkReplaceConfirm, setBookmarkReplaceConfirm] = useState(false);
   const [pendingVisualCut, setPendingVisualCut] = useState(null);
   const [visualSplitOpen, setVisualSplitOpen] = useState(false);
   // A cut can be clicked deep inside a long scrollable preview grid. If the
@@ -209,6 +211,20 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const hasOriginalPdf = pages.some(page => { const src = sourceLookup.get(page.sourceId); return src && !src.isImage && !src.isGeneratedBlank; });
   const activeFormSourceCount = countActiveSources(pages.filter(page => sourceLookup.get(page.sourceId)?.hasInteractiveForms));
   const activeBookmarkSourceCount = countActiveSources(pages.filter(page => sourceLookup.get(page.sourceId)?.hasOutlineBookmarks));
+  // PDF bookmarks point to ORIGINAL document pages. Never interpret them as
+  // today's export positions after reordering, duplicating, deleting, merging,
+  // or adding a blank. Allow page rotation, which does not change positions.
+  const originalBookmarkSource = pages.length >= 2 && activeSourceCount === 1
+    ? sourceLookup.get(pages[0].sourceId) : null;
+  const bookmarkSource = originalBookmarkSource?.hasOutlineBookmarks &&
+    !originalBookmarkSource.isImage && pages.length === originalBookmarkSource.pageCount &&
+    pages.every((page, index) => page.sourceId === originalBookmarkSource.id && page.pageIndex === index)
+    ? originalBookmarkSource : null;
+  const bookmarkSourceKey = bookmarkSource?.id ?? null;
+  useEffect(() => {
+    setBookmarkDraft(null);
+    setBookmarkReplaceConfirm(false);
+  }, [bookmarkSourceKey]);
   const pristineOutput = pages.length > 0 && Boolean(pristinePdfBytes(sources, pages, watermark));
   // Only a full Export PDF marks these particular edits as safely downloaded.
   // A later rotation/reorder/paper/watermark change immediately re-enables the
@@ -390,6 +406,86 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     tile.focus({ preventScroll: true });
     setError('');
     setNotice(interpolate(t.jumpFound, { n: number }));
+  };
+
+  const inspectBookmarkChapters = () => withBusy(async () => {
+    if (!bookmarkSource) throw new Error(t.bookmarkUnavailable);
+    setBookmarkDraft(null);
+    setBookmarkReplaceConfirm(false);
+    let document;
+    let outline;
+    try {
+      document = await getPreviewDoc(bookmarkSource);
+      outline = await document.getOutline();
+    } catch (_invalidOutline) {
+      setError(t.bookmarkReadFailed);
+      return;
+    }
+    if (!Array.isArray(outline) || !outline.length) {
+      setError(t.bookmarkNoBreaks);
+      return;
+    }
+    // Bound parsing on hostile/outlandishly long outlines. We only use
+    // TOP-LEVEL items; nested headings may subdivide chapters incorrectly.
+    if (outline.length > 250) {
+      setError(t.bookmarkTooMany);
+      return;
+    }
+    const starts = [];
+    const examples = [];
+    let ignored = 0;
+    for (const entry of outline) {
+      let index = null;
+      try {
+        const dest = typeof entry.dest === 'string'
+          ? await document.getDestination(entry.dest) : entry.dest;
+        if (Array.isArray(dest) && dest.length) {
+          const target = dest[0];
+          index = Number.isInteger(target)
+            ? target : target && typeof target === 'object'
+              ? await document.getPageIndex(target) : null;
+        }
+      } catch (_ignoredDestination) {
+        index = null;
+      }
+      if (!Number.isSafeInteger(index) || index < 0 || index >= pages.length) {
+        ignored++;
+        continue;
+      }
+      starts.push(index + 1);
+      if (examples.length < 8) examples.push({
+        page: index + 1, title: String(entry.title || '').slice(0, 80),
+      });
+    }
+    let previewRanges;
+    try {
+      previewRanges = splitRangesFromBookmarkStarts(starts, pages.length);
+    } catch (_invalidOutline) {
+      const validUniqueBreaks = new Set(starts.filter(start => start > 1)).size;
+      setError(validUniqueBreaks >= 50 ? t.bookmarkTooMany : t.bookmarkNoBreaks);
+      return;
+    }
+    const parts = parsePageRanges(previewRanges, pages.length);
+    setBookmarkDraft({
+      sourceId: bookmarkSource.id, ranges: previewRanges,
+      files: parts.length, ignored, examples,
+    });
+    setNotice(interpolate(t.bookmarkFound, { files: parts.length, ignored }));
+  });
+  const applyBookmarkChapters = () => {
+    if (!bookmarkSource || !bookmarkDraft || bookmarkDraft.sourceId !== bookmarkSource.id || busy) return;
+    // Never overwrite deliberately typed, incomplete, overlapping or
+    // reordered custom ranges without a separate, explicit confirmation.
+    if (ranges.trim() && ranges.trim() !== bookmarkDraft.ranges && !bookmarkReplaceConfirm) {
+      setBookmarkReplaceConfirm(true);
+      return;
+    }
+    setRanges(bookmarkDraft.ranges);
+    setSplitMode('ranges');
+    setPendingVisualCut(null);
+    setBookmarkReplaceConfirm(false);
+    setError('');
+    setNotice(interpolate(t.bookmarkApplied, { files: bookmarkDraft.files }));
   };
 
   const resetSelection = () => { setSelected(new Set()); lastSelectedIndex.current = null; lastGroupedSelection.current = null; };
@@ -1394,6 +1490,37 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     {t.byOddEven}
                   </label>
                   <p className="input-note" data-testid="split-odd-even-hint">{t.oddEvenHint}</p>
+                  {pages.length > 1 && <details className="split-bookmark-panel" data-testid="split-bookmark-panel">
+                    <summary>{t.bookmarkTitle}</summary>
+                    <p className="input-note">{t.bookmarkHint}</p>
+                    <p className="input-note" data-testid="bookmark-availability">
+                      {bookmarkSource ? t.bookmarkAvailable : t.bookmarkUnavailable}
+                    </p>
+                    <button type="button" className="button button-secondary button-small"
+                      data-testid="bookmark-scan" disabled={busy || !bookmarkSource}
+                      onClick={inspectBookmarkChapters}>{t.bookmarkRead}</button>
+                    {bookmarkSource && bookmarkDraft?.sourceId === bookmarkSource.id && <>
+                      <p className="utility-note" data-testid="bookmark-preview" role="status">
+                        {interpolate(t.bookmarkFound, { files: bookmarkDraft.files, ignored: bookmarkDraft.ignored })}
+                      </p>
+                      <p className="utility-note bookmark-ranges-preview" data-testid="bookmark-ranges-preview">
+                        {t.bookmarkProposedRanges}: <code>{bookmarkDraft.ranges}</code>
+                      </p>
+                      <ol className="split-bookmark-examples">{bookmarkDraft.examples.map((item, index) =>
+                        <li key={index}>{interpolate(t.bookmarkExample, { page: item.page })} — {item.title}</li>)}</ol>
+                      {bookmarkReplaceConfirm && <div className="workspace-clear-confirm" data-testid="bookmark-confirm">
+                        <p>{t.bookmarkReplaceWarning}</p>
+                        <div className="workspace-clear-buttons">
+                          <button type="button" className="button button-secondary button-small"
+                            data-testid="bookmark-keep" onClick={() => setBookmarkReplaceConfirm(false)}>{t.bookmarkKeep}</button>
+                          <button type="button" className="button button-secondary button-small"
+                            data-testid="bookmark-confirm-replace" onClick={applyBookmarkChapters}>{t.bookmarkReplace}</button>
+                        </div>
+                      </div>}
+                      {!bookmarkReplaceConfirm && <button type="button" className="button button-secondary button-small"
+                        data-testid="bookmark-apply" disabled={busy} onClick={applyBookmarkChapters}>{t.bookmarkApply}</button>}
+                    </>}
+                  </details>}
                   {pages.length > 1 && <details className="split-visual-panel" data-testid="visual-split-panel"
                     open={visualSplitOpen} onToggle={event => setVisualSplitOpen(event.currentTarget.open)}>
                     <summary>{t.visualSplitToggle}</summary>
