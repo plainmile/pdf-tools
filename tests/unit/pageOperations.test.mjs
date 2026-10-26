@@ -115,6 +115,7 @@ test('delete selected pages without mutating originals', () => {
 test('combined ranges honor typed order, remove overlaps and preserve source refs', () => {
   assert.deepEqual(pagePositionsForCombinedRanges('３，１－２、３', 3), [3, 1, 2]);
   assert.deepEqual(pagePositionsForCombinedRanges('2-3, 1-2', 3), [2, 3, 1]);
+  assert.deepEqual(pagePositionsForCombinedRanges('２－，１', 3), [2, 3, 1]);
   assert.deepEqual(pagePositionsForCombinedRanges('1-3', 3).map(n => pages[n - 1].id), ['a', 'b', 'c']);
   assert.deepEqual(pages.map(p => p.id), ['a', 'b', 'c']);
   for (const bad of ['', ' ', '2-1', '0', '4', '1,,2', '1,', 'not a range', null, 3]) {
@@ -324,6 +325,14 @@ test('localized page range punctuation is normalized but still validates bounds'
     { start: 1, end: 3 }, { start: 5, end: 5 }, { start: 7, end: 8 },
   ]);
   assert.deepEqual([...pageIdsForRanges(pages, '１－２，３')], ['a', 'b', 'c']);
+  assert.deepEqual(parsePageRanges('1-3, 4-', 10), [{ start: 1, end: 3 }, { start: 4, end: 10 }]);
+  assert.deepEqual(parsePageRanges('８－', 10), [{ start: 8, end: 10 }]);
+  assert.deepEqual(parsePageRanges(' 10 - ', 10), [{ start: 10, end: 10 }]);
+  assert.deepEqual([...pageIdsForRanges(pages, '２－')], ['b', 'c']);
+  assert.throws(() => parsePageRanges('11-', 10), /outside/);
+  assert.throws(() => parsePageRanges('-10', 10), /Invalid/);
+  assert.throws(() => parsePageRanges('3--', 10), /Invalid/);
+  assert.throws(() => parsePageRanges('3-10-', 10), /Invalid/);
   assert.throws(() => parsePageRanges('３－１，２', 10), /reversed/);
   assert.throws(() => parsePageRanges('１，１１', 10), /outside/);
   assert.throws(() => parsePageRanges('１，，２', 10));
@@ -333,6 +342,8 @@ test('visual split positions create full, ordered PDF ranges from CURRENT page p
   assert.equal(splitRangesFromCuts([4, 2], 6), '1-2, 3-4, 5-6');
   assert.deepEqual(splitCutsFromRanges('1-2, 3-4, 5-6', 6), [2, 4]);
   assert.deepEqual(splitCutsFromRanges('１－２，３－４，５－６', 6), [2, 4]);
+  assert.deepEqual(splitCutsFromRanges('1-3, 4-', 6), [3]);
+  assert.deepEqual(splitCutsFromRanges('１－３，４－', 6), [3]);
   assert.equal(splitRangesFromCuts([], 6), '1-6');
   assert.deepEqual(splitCutsFromRanges('1-6', 6), []);
   assert.deepEqual(splitCutsFromRanges('', 6), []);
