@@ -504,7 +504,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       sourceId: bookmarkSource.id, level: bookmarkLevel, ranges: previewRanges,
       files: parts.length, ignored, examples, chapters,
     });
-    setNotice(interpolate(t.bookmarkFound, { files: parts.length, ignored }));
+    setNotice(interpolate(t.bookmarkFound, { files: parts.length, ignored, level: bookmarkLevel }));
   });
   const applyBookmarkChapters = () => {
     if (!bookmarkSource || !bookmarkDraft || bookmarkDraft.sourceId !== bookmarkSource.id || bookmarkDraft.level !== bookmarkLevel || busy) return;
@@ -1558,7 +1558,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                       onClick={inspectBookmarkChapters}>{t.bookmarkRead}</button>
                     {bookmarkSource && bookmarkDraft?.sourceId === bookmarkSource.id && bookmarkDraft.level === bookmarkLevel && <>
                       <p className="utility-note" data-testid="bookmark-preview" role="status">
-                        {interpolate(t.bookmarkFound, { files: bookmarkDraft.files, ignored: bookmarkDraft.ignored })}
+                        {interpolate(t.bookmarkFound, { files: bookmarkDraft.files, ignored: bookmarkDraft.ignored, level: bookmarkDraft.level })}
                       </p>
                       <p className="utility-note bookmark-ranges-preview" data-testid="bookmark-ranges-preview">
                         {t.bookmarkProposedRanges}: <code>{bookmarkDraft.ranges}</code>
