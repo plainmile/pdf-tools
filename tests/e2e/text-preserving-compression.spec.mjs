@@ -38,6 +38,7 @@ test('default PDF optimization keeps actual text and editable form fields, does 
   await page.goto('/compress-pdf/');
   await expect(page.getByTestId('compression-strategy')).toHaveValue('structure');
   await expect(page.getByTestId('compression-level')).toHaveCount(0);
+  await expect(page.getByTestId('utility-limit-hint')).toHaveText('PDF up to 100 MB / 120 pages.');
   await expect(page.locator('.utility-note')).toContainText('digital signatures');
   await upload(page, source);
   const unexpectedDownloads = [];
@@ -75,6 +76,7 @@ test('switching compression methods keeps the earlier output until user regenera
   await expect(page.getByTestId('compression-download')).toBeEnabled({ timeout: 25000 });
   const first = await download(page, 'compression-download');
   await page.getByTestId('compression-strategy').selectOption('raster');
+  await expect(page.getByTestId('utility-limit-hint')).toContainText('JPEG output safety budget 96 MB');
   await expect(page.getByTestId('compression-result-stale')).toBeVisible();
   await expect(page.getByTestId('compression-result-method')).toContainText('Keep selectable text');
   await expect(page.getByTestId('compression-level')).toBeVisible();
@@ -89,9 +91,11 @@ test('Chinese phone UI labels both choices, warns about signatures and stays wit
   await page.goto('/zh/compress-pdf/');
   const strategy = page.getByTestId('compression-strategy');
   await expect(strategy).toHaveValue('structure');
+  await expect(page.getByTestId('utility-limit-hint')).toHaveText('PDF 最多 100 MB / 120 页。');
   await expect(strategy.locator('option')).toHaveCount(2);
   await expect(page.locator('.utility-note')).toContainText('数字签名');
   await strategy.selectOption('raster');
+  await expect(page.getByTestId('utility-limit-hint')).toContainText('JPEG 数据累计上限 96 MB');
   await expect(page.locator('.utility-note')).toContainText('图片');
   await expect(page.getByTestId('compression-level')).toBeVisible();
   await strategy.selectOption('structure');
