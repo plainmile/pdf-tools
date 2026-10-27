@@ -56,6 +56,7 @@ export const toolHelp = {
     'compress-pdf': [
       ['Will PDF compression keep my text searchable?', 'By default, yes: document optimization rewrites PDF object streams without converting pages into images. Choose JPEG page compression only if you accept that searchable text, links and forms will be lost. Both methods rewrite the file and invalidate digital signatures. Keep the original and check important output.'],
       ['What if the new file is larger?', 'Both methods measure the actual original and result sizes. A larger or equal-size result is not downloadable. The page limit remains 120 per run and some PDFs cannot be reduced further.'],
+      ['Can I compress a PDF longer than 120 pages?', 'Not in a single run. If it has 121–600 pages and meets the file-size limit, first use Split PDF to make smaller files and upload each part again here. The Split PDF workspace itself accepts at most 600 pages. For longer source files, divide them using another local PDF application before uploading; this site never transfers source files between tools.'],
     ],
     'pdf-to-txt': [
       ['Can I extract text from a 500-page book?', 'Yes, for PDFs containing selectable text, subject to a 100 MiB and 1,000-page limit and your device memory.'],
