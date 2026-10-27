@@ -12,6 +12,11 @@ test('recognize JPEG/PNG/WebP images even with missing or generic MIME types', (
   assert.equal(imageTypeFor({ name: 'sample.pdf', type: 'application/pdf' }), null);
   assert.equal(isSupportedFile({ name: 'sample.pdf', type: 'application/pdf' }), true);
   assert.equal(isSupportedFile({ name: 'other.dat', type: '' }), false);
+  // Mislabelled PDF metadata must not route real PDF bytes to the image decoder.
+  assert.equal(imageTypeFor({ name: 'scan.pdf', type: 'image/jpeg' }), null);
+  assert.equal(imageTypeFor({ name: 'scan.jpg', type: 'application/pdf' }), null);
+  assert.equal(isSupportedFile({ name: 'scan.pdf', type: 'image/jpeg' }), true);
+  assert.equal(isSupportedFile({ name: 'scan.jpg', type: 'application/pdf' }), true);
 });
 
 test('reject massive PNG before decoding image memory', () => {
