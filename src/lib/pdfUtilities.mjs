@@ -137,7 +137,7 @@ async function renderPageAsBlob(page, format = 'image/jpeg', scale = 1.5, qualit
     const task = page.render({ canvasContext: context, canvas, viewport, background: '#ffffff' });
     const abort = () => task.cancel();
     signal?.addEventListener('abort', abort, { once: true });
-    try { await task.promise; checkCancelled(signal); }
+    try { await abortableWait(task.promise, signal); checkCancelled(signal); }
     catch (error) { checkCancelled(signal); throw error; }
     finally { signal?.removeEventListener('abort', abort); }
     // Canvas encoders can stall even after PDF.js rendering has finished.
@@ -161,24 +161,29 @@ export async function convertPdfToImages(pdf, options = {}, reportProgress = () 
   try {
     for (const index of selected) {
       checkCancelled(options.signal);
-      const page = await document.getPage(index);
+      // A stalled PDF.js page request must not keep Cancel and Retry disabled.
+      const page = await abortableWait(document.getPage(index), options.signal);
       try {
         const blob = await renderPageAsBlob(page, mime, scale, .87, options.signal);
         accumulated = enforceImageBatchBytes(accumulated, blob.size, options.locale);
-        files.push({ name: filenames[files.length], bytes: new Uint8Array(await blob.arrayBuffer()) });
+        files.push({ name: filenames[files.length], bytes: new Uint8Array(
+          await abortableWait(blob.arrayBuffer(), options.signal)) });
       } finally { page.cleanup(); }
       reportProgress(files.length, selected.length);
     }
-  } finally { await document.destroy(); }
+  } finally { await abortableWait(document.destroy(), options.signal); }
   checkCancelled(options.signal);
   if (files.length === 1) return { ...files[0], mime, count: 1 };
   const zip = new JSZip();
   for (const f of files) zip.file(f.name, f.bytes);
   reportProgress(files.length, files.length, 'packaging');
-  const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'STORE', streamFiles: true }, meta => {
-    checkCancelled(options.signal);
-    options.onPackagingProgress?.(Math.round(meta.percent));
-  });
+  // JSZip can stall without calling its progress callback. Ignore any late
+  // archive after Abort rather than leaving the UI locked or downloading it.
+  const bytes = await abortableWait(zip.generateAsync(
+    { type: 'uint8array', compression: 'STORE', streamFiles: true }, meta => {
+      checkCancelled(options.signal);
+      options.onPackagingProgress?.(Math.round(meta.percent));
+    }), options.signal);
   checkCancelled(options.signal);
   return { name: 'pdf-pages.zip', bytes, mime: 'application/zip', count: files.length };
 }
@@ -217,13 +222,15 @@ export async function compressPdfRaster(pdf, options = {}, reportProgress = () =
   const quality = options.quality === .8 ? .8 : options.quality === .55 ? .55 : .7;
   enforceUtilityPdfLimits(pdf, 'compress-pdf', options.locale);
   const source = await openPdfJs(pdf.bytes, options.signal);
-  // New rasterized PDFs must not insert implicit library metadata.
-  const output = await PDFDocument.create({ updateMetadata: false });
-  let jpegBytes = 0;
+  // Always enter the finally block before creating the output document:
+  // failed/aborted initialization must release the existing PDF.js worker.
   try {
+    // New rasterized PDFs must not insert implicit library metadata.
+    const output = await abortableWait(PDFDocument.create({ updateMetadata: false }), options.signal);
+    let jpegBytes = 0;
     for (let i = 1; i <= pdf.count; i++) {
       checkCancelled(options.signal);
-      const page = await source.getPage(i);
+      const page = await abortableWait(source.getPage(i), options.signal);
       try {
         const viewport = page.getViewport({ scale: 1 });
         const jpeg = await renderPageAsBlob(page, 'image/jpeg', scale, quality, options.signal);
@@ -235,19 +242,21 @@ export async function compressPdfRaster(pdf, options = {}, reportProgress = () =
           reportProgress(i, pdf.count);
           return { bytes: null, stats: { ...compressionStats(pdf.size, jpegBytes), lowerBound: true } };
         }
-        const embedded = await output.embedJpg(await jpeg.arrayBuffer());
+        const encoded = await abortableWait(jpeg.arrayBuffer(), options.signal);
+        const embedded = await abortableWait(output.embedJpg(encoded), options.signal);
         const target = output.addPage([viewport.width, viewport.height]);
         target.drawImage(embedded, { x: 0, y: 0, width: viewport.width, height: viewport.height });
       } finally { page.cleanup(); }
       reportProgress(i, pdf.count);
     }
     checkCancelled(options.signal);
-    const bytes = new Uint8Array(await output.save({ useObjectStreams: true }));
+    const bytes = new Uint8Array(await abortableWait(
+      output.save({ useObjectStreams: true }), options.signal));
     checkCancelled(options.signal);
     const stats = compressionStats(pdf.size, bytes.length);
     // Do not hand a bigger, unusable PDF to React state.
     return { bytes: stats.smaller ? bytes : null, stats };
-  } finally { await source.destroy(); }
+  } finally { await abortableWait(source.destroy(), options.signal); }
 }
 
 /** PDF.js 6.x getTextContent() uses for-await over ReadableStream.
@@ -300,7 +309,7 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
     for (let i = 1; i <= pdf.count; i++) {
       checkCancelled(signal);
       extractionStage = `page ${i}: getPage`;
-      const page = await document.getPage(i);
+      const page = await abortableWait(document.getPage(i), signal);
       try {
         extractionStage = `page ${i}: readPdfTextContent`;
         const content = await readPdfTextContent(page, signal);
@@ -316,7 +325,7 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
         // sparse pages; avoid this extra work on ordinary searchable books.
         if (hasSparseTextScanRisk(lines)) {
           if (!imagePaintOps) {
-            const { OPS } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+            const { OPS } = await abortableWait(import('pdfjs-dist/legacy/build/pdf.mjs'), signal);
             imagePaintOps = new Set([
               OPS.paintImageXObject, OPS.paintJpegXObject,
               OPS.paintInlineImageXObject, OPS.paintInlineImageXObjectGroup,
@@ -325,7 +334,7 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
             ].filter(Number.isInteger));
           }
           extractionStage = `page ${i}: getOperatorList`;
-          const operations = await page.getOperatorList();
+          const operations = await abortableWait(page.getOperatorList(), signal);
           checkCancelled(signal);
           if (operations.fnArray.some(operator => imagePaintOps.has(operator))) {
             sparseImagePageNumbers.push(i);
@@ -334,7 +343,7 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
         // Text, choice, checkbox and signature widgets are annotations.
         // Detect form presence on the *actual* page and append visible values.
         extractionStage = `page ${i}: getAnnotations`;
-        const annotations = await page.getAnnotations({ intent: 'display' });
+        const annotations = await abortableWait(page.getAnnotations({ intent: 'display' }), signal);
         checkCancelled(signal);
         extractionStage = `page ${i}: parse annotation fields`;
         if (annotations.some(item => ['Tx', 'Ch', 'Btn', 'Sig'].includes(item?.fieldType))) {
@@ -349,7 +358,7 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
     // Keep failures diagnosable in Safari/WebKit instead of reporting a bare
     // minified TypeError with no source context.
     throw new Error(`PDF text extraction [${extractionStage}]: ${error instanceof Error ? error.message : String(error)}`);
-  } finally { await document.destroy(); }
+  } finally { await abortableWait(document.destroy(), signal); }
   const coverage = summarizeTextCoverage(pages, sparseImagePageNumbers);
   if (!coverage.withText) throw new Error(hasFormFields
     ? 'No extractable text or filled form values found. Review the original PDF and its form fields.'
