@@ -1855,7 +1855,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <div className="split-download-actions">
                     <button type="button" className="button button-primary split-download" onClick={downloadSplit}
                       disabled={busy || splitEstimate === null || imageLayoutDirty}>{busy ? t.creating : splitEstimate === 1 ? t.downloadSingle : splitPlan?.batch ? t.splitBatchDownload : t.downloadZip} ↓</button>
-                    {splitMode === 'ranges' && <button type="button" className="button button-secondary split-download"
+                    {splitMode === 'ranges' && <button type="button" className="button button-secondary split-combine-action"
                       data-testid="split-combine-download" onClick={exportSplitCombinedRanges}
                       disabled={busy || !combinedSplitPositions || imageLayoutDirty}>{busy ? t.creating : t.splitCombineAction} ↓</button>}
                   </div>
