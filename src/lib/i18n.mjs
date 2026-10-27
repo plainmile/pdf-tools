@@ -183,7 +183,7 @@ export const workspaceCopy = {
     oddEvenNeedTwo: '请先添加至少 2 页，才能按奇偶页分别拆分。',
     splitOddName: '奇数位页面（第 1、3、5… 页）', splitEvenName: '偶数位页面（第 2、4、6… 页）',
     splitParityPreviewPart: '{name}：{count} {unit}，保持当前页序。',
-    multipleRangeFilesHint: '默认将 {files} 个范围生成 {files} 份 PDF 并打包 ZIP。若要将同样的范围合并为一份 PDF，请使用下方另一个下载按钮，无需切换工具或重新导入。'
+    multipleRangeFilesHint: '默认将 {files} 个范围生成 {files} 份 PDF 并打包 ZIP。若要将同样的范围合并为一份 PDF，请使用下方另一个下载按钮，无需切换工具或重新导入。',
     splitCombineAction: '将这些范围合并为一份 PDF', splitCombineHint: '下方有另一个下载按钮，可把输入的范围按原顺序合并成一份 PDF（如 3, 1-2）。重复页仅保留首次出现；独立拆分按钮仍按每个范围生成文件。', splitCombinePreview: '合并后的 PDF 共 {pages} 页，实际顺序：{positions}',
     byRanges: '按页码范围拆分', pageRanges: '页码范围', rangeHint: '例如：1-3, 4-5, 6-。末尾的短横线表示直到最后一页；每段独立生成一个 PDF。', every: '每 N 页拆分一次', perFile: '每个 PDF 的页数', eachPagePreset: '每页生成一份 PDF', eachPageLimit: '如果选择“每页生成一份 PDF”，{pages} 页将分成 {batches} 批，每批最多 50 份 PDF。', splitBatchStatus: '第 {index}/{total} 批 · 当前导出页码 {start}–{end}', splitBatchPrevious: '上一批', splitBatchNext: '下一批', splitBatchProgress: '已发起 {done}/{total} 批下载（不代表已保存到磁盘）。', splitBatchCurrentRequested: '本批已发起过下载。若文件未保存，请再次点击“下载当前批次”。', splitBatchAllRequested: '所有批次都已发起下载。离开前请检查浏览器下载记录，确认各批文件均已保存。', splitBatchGoPending: '跳到下一未下载批次', splitBatchWarning: '请逐批下载。当前批次有多份 PDF 时打包 ZIP；只生成一份 PDF 时直接下载。仅下载某一批不代表已保存整个工作台。', splitBatchEstimate: '本批将生成 {files} 份 PDF。', splitBatchDownload: '下载当前批次（ZIP）', splitBatchDownloaded: '已发起第 {index}/{total} 批下载。请检查浏览器下载记录，继续处理其他批次。', splitFinalBatchDownloaded: '已发起最后一批（第 {index}/{total} 批）下载。之前的批次为独立文件，请检查浏览器下载记录。', downloadZip: '下载拆分文件（ZIP）', downloadSingle: '下载 PDF', creating: '正在生成…',
     foot: '所有文档操作均在浏览器本地完成', footLimit: '保留的源文件数据最多 200 MiB · 暂不支持加密 PDF', bigDocWarning: '大文档提示：仅在滚动到页面时生成缩略图，但数百页仍可能消耗较多内存，导出也可能较慢。',
