@@ -23,6 +23,15 @@ const href = (path) => langPath(path, locale);
     <div class="eyebrow">{page.private}</div>
     <h1>{tool.headline}</h1>
     <p>{tool.description}</p>
+    {tool.slug === 'compress-pdf' && <p class="tool-task-tip" data-testid="compression-split-guidance">
+      {locale === 'zh'
+        ? '超过 120 页的 PDF 无法直接压缩。为控制浏览器内存占用，请先'
+        : 'PDFs over 120 pages cannot be compressed in one run. To limit browser memory usage, first '}
+      <a href={href('/split-pdf/')}>{locale === 'zh' ? '拆分成较小的 PDF' : 'split the PDF into smaller files'}</a>
+      {locale === 'zh'
+        ? '，再回到本工具分别压缩。文件不会在工具之间自动传递。'
+        : ', then return and compress each part. Files are not transferred automatically between tools.'}
+    </p>}
   </section>
   <section class="site-container workspace-outer">
     {utilitySlugs.includes(tool.slug)
