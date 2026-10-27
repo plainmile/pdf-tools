@@ -68,7 +68,9 @@ export function enforceUtilityPdfLimits({ size, count }, mode, locale = 'en') {
     throw new Error(zh ? 'PDF 最多支持 1000 页。' : 'PDF must have 1 to 1,000 pages.');
   }
   if (mode === 'compress-pdf' && count > UTILITY_LIMITS.maxCompressionPages) {
-    throw new Error(zh ? '图片化压缩每次最多处理 120 页。长文档请先拆分，避免浏览器耗尽内存。' : 'Image-based compression supports at most 120 pages per run. Split long PDFs first to avoid memory exhaustion.');
+    throw new Error(zh
+      ? 'PDF 压缩每次最多处理 120 页，包括保留文字与 JPEG 图片化模式。长文档请先拆分，以降低浏览器内存占用。'
+      : 'PDF compression supports at most 120 pages per run in both text-preserving and JPEG modes. Split long PDFs to reduce browser memory use.');
   }
   return true;
 }

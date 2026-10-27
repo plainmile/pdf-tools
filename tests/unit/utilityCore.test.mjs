@@ -541,9 +541,11 @@ test('book-length text extraction and page numbering accept 500 pages up to 100 
 test('oversized PDFs and 1001-page PDFs fail before expensive rasterization', () => {
   assert.throws(() => enforceUtilityPdfLimits({ size: 100 * 1024 ** 2 + 1, count: 1 }, 'pdf-to-txt'), /100 MB/);
   assert.throws(() => enforceUtilityPdfLimits({ size: 2000, count: 1001 }, 'pdf-to-markdown'), /1,000 pages/);
-  assert.throws(() => enforceUtilityPdfLimits({ size: 2000, count: 121 }, 'compress-pdf'), /120 pages/);
+  assert.throws(() => enforceUtilityPdfLimits({ size: 2000, count: 121 }, 'compress-pdf'),
+    error => /120 pages/.test(error.message) && /both text-preserving and JPEG modes/.test(error.message));
   assert.equal(enforceUtilityPdfLimits({ size: 2000, count: 120 }, 'compress-pdf'), true);
-  assert.throws(() => enforceUtilityPdfLimits({ size: 2000, count: 121 }, 'compress-pdf', 'zh'), /120 页/);
+  assert.throws(() => enforceUtilityPdfLimits({ size: 2000, count: 121 }, 'compress-pdf', 'zh'),
+    error => /120 页/.test(error.message) && /包括保留文字与 JPEG 图片化模式/.test(error.message));
 });
 
 test('220 DPI image export scale is exact and untrusted scales fall back safely', () => {
