@@ -105,6 +105,37 @@ test('WebP preflight refuses malformed, truncated or unsized RIFF headers', () =
   assert.throws(() => compressedImageDimensions('image/webp', spoof), /Invalid image header/);
 });
 
+test('AVIF dimension preflight bounds metadata nesting before image decoding', () => {
+  const box = (tag, payload) => {
+    const output = Buffer.alloc(8 + payload.length);
+    output.writeUInt32BE(output.length, 0);
+    output.write(tag, 4);
+    payload.copy(output, 8);
+    return output;
+  };
+  const ftyp = Buffer.alloc(24);
+  ftyp.writeUInt32BE(24, 0);
+  ftyp.write('ftyp', 4);
+  ftyp.write('avif', 8);
+  ftyp.write('avif', 16);
+  ftyp.write('mif1', 20);
+  const property = Buffer.alloc(12);
+  property.writeUInt32BE(9, 4);
+  property.writeUInt32BE(7, 8);
+  const standard = box('meta', Buffer.concat([
+    Buffer.alloc(4),
+    box('iprp', box('ipco', box('ispe', property))),
+  ]));
+  assert.deepEqual(compressedImageDimensions('image/avif',
+    Buffer.concat([ftyp, standard])), { width: 9, height: 7 });
+  let nested = standard;
+  for (let i = 0; i < 16; i++) {
+    nested = box('meta', Buffer.concat([Buffer.alloc(4), nested]));
+  }
+  assert.throws(() => compressedImageDimensions('image/avif',
+    Buffer.concat([ftyp, nested])), /Invalid image header/);
+});
+
 test('long PDF export reports real pages and rejects cancellation without returning partial PDF', async () => {
   const doc = await PDFDocument.create();
   doc.addPage([300, 500]);

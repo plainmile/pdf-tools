@@ -99,6 +99,53 @@ test('malformed BMP and spoofed AVIF do not delete an already loaded PDF', async
   expect(output.getPageCount()).toBe(1);
 });
 
+test('failed BMP canvas encoding frees backing pixels, keeps original PDF, and permits retry', async ({ page }) => {
+  await page.addInitScript(() => {
+    const originalToBlob = HTMLCanvasElement.prototype.toBlob;
+    window.__failNextBmpEncoding = false;
+    window.__failedBmpCanvas = null;
+    HTMLCanvasElement.prototype.toBlob = function (callback, format, quality) {
+      if (window.__failNextBmpEncoding && this.width === 4 && this.height === 3 &&
+          format === 'image/png') {
+        window.__failNextBmpEncoding = false;
+        window.__failedBmpCanvas = this;
+        queueMicrotask(() => callback(null));
+        return;
+      }
+      return originalToBlob.call(this, callback, format, quality);
+    };
+  });
+  await page.goto('/image-to-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'original.bmp', mimeType: 'image/bmp', buffer: makeBmp(),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+
+  await page.evaluate(() => { window.__failNextBmpEncoding = true; });
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'failed-encode.bmp', mimeType: 'image/bmp', buffer: makeBmp(),
+  });
+  await expect(page.getByRole('alert')).toContainText('image could not be converted to PDF');
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  expect(await page.evaluate(() => ({
+    intercepted: Boolean(window.__failedBmpCanvas),
+    width: window.__failedBmpCanvas?.width,
+    height: window.__failedBmpCanvas?.height,
+  }))).toEqual({ intercepted: true, width: 1, height: 1 });
+
+  // The first valid document can still be exported after an encoding error.
+  const pdf = await downloadPdf(page);
+  expect(pdf.getPageCount()).toBe(1);
+  expect(imageSize(pdf, 0)).toContainEqual({ width: 4, height: 3 });
+
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'retry.bmp', mimeType: 'image/bmp', buffer: makeBmp(),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  const recovered = await downloadPdf(page);
+  expect(recovered.getPageCount()).toBe(2);
+});
+
 function pngChunk(type, data) {
   const chunk = Buffer.alloc(12 + data.length);
   chunk.writeUInt32BE(data.length, 0);

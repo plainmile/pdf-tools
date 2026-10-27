@@ -163,7 +163,10 @@ export function compressedImageDimensions(type, bytes) {
     if (!brands.includes('avif')) invalid();
     let dimensions = null;
     let inspected = 0;
-    const walk = (from, end, container = '') => {
+    // Malformed ISO BMFF files can nest meta containers indefinitely. Limit
+    // recursion before a crafted AVIF can exhaust the JavaScript call stack.
+    const walk = (from, end, container = '', depth = 0) => {
+      if (depth > 12) invalid();
       let offset = from;
       while (offset + 8 <= end) {
         if (++inspected > 4096) invalid();
@@ -184,11 +187,11 @@ export function compressedImageDimensions(type, bytes) {
           dimensions = { width, height };
         } else if (typeName === 'meta') {
           if (size < 12) invalid();
-          walk(dataOffset + 4, dataEnd, 'meta');
+          walk(dataOffset + 4, dataEnd, 'meta', depth + 1);
         } else if (typeName === 'iprp' && container === 'meta') {
-          walk(dataOffset, dataEnd, 'iprp');
+          walk(dataOffset, dataEnd, 'iprp', depth + 1);
         } else if (typeName === 'ipco' && container === 'iprp') {
-          walk(dataOffset, dataEnd, 'ipco');
+          walk(dataOffset, dataEnd, 'ipco', depth + 1);
         }
         offset = dataEnd;
       }
@@ -392,6 +395,7 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}, sig
   const doc = await PDFDocument.create();
   let embedded;
   let bitmap;
+  let conversionCanvas = null;
   try {
     const header = compressedImageDimensions(imageType, originalBytes);
     if (header && (!header.width || !header.height || header.width * header.height > LIMITS.maxImagePixels)) {
@@ -405,17 +409,22 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}, sig
       checkCancelled(signal);
       if (bitmap.width * bitmap.height > LIMITS.maxImagePixels) throw new Error('Image dimensions are too large.');
       const canvas = document.createElement('canvas');
+      conversionCanvas = canvas;
       canvas.width = bitmap.width;
       canvas.height = bitmap.height;
       const context = canvas.getContext('2d');
       if (!context) throw new Error('Image canvas is unavailable.');
       context.drawImage(bitmap, 0, 0);
       const blob = await new Promise((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Could not convert image to PNG.')), 'image/png'));
+      // The encoded Blob no longer depends on the decoded canvas pixels.
+      // Release them BEFORE pdf-lib embeds/serializes the image so successful
+      // large imports do not keep a second full-size RGBA buffer alive.
+      canvas.width = 1;
+      canvas.height = 1;
+      conversionCanvas = null;
       checkCancelled(signal);
       embedded = await doc.embedPng(await blob.arrayBuffer());
       checkCancelled(signal);
-      canvas.width = 1;
-      canvas.height = 1;
     }
     checkCancelled(signal);
     if (embedded.width * embedded.height > LIMITS.maxImagePixels) throw new Error('Image dimensions are too large.');
@@ -452,7 +461,14 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}, sig
         /^This AVIF could not be decoded/.test(error?.message)) throw error;
     throw new Error(`${file.name}: image could not be converted to PDF.`);
   } finally {
+    // The expensive decoded bitmap AND backing canvas must be released on
+    // every path: PNG encoding rejection, PDF embedding errors and Cancel,
+    // not just the successful import path.
     bitmap?.close();
+    if (conversionCanvas) {
+      conversionCanvas.width = 1;
+      conversionCanvas.height = 1;
+    }
   }
 }
 
