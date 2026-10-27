@@ -115,7 +115,9 @@ test('unexported split choices and an untouched multi-file merge still protect b
   await page.getByTestId('file-input').setInputFiles({
     name: 'chapters.pdf', mimeType: 'application/pdf', buffer: bytes,
   });
-  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  // Split mode shows its own range controls; the Organize thumbnail grid
+  // is intentionally hidden until its tab is selected.
+  await expect(page.locator('.file-count')).toContainText('2 pages');
   await expect.poll(nativeGuard).toBe(false);
   await page.locator('#ranges-input').fill('1');
   await expect.poll(nativeGuard).toBe(true);
@@ -186,6 +188,9 @@ test('a new selected-page plan after a successful full export re-arms the leave 
   await selectedDownload;
   await expect.poll(guard).toBe(false);
 
+  // The optional download name lives inside a native disclosure.
+  // Open the panel before interacting so Playwright exercises real user input.
+  await page.getByTestId('download-name-panel').locator('summary').click();
   // Changing only the output name after that download is also a new plan.
   await page.getByTestId('download-name-input').fill('second version');
   await expect.poll(guard).toBe(true);
