@@ -8,7 +8,7 @@ export const unlocalize = (pathname = '/') => pathname.replace(/^\/zh(?=\/|$)/, 
 export const siteCopy = {
   en: {
     nav: { workspace: 'Workspace', merge: 'Merge PDF', split: 'Split PDF', tools: 'All tools', open: 'Open workspace', privacy: 'Privacy', theme: 'Appearance', system: 'System', light: 'Light', dark: 'Dark', language: 'Language' },
-    footer: { officialSite: 'Official site', github: 'GitHub source code', report: 'Report an issue', tagline: 'Simple PDF tools that respect your files.', local: 'Files stay on your device. Nothing is uploaded.', other: 'PlainMile' },
+    footer: { officialSite: 'Official site', github: 'GitHub source code', report: 'Report an issue', tagline: 'Simple PDF tools that respect your files.', local: 'Files stay on your device. Nothing is uploaded.', imageTools: 'Image tools', other: 'PlainMile' },
     home: {
       eyebrow: 'PDF TOOLS · FREE TO USE', title: 'Work with PDF pages, your way.',
       lead: 'Combine documents, move pages into the right order, rotate, remove or split them. See the result before you save.',
@@ -31,7 +31,7 @@ export const siteCopy = {
   },
   zh: {
     nav: { workspace: 'PDF 工作台', merge: '合并 PDF', split: '拆分 PDF', tools: '全部工具', open: '打开工作台', privacy: '隐私说明', theme: '外观', system: '跟随系统', light: '浅色', dark: '深色', language: '语言' },
-    footer: { officialSite: '官方网站', github: 'GitHub 开源代码', report: '反馈问题', tagline: '简单实用、尊重隐私的 PDF 工具。', local: '文件只在设备本地处理，不上传服务器。', other: 'PlainMile 主站' },
+    footer: { officialSite: '官方网站', github: 'GitHub 开源代码', report: '反馈问题', tagline: '简单实用、尊重隐私的 PDF 工具。', local: '文件只在设备本地处理，不上传服务器。', imageTools: '图片工具', other: 'PlainMile 主站' },
     home: {
       eyebrow: 'PDF 工具 · 免费使用', title: '整理 PDF 页面，就这么简单。',
       lead: '合并多个文件、自由调整页面顺序、旋转、删除或拆分。先预览，再下载，不需要上传文件。',
