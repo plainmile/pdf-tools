@@ -35,6 +35,24 @@ test('tool search filters only relevant tools and clear restores all options', a
 });
 
 
+test('tool finder clears whitespace-only input in both languages', async ({ page }) => {
+  for (const [path, label, clearLabel] of [
+    ['/', 'Find a PDF tool', 'Clear'],
+    ['/zh/', '搜索工具', '清除'],
+  ]) {
+    await page.goto(path);
+    const search = page.getByRole('searchbox', { name: label });
+    const clear = page.getByRole('button', { name: clearLabel });
+    await expect(clear).toBeDisabled();
+    await search.fill('   ');
+    await expect(page.locator('[data-tool-card]:visible')).toHaveCount(16);
+    await expect(clear).toBeEnabled();
+    await clear.click();
+    await expect(search).toHaveValue('');
+    await expect(clear).toBeDisabled();
+  }
+});
+
 test('localized tool finder respects conversion direction and fullwidth aliases', async ({ page }) => {
   await page.goto('/');
   const search = page.getByRole('searchbox', { name: 'Find a PDF tool' });

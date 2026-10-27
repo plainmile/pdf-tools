@@ -2,7 +2,7 @@ import { chineseTools } from './i18n.mjs';
 export const tools = [
   {
     slug: 'workspace', title: 'PDF Workspace', short: 'One place for every page',
-    headline: 'Your documents, exactly how you want them.',
+    headline: 'Reorder, rotate and organize PDF pages.',
     description: 'Reorder, rotate, duplicate, insert blank pages, remove or extract PDF pages. All processing stays in your browser.',
     details: 'Drop PDF files or images, reorder visible page thumbnails, duplicate selected pages or insert a blank page after your chosen page. Download a new PDF when finished.',
     steps: ['Choose PDFs or images', 'Drag pages into a new order', 'Export your finished PDF'],
@@ -30,7 +30,7 @@ export const tools = [
   },
   {
     slug: 'rotate-pdf', title: 'Rotate PDF', short: 'Fix sideways pages',
-    headline: 'Fix sideways scans in seconds.',
+    headline: 'Rotate PDF pages in 90° steps.',
     description: 'Rotate one page or a selection of PDF pages in 90-degree steps, then export a corrected PDF locally.',
     details: 'Pick the sideways pages, rotate them clockwise or counter-clockwise and save the new document without modifying your originals.',
     steps: ['Add a PDF', 'Select the pages to rotate', 'Export the corrected PDF'],
@@ -51,7 +51,7 @@ export const tools = [
   },
   {
     slug: 'watermark-pdf', title: 'Add PDF Watermark', short: 'Optional custom text',
-    headline: 'Add a watermark only when you want one.',
+    headline: 'Add a custom text watermark to a PDF.',
     description: 'Add your own light diagonal text watermark to a PDF. Watermarking is off by default, and your files stay in the browser.',
     details: 'Open Export options, turn on Add text watermark and enter your text. Without opting in, files export without any watermark.',
     steps: ['Add a PDF', 'Enable text watermark under Export options', 'Export the marked PDF'],
@@ -86,7 +86,7 @@ export const tools = [
   },
   {
     slug: 'txt-to-pdf', title: 'TXT to PDF', short: 'Make a PDF from plain text',
-    headline: 'Turn UTF-8 plain text into a readable PDF.',
+    headline: 'Convert TXT or pasted text into a PDF.',
     description: 'Turn pasted or uploaded TXT into an A4 PDF locally. Pages with unsupported characters use browser fonts as images; other pages retain selectable text.',
     details: 'Write or import .txt content. Only pages requiring Chinese or other unsupported glyphs are rendered as images; the remaining pages stay searchable. Image-only pages cannot be searched.',
     steps: ['Paste or import a TXT file', 'Review the text', 'Download the PDF'],
@@ -107,8 +107,8 @@ export const tools = [
   },
   {
     slug: 'image-to-pdf', title: 'Images to PDF', short: 'Custom pages and margins',
-    headline: 'Turn your images into a tidy PDF.',
-    description: 'Convert JPG, PNG, WebP, BMP and static AVIF images into PDF pages with A4, US Letter or fit-to-picture paper, portrait, landscape, automatic orientation and margins.',
+    headline: 'Convert JPG, PNG and other images to PDF.',
+    description: 'Convert JPG, BMP and static PNG, WebP or AVIF images into PDF pages. Choose A4, Letter or fit-to-image paper, orientation and margins.',
     details: 'Choose a paper size and margin before import, or apply your changes to imported photos before exporting. The original image proportions and page order are preserved. Imported JPEGs have common EXIF, XMP, IPTC and comment metadata (which may include GPS) removed without recompressing their image pixels. This does not sanitize existing PDF metadata.',
     steps: ['Set paper size, orientation and margins', 'Import and arrange images', 'Check page previews and export PDF'],
   },

@@ -10,7 +10,7 @@ export const siteCopy = {
     nav: { workspace: 'Workspace', merge: 'Merge PDF', split: 'Split PDF', tools: 'All tools', open: 'Open workspace', privacy: 'Privacy', theme: 'Appearance', system: 'System', light: 'Light', dark: 'Dark', language: 'Language' },
     footer: { officialSite: 'Official site', github: 'GitHub source code', report: 'Report an issue', tagline: 'Simple PDF tools that respect your files.', local: 'Files stay on your device. Nothing is uploaded.', imageTools: 'Image tools', other: 'PlainMile' },
     home: {
-      eyebrow: 'PDF TOOLS · FREE TO USE', title: 'Work with PDF pages, your way.',
+      eyebrow: 'PDF TOOLS · FREE TO USE', title: 'Merge, split and organize PDF pages',
       lead: 'Combine documents, move pages into the right order, rotate, remove or split them. See the result before you save.',
       start: 'Open PDF workspace', explore: 'Browse tools', local: 'Processed in your browser', noaccount: 'No account or automatic watermarks', ordered: 'Full control of page order',
       visualTitle: 'Example page workspace', file1: 'Contract · page 1', file2: 'Attachment · page 2', file3: 'Contract · page 2',
@@ -33,7 +33,7 @@ export const siteCopy = {
     nav: { workspace: 'PDF 工作台', merge: '合并 PDF', split: '拆分 PDF', tools: '全部工具', open: '打开工作台', privacy: '隐私说明', theme: '外观', system: '跟随系统', light: '浅色', dark: '深色', language: '语言' },
     footer: { officialSite: '官方网站', github: 'GitHub 开源代码', report: '反馈问题', tagline: '简单实用、尊重隐私的 PDF 工具。', local: '文件只在设备本地处理，不上传服务器。', imageTools: '图片工具', other: 'PlainMile 主站' },
     home: {
-      eyebrow: 'PDF 工具 · 免费使用', title: '整理 PDF 页面，就这么简单。',
+      eyebrow: 'PDF 工具 · 免费使用', title: '合并、拆分与整理 PDF 页面',
       lead: '合并多个文件、自由调整页面顺序、旋转、删除或拆分。先预览，再下载，不需要上传文件。',
       start: '打开 PDF 工作台', explore: '查看全部工具', local: '浏览器本地处理', noaccount: '无需账号、不强制添加水印', ordered: '逐页查看与精确排序',
       visualTitle: '页面工作台示意', file1: '合同 · 第 1 页', file2: '附件 · 第 2 页', file3: '合同 · 第 2 页',
@@ -55,11 +55,11 @@ export const siteCopy = {
 };
 
 export const chineseTools = {
-  workspace: { title: 'PDF 工作台', short: '一个地方，整理全部页面', headline: '自由整理每一页 PDF。', description: '在浏览器本地整理 PDF：拖拽排序、旋转、复制页面、插入空白页、删除或提取，不上传原始文件。', details: '添加 PDF 或图片后预览全部页面；可复制选中页，或按相邻纸张大小插入空白页，再下载新的 PDF。', steps: ['添加 PDF 或图片', '按需调整页面顺序', '导出 PDF'] },
+  workspace: { title: 'PDF 工作台', short: '一个地方，整理全部页面', headline: '拖动排序、旋转和整理 PDF 页面。', description: '在浏览器本地整理 PDF：拖拽排序、旋转、复制页面、插入空白页、删除或提取，不上传原始文件。', details: '添加 PDF 或图片后预览全部页面；可复制选中页，或按相邻纸张大小插入空白页，再下载新的 PDF。', steps: ['添加 PDF 或图片', '按需调整页面顺序', '导出 PDF'] },
   'merge-pdf': { title: '合并 PDF', short: '多个文件，合并成一个', headline: '按您指定的顺序合并 PDF。', description: '在浏览器本地合并 PDF、调整逐页顺序，并支持两份单面扫描文件按正反面交错合并或反面倒序。', details: '不仅能调整文件顺序，还能混排、旋转、删除页面。对正反面分别扫描的两份 PDF，展开“合并双面扫描”选择是否反转背面页，再交错合并。两份文件的页数需相同，或正面只多一页。原文件不会被修改。', steps: ['添加多个 PDF', '调整顺序或选择双面交错合并', '导出合并后的 PDF'] },
   'split-pdf': { title: '拆分 PDF', short: '按范围、奇偶页或章节拆分', headline: '将 PDF 拆分成需要的部分。', description: '浏览器本地按页码范围、每 N 页、奇偶页或第 1～3 级章节书签拆分 PDF；先预览拆分范围，再下载 PDF 或 ZIP，无需上传。', details: '可按自定义范围（每段生成一份 PDF）、固定页数或当前页序的奇偶页拆分。单个保留完整原始页序的 PDF 如有书签，可选择第 1、2 或 3 级章节，预览后再应用；ZIP 中可主动选择使用经过清理的章节文件名，默认仍按页码命名。长文档显示页面复制和 ZIP 进度，取消不会下载未完成文件。', steps: ['添加 PDF', '选择范围、每份页数、奇偶页或原 PDF 章节书签', '检查结果并下载 PDF 或 ZIP'] },
   'organize-pdf': { title: '整理 PDF 页面', short: '缩略图拖拽排序', headline: '让每一页出现在正确位置。', description: '可视化排序、复制 PDF 页面、插入空白页，还能旋转与删除。支持撤销、重做和本地导出。', details: '跨文件调整页面顺序，复制选中页或插入与相邻页面等尺寸的空白页。支持键盘操作，不上传文档。', steps: ['添加文件', '预览并排序', '导出 PDF'] },
-  'rotate-pdf': { title: '旋转 PDF 页面', short: '修正方向不对的扫描页', headline: '轻松调整歪倒的页面。', description: '选中一页或多页，以 90° 为单位旋转，再导出新的 PDF。', details: '选中方向不正确的页面，向左或向右旋转。原始文件不会被修改。', steps: ['添加 PDF', '选择并旋转页面', '导出 PDF'] },
+  'rotate-pdf': { title: '旋转 PDF 页面', short: '修正方向不对的扫描页', headline: '将 PDF 页面旋转 90°。', description: '选中一页或多页，以 90° 为单位旋转，再导出新的 PDF。', details: '选中方向不正确的页面，向左或向右旋转。原始文件不会被修改。', steps: ['添加 PDF', '选择并旋转页面', '导出 PDF'] },
   'extract-pages': { title: '提取 PDF 页面', short: '选页或按范围合并', headline: '把需要的 PDF 页面合并保存为一份。', description: '浏览器本地提取 PDF 页面：勾选缩略图按当前页序导出，或输入多个页码范围按输入顺序合并成一份 PDF。', details: '适合从报告、合同、附件提取指定页面。勾选页面按工作台顺序输出；直接输入范围如 3, 1-2 则按输入顺序合并，相同页码只保留一次，无须上传文件。', steps: ['添加 PDF 并确认当前页序', '勾选页面或输入多个页码范围', '直接下载合并后的单份 PDF'] },
   'delete-pages': { title: '删除 PDF 页面', short: '去除不需要的页面', headline: '去掉不需要的 PDF 页面。', description: '预览并批量删除页面，支持撤销操作。不会修改原始 PDF。', details: '勾选一个或多个页面、删除、核对结果，再下载整理好的文档。', steps: ['添加 PDF', '选择并删除页面', '导出 PDF'] },
   'watermark-pdf': { title: '添加 PDF 水印', short: '自定义文字水印', headline: '按需给 PDF 添加水印。', description: '默认无水印。可选择开启并填写中文或英文文字，在浏览器本地生成水印 PDF。', details: '通过工作台的“导出选项”开启文字水印。默认关闭，不会给文件自动加标记。', steps: ['添加 PDF 文件', '打开导出选项并输入水印内容', '导出带水印的 PDF'] },
@@ -70,7 +70,7 @@ export const chineseTools = {
   'txt-to-pdf': { title: 'TXT 转 PDF', short: '纯文本生成 PDF', headline: '把 TXT 文本转换成 PDF。', description: '在浏览器中粘贴或导入 TXT，生成 A4 PDF。含中文等特殊字符的页面会图片化，其他页面保留可选择、可搜索文字。', details: '支持 UTF-8 或带 BOM 的 UTF-16。仅使用内置字体无法呈现的页面需要图片化，其余页面可继续搜索、复制文字；源文本不上传。', steps: ['输入或导入 TXT', '核对文本内容', '下载 PDF'] },
   'markdown-to-pdf': { title: 'Markdown 转 PDF', short: '支持简单标题、列表和代码', headline: '将基础 Markdown 生成 PDF。', description: '本地转换基础 Markdown 的标题、段落、列表、引用和代码块；暂不支持复杂表格、HTML 与远程图片。', details: '使用轻量级 Markdown 子集。只有包含内置字体不支持字符的页面被图片化，其他页面保留可选择文字；复杂排版需核对。', steps: ['粘贴或导入 Markdown', '检查标题和内容', '下载 PDF'] },
   'add-page-numbers': { title: '添加 PDF 页码', short: '可跳过封面，逐页检查', headline: '从指定 PDF 页面开始添加页码。', description: '在浏览器本地添加可选择的 PDF 页码，支持六种位置、三档边距、起始数字及任意页面预览，可跳过封面。', details: '分别设置开始编号的 PDF 页与显示的起始数字；封面和目录可以保留不编号。支持顶部或底部左、中、右六种位置与 12、24、40 点的页码边距；生成后可查看第一张编号页、末页或指定页面，再确认下载。小页面若容纳不下页码，会提示调整设置。重要文件还需检查数字签名。', steps: ['选择 PDF 并设置页码', '预览任意页面的实际页码', '核对后下载 PDF'] },
-  'image-to-pdf': { title: '图片转 PDF', short: 'JPG、PNG、WebP、BMP、静态 AVIF', headline: '将图片整理为 PDF。', description: '把 JPG、BMP、静态 PNG、静态 WebP 和静态 AVIF 图片转为 PDF。支持 A4、Letter、适合图片、横竖方向和边距；AVIF 需要浏览器解码能力。', details: '可在导入前设置纸张、方向和边距，也可以在导入后重新应用设置。JPG 会移除常见 EXIF、XMP、IPTC 和注释元数据（可能包含 GPS），保留照片方向和原有压缩画质；不处理已有 PDF 的元数据。', steps: ['选择纸张、方向和边距', '添加图片并按需调整顺序', '核对预览后导出 PDF'] },
+  'image-to-pdf': { title: '图片转 PDF', short: 'JPG、PNG、WebP、BMP、静态 AVIF', headline: '将 JPG、PNG 等图片转换为 PDF。', description: '把 JPG、BMP、静态 PNG、静态 WebP 和静态 AVIF 图片转为 PDF。支持 A4、Letter、适合图片、横竖方向和边距；AVIF 需要浏览器解码能力。', details: '可在导入前设置纸张、方向和边距，也可以在导入后重新应用设置。JPG 会移除常见 EXIF、XMP、IPTC 和注释元数据（可能包含 GPS），保留照片方向和原有压缩画质；不处理已有 PDF 的元数据。', steps: ['选择纸张、方向和边距', '添加图片并按需调整顺序', '核对预览后导出 PDF'] },
 };
 
 export const workspaceCopy = {
