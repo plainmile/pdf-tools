@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { abortableWait, readFileArrayBuffer } from '../../src/lib/pdfUtilities.mjs';
+import { readSourceFile } from '../../src/lib/pdfEngine.mjs';
+import { PDFDocument } from 'pdf-lib';
 
 test('cancellation releases a hung PDF worker promise without waiting for it', async () => {
   const controller = new AbortController();
@@ -46,5 +48,46 @@ test('FileReader input can be cancelled before bytes finish, then a new input su
   } finally {
     if (previousReader === undefined) delete globalThis.FileReader;
     else globalThis.FileReader = previousReader;
+  }
+});
+
+test('workspace PDF import can cancel a third-party parser that never resolves', async () => {
+  const oldReader = globalThis.FileReader;
+  const oldLoad = PDFDocument.load;
+  let parserStarted = false;
+  class ImmediateFileReader {
+    static LOADING = 1;
+    readyState = 0;
+    readAsArrayBuffer() {
+      this.readyState = 1;
+      queueMicrotask(() => {
+        if (this.readyState !== 1) return;
+        this.result = Uint8Array.of(37, 80, 68, 70, 45, 49, 46, 55).buffer;
+        this.readyState = 2;
+        this.onload?.();
+      });
+    }
+    abort() { this.readyState = 2; this.onabort?.(); }
+  }
+  try {
+    globalThis.FileReader = ImmediateFileReader;
+    PDFDocument.load = () => {
+      parserStarted = true;
+      return new Promise(() => {}); // Parsing never yields a result.
+    };
+    const controller = new AbortController();
+    const pending = readSourceFile(
+      { name: 'stalled.pdf', type: 'application/pdf', size: 8 },
+      { signal: controller.signal },
+    );
+    // Allow FileReader completion and parser startup, then abort during parse.
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(parserStarted, true);
+    controller.abort();
+    await assert.rejects(pending, /Processing cancelled/);
+  } finally {
+    PDFDocument.load = oldLoad;
+    if (oldReader === undefined) delete globalThis.FileReader;
+    else globalThis.FileReader = oldReader;
   }
 });
