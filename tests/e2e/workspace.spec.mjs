@@ -627,7 +627,7 @@ test('deleting every page allows the workspace to be completely reset', async ({
 test('Chinese pages switch languages while preserving tri-state theme choice', async ({ page }) => {
   await page.goto('/zh/');
   await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
-  await expect(page.getByRole('heading', { name: '整理 PDF 页面，就这么简单。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '合并、拆分与整理 PDF 页面' })).toBeVisible();
   await expect(page.locator('link[hreflang="en"]')).toHaveAttribute('href', 'https://pdf.plainmile.com/');
   const theme = page.getByRole('combobox', { name: '外观' });
   await expect(theme).toHaveValue('system');
