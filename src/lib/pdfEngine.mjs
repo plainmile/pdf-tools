@@ -479,8 +479,13 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}, sig
     return output;
   } catch (error) {
     checkCancelled(signal);
-    if (imageType === 'image/avif' && error?.name === 'InvalidStateError') {
-      throw new Error('This AVIF could not be decoded in your browser. Try PNG or WebP.');
+    // Browsers report unsupported AVIF codecs using different DOMException
+    // names. Do not turn them into an unhelpful generic import failure.
+    // This does not claim the file is valid: an invalid static AVIF can also
+    // fail at decoding. Preserve the already-loaded workspace on failure.
+    if (imageType === 'image/avif' &&
+        ['InvalidStateError', 'NotSupportedError', 'EncodingError'].includes(error?.name)) {
+      throw new Error('This AVIF could not be decoded in your browser. Check the file or try PNG or WebP.');
     }
     if (error?.message === 'Image dimensions are too large.' ||
         error?.message === 'JPEG metadata could not be safely removed.' ||
