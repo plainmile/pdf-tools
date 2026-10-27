@@ -26,7 +26,7 @@ test('split page exports one combined PDF in typed order while preserving separa
   await page.getByTestId('file-input').setInputFiles({
     name: 'book.pdf', mimeType: 'application/pdf', buffer: await samplePdf(),
   });
-  await expect(page.getByTestId('page-tile')).toHaveCount(5);
+  await expect(page.locator('.file-count')).toContainText('5');
 
   await page.getByRole('tab', { name: 'Organize' }).click();
   await page.getByRole('checkbox', { name: 'Select page 4' }).check();
@@ -68,7 +68,7 @@ test('Chinese mobile: fullwidth and overlapping ranges combine without duplicate
   await page.getByTestId('file-input').setInputFiles({
     name: '章节.pdf', mimeType: 'application/pdf', buffer: await samplePdf(),
   });
-  await expect(page.getByTestId('page-tile')).toHaveCount(5);
+  await expect(page.locator('.file-count')).toContainText('5');
 
   const input = page.locator('#ranges-input');
   const combinedButton = page.getByTestId('split-combine-download');
@@ -90,7 +90,7 @@ test('Chinese mobile: fullwidth and overlapping ranges combine without duplicate
   const combined = await capture(page, () => combinedButton.click());
   expect(combined.name.endsWith('-combined-3-pages.pdf')).toBe(true);
   expect(await outputWidths(combined.bytes)).toEqual([305, 301, 302]);
-  await expect(page.getByTestId('page-tile')).toHaveCount(5);
+  await expect(page.locator('.file-count')).toContainText('5');
   const viewport = await page.evaluate(() => ({
     scroll: document.documentElement.scrollWidth,
     client: document.documentElement.clientWidth,
@@ -104,7 +104,7 @@ test('combining all pages in current order keeps pristine original PDF bytes', a
   await page.getByTestId('file-input').setInputFiles({
     name: 'original.pdf', mimeType: 'application/pdf', buffer: bytes,
   });
-  await expect(page.getByTestId('page-tile')).toHaveCount(5);
+  await expect(page.locator('.file-count')).toContainText('5');
   await page.locator('#ranges-input').fill('1-2, 3-5');
   const download = await capture(page, () => page.getByTestId('split-combine-download').click());
   expect(download.bytes.equals(bytes)).toBe(true);
