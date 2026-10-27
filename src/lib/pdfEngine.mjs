@@ -514,12 +514,20 @@ export async function composePdf(sources, pageRefs, options = {}) {
   const watermarkImages = new Map();
   // Page operations create a new document. Do not stamp brand or implicit
   // creator/producer metadata on the user's exported PDF.
-  const destination = await PDFDocument.create({ updateMetadata: false });
+  const destination = await abortableWait(PDFDocument.create({ updateMetadata: false }), options.signal);
   const originalDocs = options.sourceDocuments ?? new Map();
   const byId = new Map(sources.map((source) => [source.id, source]));
   const checkAbort = () => {
     if (options.signal?.aborted) throw new Error(options.cancelMessage || 'Split cancelled.');
   };
+  // PDF parser, page copier, watermark generator and serializer can all yield
+  // indefinitely. Do not hold the browser's Cancel/Retry UI on their promises.
+  // The abandoned result must never mutate the current workspace or download.
+  const waitForExport = async promise => {
+    try { return await abortableWait(promise, options.signal); }
+    catch (error) { checkAbort(); throw error; }
+  };
+  checkAbort();
   for (let index = 0; index < pageRefs.length; index++) {
     const pageRef = pageRefs[index];
     if (options.signal) {
@@ -531,10 +539,10 @@ export async function composePdf(sources, pageRefs, options = {}) {
     if (!sourceDoc) {
       const source = byId.get(pageRef.sourceId);
       if (!source) throw new Error('A page source is missing. Reload your files.');
-      sourceDoc = await PDFDocument.load(source.bytes, { updateMetadata: false });
+      sourceDoc = await waitForExport(PDFDocument.load(source.bytes, { updateMetadata: false }));
       originalDocs.set(pageRef.sourceId, sourceDoc);
     }
-    const [page] = await destination.copyPages(sourceDoc, [pageRef.pageIndex]);
+    const [page] = await waitForExport(destination.copyPages(sourceDoc, [pageRef.pageIndex]));
     if (!page) throw new Error('Could not copy a page.');
     if (pageRef.rotation) {
       const nativeAngle = page.getRotation().angle;
@@ -547,8 +555,8 @@ export async function composePdf(sources, pageRefs, options = {}) {
       const key = `${placement.visualWidth}x${placement.visualHeight}`;
       let watermarkImage = watermarkImages.get(key);
       if (!watermarkImage) {
-        const png = await renderWatermarkPng(watermarkText, placement.visualWidth, placement.visualHeight);
-        watermarkImage = await destination.embedPng(png);
+        const png = await waitForExport(renderWatermarkPng(watermarkText, placement.visualWidth, placement.visualHeight));
+        watermarkImage = await waitForExport(destination.embedPng(png));
         watermarkImages.set(key, watermarkImage);
       }
       page.drawImage(watermarkImage, {
@@ -561,7 +569,7 @@ export async function composePdf(sources, pageRefs, options = {}) {
     }
   }
   checkAbort();
-  const result = new Uint8Array(await destination.save({ useObjectStreams: true }));
+  const result = new Uint8Array(await waitForExport(destination.save({ useObjectStreams: true })));
   checkAbort();
   return result;
 }
