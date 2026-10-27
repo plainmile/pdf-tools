@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import JSZip from 'jszip';
+import { abortableWait } from '../lib/pdfUtilities.mjs';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 import PageZoomDialog from './PageZoomDialog.jsx';
 import { LIMITS, composePdf, pristinePdfBytes, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId, createBlankPageSource, retainedSourceBytes, retainedSourcesBytes } from '../lib/pdfEngine.mjs';
@@ -876,14 +877,24 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       if (controller.signal.aborted) throw new Error('Split cancelled.');
       setSplitProgress({ phase: 'zip', percent: 0 });
       let lastPercent = -1;
-      const archive = await zip.generateAsync({ type: 'blob', compression: 'STORE', streamFiles: true }, meta => {
+      // ZIP's encoder can stop reporting progress on memory-constrained
+      // browsers. Cancel must still restore controls without downloading an
+      // unfinished archive, even if the encoder promise never resolves.
+      let archive;
+      try {
+        archive = await abortableWait(zip.generateAsync(
+          { type: 'blob', compression: 'STORE', streamFiles: true }, meta => {
+            if (controller.signal.aborted) throw new Error('Split cancelled.');
+            const percent = Math.floor(meta.percent);
+            if (percent >= lastPercent + 5 || percent === 100) {
+              lastPercent = percent;
+              setSplitProgress({ phase: 'zip', percent });
+            }
+          }), controller.signal);
+      } catch (error) {
         if (controller.signal.aborted) throw new Error('Split cancelled.');
-        const percent = Math.floor(meta.percent);
-        if (percent >= lastPercent + 5 || percent === 100) {
-          lastPercent = percent;
-          setSplitProgress({ phase: 'zip', percent });
-        }
-      });
+        throw error;
+      }
       if (controller.signal.aborted) throw new Error('Split cancelled.');
       saveDownload(archive, batch
         ? `${outputBase}-pages-${batch.start}-${batch.end}-split.zip`
