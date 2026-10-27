@@ -128,6 +128,8 @@ test('production probes exact published SHA instead of copy that SEO updates can
   assert.match(ci, /x-robots-tag: noindex/);
   assert.match(publish, /SOURCE_SHA=\$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
   assert.match(ci, /docker build --build-arg SOURCE_SHA="\$GITHUB_SHA"/);
+  assert.match(ci, /grep -q 'lang="zh-CN"' dist\/zh\/index\.html/);
+  assert.doesNotMatch(ci, /grep -q '整理 PDF 页面'/);
   assert.match(ci, /\.well-known\/plainmile-release\)" = "\$GITHUB_SHA"/);
 
   assert.match(publicProbe, /EXPECTED_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
