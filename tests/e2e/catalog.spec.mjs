@@ -75,6 +75,27 @@ test('localized tool finder respects conversion direction and fullwidth aliases'
   await expect(page.locator('[data-tool-card]:visible')).toHaveCount(1);
 });
 
+test('Chinese search finds PDF-first and action-first task names without false conversions', async ({ page }) => {
+  await page.goto('/zh/');
+  const search = page.getByRole('searchbox', { name: '搜索工具' });
+  for (const [term, slug] of [
+    ['PDF合并', 'merge-pdf'],
+    ['PDF拆分', 'split-pdf'],
+    ['PDF压缩', 'compress-pdf'],
+    ['PDF水印', 'watermark-pdf'],
+    ['PDF加页码', 'add-page-numbers'],
+    ['提取PDF页面', 'extract-pages'],
+    ['删除PDF页面', 'delete-pages'],
+  ]) {
+    await search.fill(term);
+    await expect(page.locator('[data-tool-card]:visible'), term).toHaveCount(1);
+    await expect(page.locator('a.tool-card[href="/zh/' + slug + '/"]')).toBeVisible();
+  }
+  await search.fill('PDF转Word');
+  await expect(page.locator('[data-tool-card]:visible')).toHaveCount(0);
+  await expect(page.getByText('没有匹配的工具，请换一个关键词。')).toBeVisible();
+});
+
 test('conversion search accepts arrows and Chinese verbs without reversing direction', async ({ page }) => {
   await page.goto('/');
   const search = page.getByRole('searchbox', { name: 'Find a PDF tool' });
