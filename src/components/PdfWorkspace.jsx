@@ -1833,7 +1833,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     </details>
                   </div>}
                    {splitMode === 'ranges' && combinedSplitPositions && <p className="input-note split-combined-preview"
-                     data-testid="split-combined-preview" role="status">{interpolate(t.splitCombinePreview, {
+                     data-testid="split-combined-preview">{interpolate(t.splitCombinePreview, {
                        pages: combinedSplitPositions.length,
                        positions: combinedSplitPositions.slice(0, 10).join(', ') +
                          (combinedSplitPositions.length > 10 ? ', …' : ''),
