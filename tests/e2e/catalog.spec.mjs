@@ -57,6 +57,49 @@ test('localized tool finder respects conversion direction and fullwidth aliases'
   await expect(page.locator('[data-tool-card]:visible')).toHaveCount(1);
 });
 
+test('conversion search accepts arrows and Chinese verbs without reversing direction', async ({ page }) => {
+  await page.goto('/');
+  const search = page.getByRole('searchbox', { name: 'Find a PDF tool' });
+  for (const query of ['JPG → PDF', 'JPG -> PDF']) {
+    await search.fill(query);
+    await expect(page.locator('[data-tool-card]:visible')).toHaveCount(1);
+    await expect(page.locator('a.tool-card[href="/image-to-pdf/"]')).toBeVisible();
+  }
+  await search.fill('PDF → JPG');
+  await expect(page.locator('[data-tool-card]:visible')).toHaveCount(1);
+  await expect(page.locator('a.tool-card[href="/pdf-to-images/"]')).toBeVisible();
+
+  await page.goto('/zh/');
+  const zhSearch = page.getByRole('searchbox', { name: '搜索工具' });
+  for (const query of ['PDF 转换成 JPG', 'PDF转为JPG']) {
+    await zhSearch.fill(query);
+    await expect(page.locator('[data-tool-card]:visible')).toHaveCount(1);
+    await expect(page.locator('a.tool-card[href="/zh/pdf-to-images/"]')).toBeVisible();
+  }
+  await zhSearch.fill('JPG 转换为 PDF');
+  await expect(page.locator('[data-tool-card]:visible')).toHaveCount(1);
+  await expect(page.locator('a.tool-card[href="/zh/image-to-pdf/"]')).toBeVisible();
+});
+
+test('reciprocal converter navigation is crawlable with localized breadcrumbs', async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  try {
+    for (const [route, target, breadcrumb] of [
+      ['/pdf-to-txt/', '/txt-to-pdf/', 'Breadcrumb'],
+      ['/zh/pdf-to-markdown/', '/zh/markdown-to-pdf/', '面包屑导航'],
+      ['/pdf-to-images/', '/image-to-pdf/', 'Breadcrumb'],
+      ['/zh/extract-pages/', '/zh/split-pdf/', '面包屑导航'],
+    ]) {
+      await page.goto(route);
+      await expect(page.locator('.below-tools a[href="' + target + '"]')).toHaveCount(1);
+      const nav = page.getByRole('navigation', { name: breadcrumb });
+      await expect(nav).toHaveCount(1);
+      await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
+    }
+  } finally { await context.close(); }
+});
+
 test('tool finder announces localized match counts and no-match status to assistive technology', async ({ page }) => {
   await page.goto('/');
   const status = page.locator('[data-tool-results]');

@@ -107,7 +107,12 @@ const desc = zh
       const categoryLinks = new Map([...(categoryNav?.querySelectorAll('[data-category-link]') || [])]
         .map(link => [link.getAttribute('href')?.slice(1), link]));
       const update = () => {
-        const query = search.value.normalize('NFKC').trim().replace(/\s+/g, ' ')
+        // Common arrows and Chinese conversion verbs describe the same
+        // direction as our real tool aliases; never reverse the conversion.
+        const query = search.value.normalize('NFKC').trim()
+          .replace(/(?:->|[→➡➜➔⇒])/g, ' to ')
+          .replace(/(?:转换成|转换为|转成|转为)/g, '转')
+          .replace(/\s+/g, ' ')
           .replace(/\s*转\s*/g, '转').toLocaleLowerCase();
         let matches = 0;
         for (const card of cards) {

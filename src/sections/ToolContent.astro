@@ -19,7 +19,7 @@ const href = (path) => langPath(path, locale);
 <Base locale={locale} title={tool.title + ' - ' + (locale === 'zh' ? '免费本地 PDF 工具' : 'Free & Private')}
   description={tool.description} structuredData={toolJsonLd(tool, locale)}>
   <section class="tool-hero site-container">
-    <div class="breadcrumbs"><a href={href('/')}>{page.home}</a><span aria-hidden="true">/</span><span>{tool.title}</span></div>
+    <nav class="breadcrumbs" aria-label={locale === 'zh' ? '面包屑导航' : 'Breadcrumb'}><a href={href('/')}>{page.home}</a><span aria-hidden="true">/</span><span aria-current="page">{tool.title}</span></nav>
     <div class="eyebrow">{page.private}</div>
     <h1>{tool.headline}</h1>
     <p>{tool.description}</p>
