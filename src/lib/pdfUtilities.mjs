@@ -183,6 +183,28 @@ export async function convertPdfToImages(pdf, options = {}, reportProgress = () 
   return { name: 'pdf-pages.zip', bytes, mime: 'application/zip', count: files.length };
 }
 
+/**
+ * Try smaller PDF object-stream serialization without rasterizing any pages.
+ * This rewrites the PDF container: text and image content stay as PDF objects,
+ * but this is NOT bitwise-lossless, a sanitizer, or a safe operation for signed
+ * documents (any digital signature can be invalidated by rewriting bytes).
+ * Keep original bytes untouched; never return a larger PDF as a saving.
+ */
+export async function compressPdfStructure(pdf, options = {}, reportProgress = () => {}) {
+  enforceUtilityPdfLimits(pdf, 'compress-pdf', options.locale);
+  checkCancelled(options.signal);
+  const source = await PDFDocument.load(pdf.bytes, { updateMetadata: false });
+  checkCancelled(options.signal);
+  if (source.getPageCount() !== pdf.count) throw new Error('The PDF page count changed while opening it.');
+  // Allow the browser to handle Cancel between object serialization batches.
+  // The resulting file is exposed only after a completed save and size check.
+  const bytes = new Uint8Array(await source.save({ useObjectStreams: true, objectsPerTick: 25 }));
+  checkCancelled(options.signal);
+  reportProgress(pdf.count, pdf.count);
+  const stats = compressionStats(pdf.size, bytes.length);
+  return { bytes: stats.smaller ? bytes : null, stats };
+}
+
 // Honest, intentionally lossy raster recompression: no promise to keep searchable text,
 // internal links, annotations, form fields or digital signatures. Never auto-download if larger.
 export async function compressPdfRaster(pdf, options = {}, reportProgress = () => {}) {
