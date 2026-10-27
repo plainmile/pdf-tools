@@ -146,6 +146,8 @@ main { flex: 1; }
 .breadcrumbs a { text-decoration: none; }
 .tool-hero h1 { font-size: clamp(31px, 3.5vw, 46px); margin: 12px 0 12px; max-width: 830px; }
 .tool-hero > p { max-width: 740px; margin: 0; line-height: 1.75; font-size: 14px; color: var(--muted); }
+.tool-hero > .tool-task-tip { margin-top: 12px; }
+.tool-task-tip a { color: var(--accent); text-underline-offset: 2px; }
 .workspace-outer { padding-bottom: 65px; }
 .tool-js-required { margin: 0; padding: 16px 18px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); font-size: 14px; line-height: 1.65; }
 .tool-explanation { display: grid; grid-template-columns: 1fr .72fr; gap: 50px; padding: 45px 0 65px; border-top: 1px solid var(--border); }
