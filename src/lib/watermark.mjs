@@ -1,3 +1,6 @@
+import { abortableWait } from './pdfUtilities.mjs';
+import { checkCancelled } from './utilityCore.mjs';
+
 /** Optional watermark text is intentionally disabled unless the user opts in. */
 export const MAX_WATERMARK_CHARS = 60;
 export const WATERMARK_OPACITY = 0.2;
@@ -50,7 +53,8 @@ export function watermarkTextFromOptions(watermark) {
  * do not support Chinese; embedding this transparent image makes Chinese text
  * display correctly without sending content or fonts to an external service.
  */
-export async function renderWatermarkPng(text, pageWidth, pageHeight) {
+export async function renderWatermarkPng(text, pageWidth, pageHeight, signal = null) {
+  checkCancelled(signal);
   if (typeof document === 'undefined' || !document.createElement) {
     throw new Error('Watermarks require a browser with canvas support.');
   }
@@ -78,10 +82,15 @@ export async function renderWatermarkPng(text, pageWidth, pageHeight) {
     const fit = Math.min(1, availableWidth / Math.max(measuredWidth, 1));
     context.scale(fit, fit);
     context.fillText(text, 0, 0);
-    const blob = await new Promise((resolve, reject) => {
+    // A browser encoder or Blob read can stall indefinitely after export is
+    // cancelled. Race both stages against AbortSignal so finally releases
+    // the canvas backing store and no late watermark enters the PDF.
+    const blob = await abortableWait(new Promise((resolve, reject) => {
       canvas.toBlob((png) => png ? resolve(png) : reject(new Error('Could not create the watermark image.')), 'image/png');
-    });
-    return new Uint8Array(await blob.arrayBuffer());
+    }), signal);
+    const bytes = new Uint8Array(await abortableWait(blob.arrayBuffer(), signal));
+    checkCancelled(signal);
+    return bytes;
   } finally {
     canvas.width = 0;
     canvas.height = 0;
