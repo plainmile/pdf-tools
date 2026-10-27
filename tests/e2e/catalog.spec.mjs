@@ -23,6 +23,7 @@ test('no-JavaScript homepage keeps all 16 crawlable PDF tools without a misleadi
       const response = await page.goto(route);
       expect(response.status()).toBe(200);
       await expect(page.locator('[data-tool-finder]')).toBeHidden();
+      await expect(page.locator('[data-theme-switch]')).toBeHidden();
       await expect(page.getByTestId('tool-finder-nojs')).toContainText(description);
       await expect(page.locator('[data-tool-card]:visible')).toHaveCount(16);
       await expect(page.locator('[data-category-link]:visible')).toHaveCount(4);
@@ -39,6 +40,7 @@ test('JavaScript-enabled homepage reveals interactive finder and keeps all tool 
   for (const [route, label] of [['/', 'Find a PDF tool'], ['/zh/', '搜索工具']]) {
     await page.goto(route);
     await expect(page.locator('[data-tool-finder]')).toBeVisible();
+    await expect(page.locator('[data-theme-switch]')).toBeVisible();
     await expect(page.getByRole('searchbox', { name: label })).toBeVisible();
     await expect(page.locator('[data-tool-card]:visible')).toHaveCount(16);
   }
