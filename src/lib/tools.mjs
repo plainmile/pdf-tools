@@ -64,11 +64,11 @@ export const tools = [
     steps: ['Choose a PDF', 'Select image format and pages', 'Download JPG, PNG or ZIP'],
   },
   {
-    slug: 'compress-pdf', title: 'Compress PDF', short: 'Measure actual size savings',
-    headline: 'Compress a PDF, then check what was saved.',
-    description: 'Try local image-based PDF compression and see original size versus output size before downloading. Clear warnings for lost searchable text.',
-    details: 'PDFs with dense images can often become smaller when re-rendered at reduced quality. Text and links become images, and some PDFs will not shrink at all. Nothing is downloaded when there are no savings.',
-    steps: ['Choose a PDF and compression level', 'Compare original and result sizes', 'Download only if output is smaller'],
+    slug: 'compress-pdf', title: 'Compress PDF', short: 'Keep text or shrink page images',
+    headline: 'Compress PDF while choosing what stays readable.',
+    description: 'Compress PDF files locally with a text-preserving optimization or optional JPEG page compression. Compare actual file sizes; no uploads or signup.',
+    details: 'First try reorganizing PDF objects without rasterizing the text, which may not reduce an already optimized file. For scanned or image-heavy PDFs, explicitly choose smaller JPEG page images; this loses selectable text, forms and links. Both methods rewrite the PDF and invalidate digital signatures. Only a smaller output is downloadable; keep the original and inspect important documents.',
+    steps: ['Choose a PDF and text-preserving or JPEG method', 'Compare actual original and output sizes', 'Inspect and download only a smaller PDF'],
   },
   {
     slug: 'pdf-to-txt', title: 'PDF to TXT', short: 'Extract selectable text',

@@ -189,7 +189,9 @@ test('English tool help is readable, accessible and structured data describes re
   await expect(accordion).toBeVisible();
   await accordion.locator('summary').click();
   await expect(accordion).toHaveAttribute('open', '');
-  await expect(accordion.locator('p')).toContainText('JPEG images');
+  await expect(accordion.locator('p')).toContainText('document optimization rewrites PDF object streams');
+  await expect(accordion.locator('p')).toContainText('JPEG page compression');
+  await expect(accordion.locator('p')).toContainText('digital signatures');
   const schema = await page.locator('script[type="application/ld+json"]').textContent();
   const schemas = JSON.parse(schema);
   expect(schemas.find(x => x['@type'] === 'WebApplication')).toMatchObject({

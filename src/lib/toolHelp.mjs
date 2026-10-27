@@ -1,5 +1,5 @@
 // Practical, visible help for users and crawlers. Not FAQPage rich-result spam.
-// Do not imply OCR, lossless compression, editable PDF text, or cryptographic signatures.
+// Do not imply OCR, bitwise-lossless compression, editable PDF text, or intact digital signatures.
 export const toolHelp = {
   en: {
     workspace: [
@@ -49,8 +49,8 @@ export const toolHelp = {
       ['Does this extract the original photos embedded inside a PDF?', 'No. This converts whole PDF pages into new JPG or PNG images, including any text or graphics on those pages. It does not separately extract embedded photos or preserve their original image data.'],
     ],
     'compress-pdf': [
-      ['Will compressed pages still contain selectable text?', 'No. This tool re-renders pages as JPEG images; searchable text, clickable links, forms and signatures may be lost. Keep your original PDF.'],
-      ['What if the new file is larger?', 'The tool measures the actual sizes and will not offer a larger result as an improvement. Image-based compression is limited to 120 pages per run.'],
+      ['Will PDF compression keep my text searchable?', 'By default, yes: document optimization rewrites PDF object streams without converting pages into images. Choose JPEG page compression only if you accept that searchable text, links and forms will be lost. Both methods rewrite the file and invalidate digital signatures. Keep the original and check important output.'],
+      ['What if the new file is larger?', 'Both methods measure the actual original and result sizes. A larger or equal-size result is not downloadable. The page limit remains 120 per run and some PDFs cannot be reduced further.'],
     ],
     'pdf-to-txt': [
       ['Can I extract text from a 500-page book?', 'Yes, for PDFs containing selectable text, subject to a 100 MiB and 1,000-page limit and your device memory.'],
@@ -131,8 +131,8 @@ export const toolHelp = {
       ['能从 PDF 中单独提取原始照片吗？', '不能。这里是把整个 PDF 页面重新渲染为 JPG 或 PNG，包含页面上的文字和图形；并非单独提取 PDF 内嵌照片，也不保留原始图片数据。'],
     ],
     'compress-pdf': [
-      ['压缩后的 PDF 还能搜索和复制文字吗？', '不能保证。当前压缩会将页面重新渲染为 JPEG 图片，可能丢失可搜索文本、链接、表单和签名。请保留原文件。'],
-      ['如果压缩后的 PDF 反而更大呢？', '工具会真实比较文件大小，不会把变大的结果当作压缩成功。当前图片化压缩每次最多支持 120 页。'],
+      ['压缩后的 PDF 还能搜索和复制文字吗？', '默认的文档结构优化不会将文字图片化，因此可选中文字通常仍可搜索；若主动选择 JPEG 图片化压缩，则会丢失文字搜索能力、表单及链接。两种模式都将重写 PDF，使数字签名失效。请保留原文件并核查重要内容。'],
+      ['如果压缩后的 PDF 反而更大呢？', '两种方式都真实比较输入和输出大小，变大或没有变小就不能下载优化结果。每次最多处理 120 页，部分文件已经很紧凑，无法进一步缩小。'],
     ],
     'pdf-to-txt': [
       ['可以提取 500 页电子书的文字吗？', '可以，但 PDF 必须有可选择的文字层，且文件不超过 100 MiB、页数不超过 1000 页，实际还受设备内存限制。'],
