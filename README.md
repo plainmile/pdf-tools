@@ -75,6 +75,8 @@ The 600-page workspace ceiling includes duplicated and generated blank pages. Du
 
 The PDF.js Worker lives at the stable path `/pdfjs/pdf.worker.min.mjs`, while Astro application chunks have versioned filenames. Nginx requires the Worker to be revalidated (`Cache-Control: no-cache`) on each navigation to prevent a stale Worker from becoming incompatible with the updated PDF.js client after an upgrade. Versioned JS/CSS assets continue to use short-lived normal caching. The Docker CI smoke test verifies the Worker MIME type and cache response headers.
 
+On each successful production publish, the container exposes the exact commit SHA at `/.well-known/plainmile-release` with a revalidation-only cache policy. Deployment confirms that the public Cloudflare URL returns that SHA before running browser E2E; the public HTML is also checked for canonical/hreflang. These checks deliberately do not depend on editable H1 or marketing text. A failed check rolls back only the PDF container to the last recorded healthy release.
+
 ## Leaving an active browser-local document
 
 Imported PDFs/photos and typed text are kept only in the current browser tab. When leaving with unexported work, normal same-tab links (including tools and language changes) open a localized confirmation offering **Keep editing** or **Leave without saving**. A completed full PDF export, text/PDF download, or explicit Clear releases the guard; subsequent changes reactivate it. Browser Reload/Back/Close use the standard `beforeunload` warning where supported; browsers may suppress these native prompts without prior user interaction and their warning text cannot be customized. The feature does not persist file contents in localStorage, IndexedDB, cookies, or any server.
