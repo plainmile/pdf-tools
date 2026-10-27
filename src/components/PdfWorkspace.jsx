@@ -1118,7 +1118,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           onKeyDown={event => {
             if (busy || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
             event.preventDefault();
-            const next = event.key === 'ArrowLeft' || event.key === 'Home' ? 'organize' : 'split';
+            // A two-tab list wraps in either direction: ArrowLeft from the
+            // first tab goes to the last, and ArrowRight from the last to the
+            // first. Home/End always jump to the respective edge.
+            const current = event.target.dataset.workspaceTab;
+            const next = event.key === 'Home' ? 'organize'
+              : event.key === 'End' ? 'split'
+                : current === 'organize' ? 'split' : 'organize';
             setTab(next);
             event.currentTarget.querySelector('[data-workspace-tab="' + next + '"]')?.focus();
           }}>
