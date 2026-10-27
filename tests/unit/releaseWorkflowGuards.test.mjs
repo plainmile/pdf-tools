@@ -124,6 +124,8 @@ test('production probes exact published SHA instead of copy that SEO updates can
   assert.match(docker, /printf '%s\\n' "\$SOURCE_SHA" > \/usr\/share\/nginx\/html\/\.well-known\/plainmile-release/);
   assert.match(nginx, /location = \/\.well-known\/plainmile-release/);
   assert.match(nginx, /location = \/\.well-known\/plainmile-release \{[\s\S]*?expires -1;/);
+  assert.match(nginx, /location = \/\.well-known\/plainmile-release \{[\s\S]*?X-Robots-Tag "noindex, nofollow"/);
+  assert.match(ci, /x-robots-tag: noindex/);
   assert.match(publish, /SOURCE_SHA=\$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
   assert.match(ci, /docker build --build-arg SOURCE_SHA="\$GITHUB_SHA"/);
   assert.match(ci, /\.well-known\/plainmile-release\)" = "\$GITHUB_SHA"/);
