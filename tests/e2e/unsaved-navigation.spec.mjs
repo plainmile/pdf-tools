@@ -100,6 +100,44 @@ test('unchanged source PDF can be previewed and left freely; selected pages stil
   await expect(page).toHaveURL(/\\/workspace\\/$/);
 });
 
+test('unexported split choices and an untouched multi-file merge still protect browser-only work', async ({ page }) => {
+  const doc = await PDFDocument.create();
+  doc.addPage([320, 420]);
+  doc.addPage([330, 430]);
+  const bytes = Buffer.from(await doc.save());
+  const nativeGuard = () => page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'chapters.pdf', mimeType: 'application/pdf', buffer: bytes,
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  await expect.poll(nativeGuard).toBe(false);
+  await page.locator('#ranges-input').fill('1');
+  await expect.poll(nativeGuard).toBe(true);
+  await page.locator('.language-link').click();
+  await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
+  await page.getByTestId('unsaved-keep').click();
+  await page.locator('#ranges-input').fill('');
+  await expect.poll(nativeGuard).toBe(false);
+
+  await page.goto('/zh/merge-pdf/');
+  await page.getByTestId('file-input').setInputFiles([
+    { name: 'front.pdf', mimeType: 'application/pdf', buffer: bytes },
+    { name: 'back.pdf', mimeType: 'application/pdf', buffer: bytes },
+  ]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(4);
+  // The two source PDFs still exist, but their assembled combination has
+  // never been downloaded. This is not a "single untouched PDF" preview.
+  await expect.poll(nativeGuard).toBe(true);
+  await page.locator('.language-link').click();
+  await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
+});
+
 test('successful full export allows normal navigation; a new page edit warns again', async ({ page }) => {
   await page.goto('/workspace/');
   await page.getByTestId('file-input').setInputFiles({
