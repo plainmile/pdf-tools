@@ -56,6 +56,8 @@ const companionTools = Object.freeze({
   'markdown-to-pdf': 'pdf-to-markdown',
   'split-pdf': 'extract-pages',
   'extract-pages': 'split-pdf',
+  // Compression refuses >120-page inputs: splitting is the useful recovery step.
+  'compress-pdf': 'split-pdf',
 });
 
 export function relatedToolSlugs(slug) {

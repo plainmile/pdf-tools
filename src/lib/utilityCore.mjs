@@ -68,9 +68,19 @@ export function enforceUtilityPdfLimits({ size, count }, mode, locale = 'en') {
     throw new Error(zh ? 'PDF 最多支持 1000 页。' : 'PDF must have 1 to 1,000 pages.');
   }
   if (mode === 'compress-pdf' && count > UTILITY_LIMITS.maxCompressionPages) {
+    // The focused converter accepts 1,000-page PDFs for text extraction, but
+    // the separate visual Split PDF workspace itself stops at 600 pages.
+    // Do not send a 601-1,000-page user into a tool that cannot open the file.
+    const canSplitOnSite = count <= 600;
     throw new Error(zh
-      ? 'PDF 压缩每次最多处理 120 页，包括保留文字与 JPEG 图片化模式。长文档请先拆分，以降低浏览器内存占用。'
-      : 'PDF compression supports at most 120 pages per run in both text-preserving and JPEG modes. Split long PDFs to reduce browser memory use.');
+      ? 'PDF 压缩每次最多处理 120 页，包括保留文字与 JPEG 图片化模式。' +
+        (canSplitOnSite
+          ? '本文件可先使用本站拆分 PDF 工具分段（最多支持 600 页，且受文件大小限制），然后逐份压缩。'
+          : '本站拆分 PDF 工具最多支持 600 页；请先使用其他本地 PDF 软件拆分此文件，再逐份压缩。')
+      : 'PDF compression supports at most 120 pages per run in both text-preserving and JPEG modes. ' +
+        (canSplitOnSite
+          ? 'Split this PDF into smaller parts with our Split PDF tool (up to 600 pages, subject to file-size limits), then compress each part.'
+          : 'Our Split PDF tool also stops at 600 pages. First divide this file with another local PDF application, then compress the smaller parts.'));
   }
   return true;
 }

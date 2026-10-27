@@ -56,6 +56,7 @@ export const toolHelp = {
     'compress-pdf': [
       ['Will PDF compression keep my text searchable?', 'By default, yes: document optimization rewrites PDF object streams without converting pages into images. Choose JPEG page compression only if you accept that searchable text, links and forms will be lost. Both methods rewrite the file and invalidate digital signatures. Keep the original and check important output.'],
       ['What if the new file is larger?', 'Both methods measure the actual original and result sizes. A larger or equal-size result is not downloadable. The page limit remains 120 per run and some PDFs cannot be reduced further.'],
+      ['Can I compress a PDF longer than 120 pages?', 'Not in a single run. If it has 121–600 pages and meets the file-size limit, first use Split PDF to make smaller files and upload each part again here. The Split PDF workspace itself accepts at most 600 pages. For longer source files, divide them using another local PDF application before uploading; this site never transfers source files between tools.'],
     ],
     'pdf-to-txt': [
       ['Can I extract text from a 500-page book?', 'Yes, for PDFs containing selectable text, subject to a 100 MiB and 1,000-page limit and your device memory.'],
@@ -145,6 +146,7 @@ export const toolHelp = {
     'compress-pdf': [
       ['压缩后的 PDF 还能搜索和复制文字吗？', '默认的文档结构优化不会将文字图片化，因此可选中文字通常仍可搜索；若主动选择 JPEG 图片化压缩，则会丢失文字搜索能力、表单及链接。两种模式都将重写 PDF，使数字签名失效。请保留原文件并核查重要内容。'],
       ['如果压缩后的 PDF 反而更大呢？', '两种方式都真实比较输入和输出大小，变大或没有变小就不能下载优化结果。每次最多处理 120 页，部分文件已经很紧凑，无法进一步缩小。'],
+      ['超过 120 页的 PDF 能压缩吗？', '不能一次处理超过 120 页。121–600 页且符合文件大小限制的文件，可先使用“拆分 PDF”切成小文件，再逐份重新上传压缩。本站拆分工作台最多支持 600 页；更长的文件需要先用其他本地 PDF 软件分段。本站不会在不同工具之间自动传递文件。'],
     ],
     'pdf-to-txt': [
       ['可以提取 500 页电子书的文字吗？', '可以，但 PDF 必须有可选择的文字层，且文件不超过 100 MiB、页数不超过 1000 页，实际还受设备内存限制。'],

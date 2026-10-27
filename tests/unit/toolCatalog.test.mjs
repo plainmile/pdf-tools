@@ -67,7 +67,9 @@ test('related tools prioritize matching real tasks and exclude the current route
     assert.equal(new Set(related).size, related.length);
     assert.ok(related.every(slug => known.has(slug)));
   }
-  assert.equal(relatedToolSlugs('compress-pdf')[0], 'watermark-pdf');
+  // A PDF above the 120-page compression ceiling must be split first;
+  // watermarking is unrelated to that common recovery path.
+  assert.equal(relatedToolSlugs('compress-pdf')[0], 'split-pdf');
   for (const [source, companion] of [
     ['pdf-to-images', 'image-to-pdf'],
     ['image-to-pdf', 'pdf-to-images'],
