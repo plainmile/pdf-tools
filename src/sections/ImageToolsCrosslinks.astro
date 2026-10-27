@@ -1,0 +1,47 @@
+---
+import { companionImageTools, imageToolsHome } from '../lib/companionTools.mjs';
+const { locale = 'en', context = 'home' } = Astro.props;
+const zh = locale === 'zh';
+const copy = {
+  home: {
+    en: { heading: 'Need to resize or compress a photo?', intro: 'Use the separate PlainMile Image Tools to prepare JPG, PNG or WebP pictures for online forms or PDF creation.' },
+    zh: { heading: '还需要调整或压缩图片吗？', intro: '使用独立的 PlainMile 图片工具，先处理 JPG、PNG 或 WebP 图片，再用于表单或制作 PDF。' },
+  },
+  'image-to-pdf': {
+    en: { heading: 'Prepare your images before making a PDF', intro: 'Need exact photo dimensions or a smaller JPG? Adjust the image first, then choose the downloaded picture in this PDF tool.' },
+    zh: { heading: '制作 PDF 前先调整图片', intro: '如果照片需要指定像素或更小的 JPG 文件，可先处理图片，再回到此处选择下载后的图片制作 PDF。' },
+  },
+  'pdf-to-images': {
+    en: { heading: 'Resize or compress the exported PDF page images', intro: 'This tool exports entire PDF pages as JPG or PNG. To change the resulting image dimensions or file size, use the separate image utilities after downloading.' },
+    zh: { heading: '继续调整导出的 PDF 页面图片', intro: '本工具把整个 PDF 页面导出成 JPG 或 PNG。如需改变图片像素或文件大小，请先下载结果，再使用独立图片工具。' },
+  },
+};
+const heading = copy[context]?.[locale];
+if (!heading) throw new Error('Unsupported image companion route or locale.');
+const items = companionImageTools(context, locale);
+---
+<section class="image-companion site-container" data-image-companion={context} aria-labelledby={'image-companion-' + context}>
+  <div class="image-companion-heading">
+    <div>
+      <h2 id={'image-companion-' + context}>{heading.heading}</h2>
+      <p>{heading.intro}</p>
+    </div>
+    <a class="image-companion-all" href={imageToolsHome(locale)} target="_blank" rel="noopener noreferrer" data-image-tools-home>
+      {zh ? '查看全部图片工具' : 'All image tools'} <span aria-hidden="true">↗</span><span class="visually-hidden">{zh ? '（在新标签页打开）' : ' (opens in a new tab)'}</span>
+    </a>
+  </div>
+  <ul class="image-companion-list">
+    {items.map((item) => <li>
+      <a href={item.href} data-image-tool={item.slug} target="_blank" rel="noopener noreferrer">
+        <strong>{item.title}<span aria-hidden="true"> ↗</span></strong>
+        <span>{item.description}</span>
+        <span class="visually-hidden">{zh ? '（在新标签页打开）' : ' (opens in a new tab)'}</span>
+      </a>
+    </li>)}
+  </ul>
+  <p class="image-companion-note">
+    {zh
+      ? '图片工具会在新标签页打开，当前 PDF 编辑内容不会被覆盖。两个网站之间不会自动传送文件，请先下载处理结果，再手动选择。'
+      : 'Image tools open in a new tab, keeping this PDF session intact. Files are not transferred between websites: download the result, then choose it yourself.'}
+  </p>
+</section>
