@@ -68,5 +68,16 @@ test('related tools prioritize matching real tasks and exclude the current route
     assert.ok(related.every(slug => known.has(slug)));
   }
   assert.equal(relatedToolSlugs('compress-pdf')[0], 'watermark-pdf');
-  assert.equal(relatedToolSlugs('pdf-to-txt')[0], 'pdf-to-images');
+  for (const [source, companion] of [
+    ['pdf-to-images', 'image-to-pdf'],
+    ['image-to-pdf', 'pdf-to-images'],
+    ['pdf-to-txt', 'txt-to-pdf'],
+    ['txt-to-pdf', 'pdf-to-txt'],
+    ['pdf-to-markdown', 'markdown-to-pdf'],
+    ['markdown-to-pdf', 'pdf-to-markdown'],
+    ['split-pdf', 'extract-pages'],
+    ['extract-pages', 'split-pdf'],
+  ]) {
+    assert.equal(relatedToolSlugs(source)[0], companion);
+  }
 });
