@@ -190,6 +190,54 @@ test('stalled BMP encoder can be cancelled without losing existing PDF pages or 
   expect(imageSize(exported, 1)).toContainEqual({ width: 4, height: 3 });
 });
 
+test('cancel a stalled BMP decoder, release its late bitmap and retry without losing pages', async ({ page }) => {
+  await page.addInitScript(() => {
+    const nativeDecode = window.createImageBitmap;
+    window.__holdBmpDecode = false;
+    window.__decodedButHeld = null;
+    window.__resolveHeldBitmap = null;
+    window.createImageBitmap = async function (...args) {
+      const bitmap = await nativeDecode.apply(this, args);
+      if (window.__holdBmpDecode && args[0] instanceof Blob && args[0].type === 'image/bmp') {
+        window.__holdBmpDecode = false;
+        window.__decodedButHeld = bitmap;
+        return new Promise(resolve => { window.__resolveHeldBitmap = () => resolve(bitmap); });
+      }
+      return bitmap;
+    };
+  });
+  await page.goto('/image-to-pdf/');
+  const original = await PDFDocument.create();
+  original.addPage([300, 400]);
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'original.pdf', mimeType: 'application/pdf',
+    buffer: Buffer.from(await original.save()),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  await page.evaluate(() => { window.__holdBmpDecode = true; });
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'decode-stalled.bmp', mimeType: 'image/bmp', buffer: makeBmp(),
+  });
+  await expect.poll(() => page.evaluate(() => Boolean(window.__resolveHeldBitmap))).toBe(true);
+  await expect(page.getByTestId('workspace-import-cancel')).toBeVisible();
+  await page.getByTestId('workspace-import-cancel').click();
+  await expect(page.getByTestId('workspace-import-progress')).toHaveCount(0);
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+
+  // Even though the aborted async operation has returned to the UI, the
+  // browser may resolve the old decoder later. That late bitmap must close.
+  await page.evaluate(() => window.__resolveHeldBitmap());
+  await expect.poll(() => page.evaluate(() => window.__decodedButHeld?.width)).toBe(0);
+
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'decode-retry.bmp', mimeType: 'image/bmp', buffer: makeBmp(),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  const exported = await downloadPdf(page);
+  expect(exported.getPageCount()).toBe(2);
+  expect(imageSize(exported, 1)).toContainEqual({ width: 4, height: 3 });
+});
+
 function pngChunk(type, data) {
   const chunk = Buffer.alloc(12 + data.length);
   chunk.writeUInt32BE(data.length, 0);
