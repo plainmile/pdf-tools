@@ -45,9 +45,24 @@ export const toolSymbols = {
   'watermark-pdf': 'W', 'add-page-numbers': '#',
 };
 
+// Conversion pairs and the two ways to extract/split are intentional next
+// steps, not generic keyword links. Keep them visible in prerendered HTML.
+const companionTools = Object.freeze({
+  'pdf-to-images': 'image-to-pdf',
+  'image-to-pdf': 'pdf-to-images',
+  'pdf-to-txt': 'txt-to-pdf',
+  'txt-to-pdf': 'pdf-to-txt',
+  'pdf-to-markdown': 'markdown-to-pdf',
+  'markdown-to-pdf': 'pdf-to-markdown',
+  'split-pdf': 'extract-pages',
+  'extract-pages': 'split-pdf',
+});
+
 export function relatedToolSlugs(slug) {
   const matchingGroup = toolGroups.find(group => group.slugs.includes(slug));
   const groupNeighbors = matchingGroup ? matchingGroup.slugs.filter(candidate => candidate !== slug) : [];
   const mainTasks = ['merge-pdf', 'split-pdf', 'compress-pdf', 'pdf-to-images', 'workspace'];
-  return [...new Set([...groupNeighbors, ...mainTasks])].filter(candidate => candidate !== slug).slice(0, 5);
+  const companion = companionTools[slug] ? [companionTools[slug]] : [];
+  return [...new Set([...companion, ...groupNeighbors, ...mainTasks])]
+    .filter(candidate => candidate !== slug).slice(0, 5);
 }
