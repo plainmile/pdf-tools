@@ -21,7 +21,7 @@ async function upload(page, count = 2) {
   await expect(page.getByTestId('utility-file-summary')).toBeVisible();
 }
 
-test('Cancel interrupts a stalled browser image encoder, frees its pixels and permits valid ZIP retry', async ({ page }) => {
+test('Cancel frees a stalled encoder and retains previous ZIP for download before a valid retry', async ({ page }) => {
   // A stalled toBlob callback is an actual browser failure mode; the PDF.js
   // page render has already completed, so cancelling that render alone is not
   // enough to unblock the editor.
@@ -41,8 +41,15 @@ test('Cancel interrupts a stalled browser image encoder, frees its pixels and pe
   });
   await page.goto('/pdf-to-images/');
   await upload(page);
-  const priorDownloads = [];
-  page.on('download', file => priorDownloads.push(file.suggestedFilename()));
+  // An earlier successful conversion is the only copy if the browser blocked
+  // the automatic save. Failure on the next retry must not erase its fallback.
+  const firstPending = page.waitForEvent('download', { timeout: 30000 });
+  await page.getByTestId('utility-run').click();
+  const firstFile = await firstPending;
+  const previousZipBytes = await readFile(await firstFile.path());
+  await expect(page.getByTestId('image-result')).toBeVisible();
+  const failedAttemptDownloads = [];
+  page.on('download', file => failedAttemptDownloads.push(file.suggestedFilename()));
   await page.evaluate(() => { window.__stallNextRasterEncode = true; });
   await page.getByTestId('utility-run').click();
   await expect.poll(() => page.evaluate(() => Boolean(window.__stalledRasterCanvas))).toBe(true);
@@ -50,12 +57,17 @@ test('Cancel interrupts a stalled browser image encoder, frees its pixels and pe
   await page.getByTestId('utility-cancel').click();
   await expect(page.getByTestId('utility-run')).toBeEnabled();
   await expect(page.getByTestId('utility-cancel')).toHaveCount(0);
-  await expect(page.getByTestId('image-result')).toHaveCount(0);
-  expect(priorDownloads).toEqual([]);
+  await expect(page.getByTestId('image-result')).toBeVisible();
+  expect(failedAttemptDownloads).toEqual([]);
   expect(await page.evaluate(() => ({
     width: window.__stalledRasterCanvas?.width,
     height: window.__stalledRasterCanvas?.height,
   }))).toEqual({ width: 1, height: 1 });
+
+  const fallbackPending = page.waitForEvent('download', { timeout: 30000 });
+  await page.getByTestId('image-download-again').click();
+  const fallbackDownload = await fallbackPending;
+  expect((await readFile(await fallbackDownload.path())).equals(previousZipBytes)).toBe(true);
 
   const pendingDownload = page.waitForEvent('download', { timeout: 30000 });
   await page.getByTestId('utility-run').click();
