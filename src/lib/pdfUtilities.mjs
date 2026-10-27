@@ -360,8 +360,10 @@ export async function extractPdfText(pdf, markdown = false, reportProgress = () 
 }
 
 export async function addPageNumbers(pdf, opts = {}, reportProgress = () => {}) {
-  const doc = await PDFDocument.load(pdf.bytes, { updateMetadata: false });
-  const font = await doc.embedFont(StandardFonts.Helvetica);
+  checkCancelled(opts.signal);
+  // A hung third-party parser/font embed must not block Cancel on long PDFs.
+  const doc = await abortableWait(PDFDocument.load(pdf.bytes, { updateMetadata: false }), opts.signal);
+  const font = await abortableWait(doc.embedFont(StandardFonts.Helvetica), opts.signal);
   const size = opts.fontSize === 16 ? 16 : opts.fontSize === 10 ? 10 : 12;
   const start = Number(opts.start ?? 1);
   const pageCount = doc.getPageCount();
@@ -398,7 +400,7 @@ export async function addPageNumbers(pdf, opts = {}, reportProgress = () => {}) 
     reportProgress(i + 1, pageCount);
   }
   checkCancelled(opts.signal);
-  const bytes = new Uint8Array(await doc.save({ useObjectStreams: true }));
+  const bytes = new Uint8Array(await abortableWait(doc.save({ useObjectStreams: true }), opts.signal));
   checkCancelled(opts.signal);
   return bytes;
 }
@@ -414,10 +416,10 @@ export async function textToPdf(text, markdown = false, options = {}) {
   while (blocks.at(-1)?.kind === 'gap') blocks.pop();
   if (!blocks.some(b => b.text.trim())) throw new Error('Enter some text first.');
   // TXT/Markdown output is a new document, not a metadata scrubber.
-  const doc = await PDFDocument.create({ updateMetadata: false });
-  const regular = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const mono = await doc.embedFont(StandardFonts.Courier);
+  const doc = await abortableWait(PDFDocument.create({ updateMetadata: false }), options.signal);
+  const regular = await abortableWait(doc.embedFont(StandardFonts.Helvetica), options.signal);
+  const bold = await abortableWait(doc.embedFont(StandardFonts.HelveticaBold), options.signal);
+  const mono = await abortableWait(doc.embedFont(StandardFonts.Courier), options.signal);
   const unicode = blocks.some(b => {
     try { regular.encodeText(b.text); return false; } catch { return true; }
   });
@@ -457,10 +459,13 @@ export async function textToPdf(text, markdown = false, options = {}) {
         // Invert Y or Chinese lines start near the bottom and flow upward.
         ctx.fillText(entry.text, margin, pdfHeight - entry.y);
       }
-      const jpg = await new Promise((resolve, reject) => canvas.toBlob(
-        blob => blob ? resolve(blob) : reject(new Error('Text rendering failed.')), 'image/jpeg', .92));
+      // A stalled browser JPEG encoder must release the Cancel button and
+      // discard this incomplete page, just like the PDF-to-image converter.
+      const jpg = await abortableWait(new Promise((resolve, reject) => canvas.toBlob(
+        blob => blob ? resolve(blob) : reject(new Error('Text rendering failed.')), 'image/jpeg', .92)), options.signal);
       checkCancelled(options.signal);
-      const img = await doc.embedJpg(await jpg.arrayBuffer());
+      const jpgBytes = await abortableWait(jpg.arrayBuffer(), options.signal);
+      const img = await abortableWait(doc.embedJpg(jpgBytes), options.signal);
       checkCancelled(options.signal);
       pdfPage.drawImage(img, { x: 0, y: 0, width: pdfWidth, height: pdfHeight });
     } else {
@@ -533,7 +538,7 @@ export async function textToPdf(text, markdown = false, options = {}) {
     }
     if (pdfPage) await finishPage();
     checkCancelled(options.signal);
-    const bytes = new Uint8Array(await doc.save({ useObjectStreams: true }));
+    const bytes = new Uint8Array(await abortableWait(doc.save({ useObjectStreams: true }), options.signal));
     checkCancelled(options.signal);
     return { bytes, searchable: rasterPages === 0, rasterPages, pageCount: totalPages };
   } finally { freeCanvas(canvas); freeCanvas(measureCanvas); }
