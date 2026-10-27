@@ -15,7 +15,8 @@ export const toolHelp = {
       ['Will merging upload private documents?', 'No. Files are processed locally in the browser and are not sent to a PDF conversion server.'],
     ],
     'split-pdf': [
-      ['Can I split a PDF into custom page ranges?', 'Yes. Enter ranges such as 1-3, 4-6; each range generates a separate PDF. Type 15- to include page 15 through the final PDF page (an omitted start such as -15 is not accepted). For one combined PDF, use Extract PDF Pages and enter ranges in the desired combined order. Invalid ranges are flagged directly in the split field before download.'],
+      ['Can I split a PDF into custom page ranges?', 'Yes. Enter ranges such as 1-3, 4-6; the default download creates a separate PDF per range. Type 15- to include page 15 through the final page (not -15). On this same split page, choose Download ranges as one PDF to combine the entered ranges in order without opening another tool. Invalid and reversed ranges disable both downloads.'],
+      ['Can overlapping ranges be combined without duplicated pages?', 'Yes. Separate split outputs may intentionally repeat pages between files. The single combined-PDF download follows the entered range order but keeps repeated or overlapping pages only at their first occurrence. Your source pages and checkbox selections are unchanged.'],
       ['Can I split odd and even pages into two PDFs?', 'Yes. Choose Split into odd-page and even-page PDFs to get two PDFs in one ZIP. Odd and even refer to the current export page order, not the original scanned page numbers.'],
       ['Can I split a PDF by chapters or subchapters?', 'Yes. For one PDF in its complete original page order, choose bookmark level 1, 2 or 3 and preview the exact chapter boundaries before applying. Up to 50 output PDFs are supported; missing levels or invalid destinations do not invent chapters. You can optionally add sanitized chapter titles to ZIP filenames, but this is off by default. Exported PDFs do not retain the original clickable bookmarks.'],
       ['Can I choose split points by looking at the pages?', 'Yes. Expand Choose split points by clicking pages, then click Cut after this page under a preview. Click again to remove a cut. It uses your current page order; manually entered custom ranges are protected from accidental replacement.'],
@@ -100,7 +101,8 @@ export const toolHelp = {
       ['合并时会上传合同等隐私文件吗？', '不会。文件直接在您的浏览器中处理，不上传到转换服务器。'],
     ],
     'split-pdf': [
-      ['可以按自定义范围拆分吗？', '可以。输入 1-3、4-6 这样的页码范围，每个范围单独生成一份 PDF；输入 15- 表示从第 15 页一直到文档末页（不支持省略起点的 -15）。需要合并成一份 PDF 时请使用「提取 PDF 页面」，直接按所需顺序输入页码范围。反向或越界的范围会在拆分输入框直接标记，禁止下载。'],
+      ['可以按自定义范围拆分吗？', '可以。输入 1-3、4-6，默认每段生成一份 PDF；输入 15- 表示直到最后一页（不支持 -15）。若想合并成一份 PDF，可直接在此拆分页选择「将这些范围合并为一份 PDF」，不需要切换工具或重新导入。反向、越界或过多范围会禁用两种下载。'],
+      ['范围重叠时，合并 PDF 会重复页面吗？', '不会。独立拆分会保留不同文件中的重复页；合并成一份 PDF 时则按输入顺序处理，重复或重叠页只保留首次出现。原始页序和勾选状态不会改变。'],
       ['能把奇数页、偶数页分别保存吗？', '可以。选择「按奇偶页分别生成 PDF」，会把当前页序的奇数位、偶数位页面分别生成两份 PDF，并打包为一个 ZIP；不是依据原文件印刷页码。'],
       ['能按 PDF 的章节和子章节书签拆分吗？', '可以，前提是单份 PDF 保留了完整原始页序并且带有内置书签。选择第 1、2 或 3 级书签，先预览并确认；不存在的层级不会虚构拆分点，单次最多 50 份。ZIP 文件名可主动选择使用经过清理的章节标题，默认关闭。导出的 PDF 不保留原书签导航，也不能通过扫描文字识别章节。'],
       ['可以看着页面缩略图选择拆分位置吗？', '可以。展开「按页面预览设置拆分点」，在缩略图下选择「在此页后拆分」，再次点击可取消。拆分按当前页面顺序进行；手工指定的特殊范围不会被意外覆盖。'],
