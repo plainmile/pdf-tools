@@ -110,6 +110,36 @@ test('production Compose deployment uses /opt/compose/pdf-tools and safely migra
   assert.match(agentPolicy, /must live in `\/opt\/compose\/pdf-tools\/`/);
 });
 
+test('production probes exact published SHA instead of copy that SEO updates can legitimately change', () => {
+  const docker = readFileSync(new URL('../../Dockerfile', import.meta.url), 'utf8');
+  const nginx = readFileSync(new URL('../../deploy/nginx.conf', import.meta.url), 'utf8');
+  const publish = readWorkflow('publish.yml');
+  const deploy = readWorkflow('deploy.yml');
+  const ci = readWorkflow('ci.yml');
+  const publicProbe = deploy.split('- name: Verify public HTTPS, exact release SHA, SEO and worker')[1]
+    ?.split('- name: Public browser E2E and SEO against deployed site')[0];
+
+  assert.ok(publicProbe, 'immutable SHA public deployment verification step required');
+  assert.match(docker, /ARG SOURCE_SHA=development/);
+  assert.match(docker, /printf '%s\\n' "\$SOURCE_SHA" > \/usr\/share\/nginx\/html\/\.well-known\/plainmile-release/);
+  assert.match(nginx, /location = \/\.well-known\/plainmile-release/);
+  assert.match(nginx, /location = \/\.well-known\/plainmile-release \{[\s\S]*?expires -1;/);
+  assert.match(nginx, /location = \/\.well-known\/plainmile-release \{[\s\S]*?X-Robots-Tag "noindex, nofollow"/);
+  assert.match(ci, /x-robots-tag: noindex/);
+  assert.match(publish, /SOURCE_SHA=\$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
+  assert.match(ci, /docker build --build-arg SOURCE_SHA="\$GITHUB_SHA"/);
+  assert.match(ci, /grep -q 'lang="zh-CN"' dist\/zh\/index\.html/);
+  assert.doesNotMatch(ci, /grep -q '整理 PDF 页面'/);
+  assert.match(ci, /\.well-known\/plainmile-release\)" = "\$GITHUB_SHA"/);
+
+  assert.match(publicProbe, /EXPECTED_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
+  assert.match(publicProbe, /\.well-known\/plainmile-release\?sha=\$EXPECTED_SHA/);
+  assert.match(publicProbe, /if \[ "\$deployed_sha" != "\$EXPECTED_SHA" \]; then/);
+  assert.match(publicProbe, /grep -q 'rel="canonical"'/);
+  assert.match(publicProbe, /grep -q 'hreflang="zh-CN"'/);
+  assert.doesNotMatch(publicProbe, /Your documents|Work with PDF pages|自由整理每一页|<h1>/);
+});
+
 test('public production QA retries transient browser failures at most once without weakening strict Docker CI', () => {
   const deploy = readWorkflow('deploy.yml');
   const ci = readWorkflow('ci.yml');

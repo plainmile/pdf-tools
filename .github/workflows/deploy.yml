@@ -193,17 +193,33 @@ jobs:
             https://pdf.plainmile.com/ || true
           REMOTE
 
-      - name: Verify public HTTPS and worker availability
+      - name: Verify public HTTPS, exact release SHA, SEO and worker
+        env:
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          curl --fail --show-error --silent --location --retry 4 \
-            -o /tmp/pdf-home.html https://pdf.plainmile.com/
-          grep -q 'Work with PDF pages' /tmp/pdf-home.html
-          curl --fail --show-error --silent --location --retry 4 \
-            -o /tmp/pdf-workspace.html https://pdf.plainmile.com/workspace/
-          grep -q 'Your documents' /tmp/pdf-workspace.html
-          curl -fsS -o /tmp/pdf-workspace-zh.html https://pdf.plainmile.com/zh/workspace/
-          grep -q '自由整理每一页' /tmp/pdf-workspace-zh.html
+          # Cloudflare may still be propagating a new release. A content or
+          # cache failure must fail closed instead of rolling back just because
+          # somebody improved SEO headings or translated user-visible text.
+          deployed_sha=''
+          for attempt in $(seq 1 12); do
+            deployed_sha=$(curl --fail --silent --show-error --max-time 15 \
+              -H 'Cache-Control: no-cache' \
+              "https://pdf.plainmile.com/.well-known/plainmile-release?sha=$EXPECTED_SHA" || true)
+            if [ "$deployed_sha" = "$EXPECTED_SHA" ]; then break; fi
+            sleep 3
+          done
+          if [ "$deployed_sha" != "$EXPECTED_SHA" ]; then
+            echo "Public release SHA does not match published image ($EXPECTED_SHA)." >&2
+            exit 1
+          fi
+          for route in / /workspace/ /zh/workspace/; do
+            curl --fail --show-error --silent --location --retry 4 \
+              -o /tmp/pdf-public-page.html "https://pdf.plainmile.com$route"
+            grep -q 'rel="canonical"' /tmp/pdf-public-page.html
+            grep -q 'hreflang="en"' /tmp/pdf-public-page.html
+            grep -q 'hreflang="zh-CN"' /tmp/pdf-public-page.html
+          done
           curl -fsS -o /dev/null https://pdf.plainmile.com/pdfjs/pdf.worker.min.mjs
 
       # Reuse the SAME GitHub-hosted Runner after a successful netcup deployment,

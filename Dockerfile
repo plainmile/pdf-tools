@@ -6,6 +6,9 @@ COPY . .
 RUN npm run test:unit && npm run build
 
 FROM nginx:1.30.6-alpine
+# The release ID belongs to this published image, not the mutable :latest tag.
+# Local self-host builds use 'development'; CI/publish provide the commit SHA.
+ARG SOURCE_SHA=development
 # OCI metadata is shown on the GHCR package page and with docker image inspect.
 LABEL org.opencontainers.image.title="PlainMile PDF Tools" \
       org.opencontainers.image.description="Free, private, browser-local PDF tools for merging, splitting, organizing and converting PDFs" \
@@ -16,6 +19,10 @@ LABEL org.opencontainers.image.title="PlainMile PDF Tools" \
       org.opencontainers.image.vendor="PlainMile"
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist/ /usr/share/nginx/html/
+# A stable, non-indexable (unlinked) metadata probe detects a stale CDN page or
+# a wrong release without depending on user-facing SEO headings.
+RUN mkdir -p /usr/share/nginx/html/.well-known && \
+    printf '%s\n' "$SOURCE_SHA" > /usr/share/nginx/html/.well-known/plainmile-release
 EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget -qO- http://127.0.0.1/healthz | grep -qx 'ok' || exit 1
