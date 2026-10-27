@@ -565,3 +565,126 @@ test('static PDF text conversion pages explain missing browser downloads without
     expect(html, path).not.toContain('"@type":"FAQPage"');
   }
 });
+
+
+test('changing PDF image settings retains the unconfirmed JPG and explicit saved confirmation avoids duplicate downloads', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/pdf-to-images/');
+  const doc = await PDFDocument.create();
+  doc.addPage([72, 72]).drawText('SAVE CONFIRM');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'saved-confirm.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await doc.save()),
+  });
+  await expect(page.getByTestId('utility-file-summary')).toBeVisible();
+  const auto = page.waitForEvent('download');
+  await page.getByTestId('utility-run').click();
+  const downloaded = await auto;
+  expect(downloaded.suggestedFilename()).toMatch(/\.jpg$/);
+  const original = Buffer.from(await readFile(await downloaded.path()));
+  expect(Array.from(original.slice(0, 3))).toEqual([255, 216, 255]);
+
+  const nativeGuard = () => page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  await expect.poll(nativeGuard).toBe(true);
+  await page.getByRole('combobox', { name: '图片格式' }).selectOption('png');
+  await page.getByRole('combobox', { name: '渲染清晰度' }).selectOption('2');
+  await page.getByTestId('utility-page-ranges').fill('1');
+  await expect(page.getByTestId('image-result-stale')).toBeVisible();
+  await expect(page.getByTestId('image-result')).toContainText(downloaded.suggestedFilename());
+  await expect.poll(nativeGuard).toBe(true);
+
+  // The user already verified Downloads; acknowledging it must never
+  // accidentally trigger a second file download or discard the retry bytes.
+  const extraDownloads = [];
+  page.on('download', dl => extraDownloads.push(dl.suggestedFilename()));
+  await page.getByTestId('image-confirm-saved').click();
+  await expect(page.getByTestId('image-confirm-saved')).toHaveCount(0);
+  await expect.poll(nativeGuard).toBe(false);
+  expect(extraDownloads).toEqual([]);
+  await expect(page.getByTestId('image-download-again')).toBeVisible();
+  const width = await page.evaluate(() => ({
+    page: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth,
+  }));
+  expect(width.page).toBeLessThanOrEqual(width.viewport + 2);
+  await page.locator('.language-link').click();
+  await expect(page).toHaveURL(/\/pdf-to-images\/$/);
+  await expect(page.getByTestId('unsaved-navigation-dialog')).toHaveCount(0);
+});
+
+test('complete TXT auto-download can be acknowledged without re-downloading; no incomplete text is auto-acknowledged', async ({ page }) => {
+  await page.goto('/pdf-to-txt/');
+  const doc = await PDFDocument.create();
+  doc.addPage([320, 420]).drawText('AUTOSAVED TEXT', { x: 30, y: 300, size: 14 });
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'plain.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await doc.save()),
+  });
+  await expect(page.getByTestId('utility-file-summary')).toBeVisible();
+  const auto = page.waitForEvent('download');
+  await page.getByTestId('utility-run').click();
+  const download = await auto;
+  expect((await readFile(await download.path())).toString('utf8')).toContain('AUTOSAVED TEXT');
+  await expect(page.getByTestId('text-confirm-saved')).toBeVisible();
+  const nativeGuard = () => page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  await expect.poll(nativeGuard).toBe(true);
+  const additionalDownloads = [];
+  page.on('download', dl => additionalDownloads.push(dl.suggestedFilename()));
+  await page.getByTestId('text-confirm-saved').click();
+  await expect.poll(nativeGuard).toBe(false);
+  expect(additionalDownloads).toEqual([]);
+  await page.locator('.language-link').click();
+  await expect(page).toHaveURL(/\/zh\/pdf-to-txt\/$/);
+});
+
+
+test('a browser-thrown automatic download cleans the temporary anchor and preserves a manual JPG retry', async ({ page }) => {
+  await page.goto('/pdf-to-images/');
+  const pdf = await PDFDocument.create();
+  pdf.addPage([72, 72]).drawText('BROWSER BLOCKED DOWNLOAD');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'blocked.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await pdf.save()),
+  });
+  await expect(page.getByTestId('utility-file-summary')).toBeVisible();
+  await page.evaluate(() => {
+    window.__pdfOriginalAnchorClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function simulateBlockedDownload() {
+      throw new Error('simulated browser download restriction');
+    };
+  });
+  try {
+    await page.getByTestId('utility-run').click();
+    await expect(page.getByTestId('image-result')).toBeVisible();
+    await expect(page.getByRole('alert')).toBeVisible();
+    // The anchor must be removed even though the browser threw from click().
+    await expect(page.locator('a[download]')).toHaveCount(0);
+    const nativeGuard = () => page.evaluate(() => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+    await expect.poll(nativeGuard).toBe(true);
+    await page.evaluate(() => {
+      HTMLAnchorElement.prototype.click = window.__pdfOriginalAnchorClick;
+    });
+    const retry = page.waitForEvent('download');
+    await page.getByTestId('image-download-again').click();
+    const downloaded = await retry;
+    expect(downloaded.suggestedFilename()).toMatch(/\.jpg$/);
+    const bytes = Buffer.from(await readFile(await downloaded.path()));
+    expect(Array.from(bytes.slice(0, 3))).toEqual([255, 216, 255]);
+    await expect.poll(nativeGuard).toBe(false);
+  } finally {
+    await page.evaluate(() => {
+      if (window.__pdfOriginalAnchorClick) {
+        HTMLAnchorElement.prototype.click = window.__pdfOriginalAnchorClick;
+      }
+      delete window.__pdfOriginalAnchorClick;
+    });
+  }
+});

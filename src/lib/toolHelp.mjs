@@ -50,7 +50,7 @@ export const toolHelp = {
       ['Does PNG or JPG keep selectable text?', 'No. PNG and JPG are images of the rendered pages, so their text cannot be selected as PDF text.'],
       ['Do repeated or overlapping page ranges export a page twice?', 'No. Each PDF page is rendered once in the order it first appears in your selection. The ZIP name reflects the pages actually exported; non-ascending output files use order-number prefixes.'],
       ['What happens if I leave while pages are converting?', 'The browser asks for confirmation when a PDF is loading or image conversion is running. Stay to finish the batch or cancel first; leaving discards unfinished work without downloading incomplete images.'],
-      ['What if my JPG, PNG or ZIP download did not appear?', 'The conversion starts a browser download automatically, but your browser may block it. Check Downloads, then use Download again for the same finished result without reprocessing the PDF. Until you explicitly retry, the site warns before you leave and lose the in-tab copy.'],
+      ['What if my JPG, PNG or ZIP download did not appear?', 'The conversion starts a browser download automatically, but your browser may block it. Check Downloads, then use Download again for the same finished result without reprocessing the PDF. Until you explicitly retry or confirm the file is saved, the site warns before you leave and lose the in-tab copy.'],
       ['Does this extract the original photos embedded inside a PDF?', 'No. This converts whole PDF pages into new JPG or PNG images, including any text or graphics on those pages. It does not separately extract embedded photos or preserve their original image data.'],
     ],
     'compress-pdf': [
@@ -60,12 +60,12 @@ export const toolHelp = {
     'pdf-to-txt': [
       ['Can I extract text from a 500-page book?', 'Yes, for PDFs containing selectable text, subject to a 100 MiB and 1,000-page limit and your device memory.'],
       ['Will this read a scanned PDF?', 'Not if it contains only page images. This tool does not perform OCR, and multi-column reading order may need manual corrections.'],
-      ['What if the automatic TXT download did not appear?', 'Check Downloads: browsers can block automatic downloads. Use Download again for the same locally extracted TXT without running extraction again. The page warns before you leave while that retry copy remains unconfirmed.'],
+      ['What if the automatic TXT download did not appear?', 'Check Downloads: browsers can block automatic downloads. Use Download again for the same locally extracted TXT without running extraction again. The page warns before you leave until you retry or confirm the file is saved.'],
     ],
     'pdf-to-markdown': [
       ['Will headings be reproduced exactly?', 'No. Heading levels are inferred from text sizes. Tables, images and complex layouts may not transfer reliably.'],
       ['Can I convert a scanned textbook?', 'Only text already embedded in a PDF is extracted. Scanned pages without a text layer need OCR from a separate tool.'],
-      ['What if the Markdown download is blocked?', 'If the automatically requested .md file is missing from Downloads, use Download again without extracting the PDF a second time. The existing browser-local result is protected from accidental navigation until you retry.'],
+      ['What if the Markdown download is blocked?', 'If the automatically requested .md file is missing from Downloads, use Download again without extracting the PDF a second time. The browser-local result is protected from accidental navigation until you retry or confirm the file is saved.'],
     ],
     'txt-to-pdf': [
       ['Can I turn a book-length TXT file into PDF?', 'You can import up to 5 MiB of UTF-8 or BOM-marked UTF-16 text. Output is limited to 1,000 total pages, including at most 300 image-based pages requiring unsupported glyphs.'],
@@ -139,7 +139,7 @@ export const toolHelp = {
       ['转换成 PNG 或 JPG 后还能复制文字吗？', '不能。PNG 和 JPG 是页面的图片，不包含原 PDF 的可选择文字。'],
       ['页码范围重复或重叠，会导出重复图片吗？', '不会。同一 PDF 页面只在首次出现的位置导出一次，并保留自定义顺序。ZIP 名称对应实际导出的页面；倒序或交错的图片文件名前会加顺序前缀。'],
       ['正在转换 PDF 页面时离开会怎样？', '文件仍在读取或图片转换未完成时，浏览器会先询问是否离开。可以继续转换或先取消；明确离开将放弃未完成的图片批次，不会下载不完整的结果。'],
-      ['JPG、PNG 或 ZIP 下载后没有出现怎么办？', '转换完成后会自动发起浏览器下载，但浏览器可能拦截。请先检查“下载”文件夹；如未出现，可点击“再次下载”，无需重新转换。未主动再次下载之前，离开页面会先提示，避免丢失标签页内的补救下载副本。'],
+      ['JPG、PNG 或 ZIP 下载后没有出现怎么办？', '转换完成后会自动发起浏览器下载，但浏览器可能拦截。请先检查“下载”文件夹；如未出现，可点击“再次下载”，无需重新转换。未主动再次下载或确认已保存之前，离开页面会先提示，避免丢失标签页内的补救下载副本。'],
       ['能从 PDF 中单独提取原始照片吗？', '不能。这里是把整个 PDF 页面重新渲染为 JPG 或 PNG，包含页面上的文字和图形；并非单独提取 PDF 内嵌照片，也不保留原始图片数据。'],
     ],
     'compress-pdf': [
@@ -149,12 +149,12 @@ export const toolHelp = {
     'pdf-to-txt': [
       ['可以提取 500 页电子书的文字吗？', '可以，但 PDF 必须有可选择的文字层，且文件不超过 100 MiB、页数不超过 1000 页，实际还受设备内存限制。'],
       ['扫描版电子书可以直接提取吗？', '没有文字层的图片型扫描件不能提取文字。当前不包含 OCR，多栏排版的顺序也可能需要检查。'],
-      ['自动下载的 TXT 没有出现怎么办？', '浏览器可能拦截自动下载。请检查“下载”文件夹，并点击“再次下载”获取同一份本地提取结果，不必重新处理 PDF。完成再次下载前，页面会提醒您避免意外离开导致结果丢失。'],
+      ['自动下载的 TXT 没有出现怎么办？', '浏览器可能拦截自动下载。请检查“下载”文件夹，并点击“再次下载”获取同一份本地提取结果，不必重新处理 PDF。再次下载或确认已保存前，页面会提醒您避免意外离开导致结果丢失。'],
     ],
     'pdf-to-markdown': [
       ['Markdown 标题和表格能保持原样吗？', '不能保证。标题依据文字大小推测；图片、表格和复杂排版不一定能正确还原。'],
       ['扫描版教材能转换吗？', '只能提取 PDF 中已有的文字层。没有文字层的扫描件需要先进行 OCR。'],
-      ['Markdown 文件没有自动下载怎么办？', '如果“下载”文件夹内找不到自动下载的 .md 文件，可以点击“再次下载”，无需重新提取 PDF。当前标签页内的结果在主动重试前有离开确认保护。'],
+      ['Markdown 文件没有自动下载怎么办？', '如果“下载”文件夹内找不到自动下载的 .md 文件，可以点击“再次下载”，无需重新提取 PDF。当前标签页内的结果在主动重试或确认已保存前有离开确认保护。'],
     ],
     'txt-to-pdf': [
       ['可以将长篇 TXT 电子书转换成 PDF 吗？', '支持 UTF-8 或带 BOM 的 UTF-16 文本，文件最多 5 MiB。输出总计最多 1000 页，其中需要特殊字体的图片化页面最多 300 页。'],
