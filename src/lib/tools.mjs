@@ -108,7 +108,7 @@ export const tools = [
   {
     slug: 'image-to-pdf', title: 'Images to PDF', short: 'Custom pages and margins',
     headline: 'Convert JPG, PNG and other images to PDF.',
-    description: 'Convert JPG, PNG, WebP, BMP and static AVIF images into PDF pages with A4, US Letter or fit-to-picture paper, portrait, landscape, automatic orientation and margins.',
+    description: 'Convert JPG, BMP and static PNG, WebP or AVIF images into PDF pages. Choose A4, Letter or fit-to-image paper, orientation and margins.',
     details: 'Choose a paper size and margin before import, or apply your changes to imported photos before exporting. The original image proportions and page order are preserved. Imported JPEGs have common EXIF, XMP, IPTC and comment metadata (which may include GPS) removed without recompressing their image pixels. This does not sanitize existing PDF metadata.',
     steps: ['Set paper size, orientation and margins', 'Import and arrange images', 'Check page previews and export PDF'],
   },
