@@ -36,10 +36,15 @@ test('Cancel interrupts a never-resolving PNG embed and the next valid import su
     };
     const controller = new AbortController();
     const pending = readSourceFile(input, { signal: controller.signal });
-    await Promise.race([
-      entered,
-      new Promise((_, reject) => setTimeout(() => reject(new Error('PNG embed not reached')), 5000)),
-    ]);
+    let timeout;
+    try {
+      await Promise.race([
+        entered,
+        new Promise((_, reject) => {
+          timeout = setTimeout(() => reject(new Error('PNG embed not reached')), 5000);
+        }),
+      ]);
+    } finally { clearTimeout(timeout); }
     controller.abort();
     await assert.rejects(pending, /Processing cancelled/);
   } finally {
