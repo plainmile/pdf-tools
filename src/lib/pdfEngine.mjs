@@ -394,7 +394,8 @@ export async function reflowImageSources(sources, layout, report = () => {}, bud
 
 async function imageToPdfBytes(file, originalBytes, imageType, options = {}, signal = null) {
   checkCancelled(signal);
-  const doc = await PDFDocument.create();
+  // A stalled pdf-lib initialization must not trap the import/reflow Cancel UI.
+  const doc = await abortableWait(PDFDocument.create({ updateMetadata: false }), signal);
   let embedded;
   let bitmap;
   let conversionCanvas = null;
@@ -404,8 +405,9 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}, sig
       throw new Error('Image dimensions are too large.');
     }
     const exifOrientation = imageType === 'image/jpeg' ? jpegExifOrientation(originalBytes) : 1;
-    if (imageType === 'image/jpeg') embedded = await doc.embedJpg(stripJpegPrivateMetadata(originalBytes));
-    else if (imageType === 'image/png') embedded = await doc.embedPng(originalBytes);
+    if (imageType === 'image/jpeg') embedded = await abortableWait(
+      doc.embedJpg(stripJpegPrivateMetadata(originalBytes)), signal);
+    else if (imageType === 'image/png') embedded = await abortableWait(doc.embedPng(originalBytes), signal);
     else {
       // Browser decoders can remain pending even after the file has loaded.
       // Race decoding against Cancel, but also close a *late* ImageBitmap:
@@ -444,7 +446,10 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}, sig
       canvas.height = 1;
       conversionCanvas = null;
       checkCancelled(signal);
-      embedded = await doc.embedPng(await blob.arrayBuffer());
+      // PNG Blob reads and pdf-lib embedding are asynchronous too. A stuck
+      // result is discarded on Cancel instead of committing a partial photo.
+      const pngBytes = await abortableWait(blob.arrayBuffer(), signal);
+      embedded = await abortableWait(doc.embedPng(pngBytes), signal);
       checkCancelled(signal);
     }
     checkCancelled(signal);
