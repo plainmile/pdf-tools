@@ -1611,8 +1611,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <label className="option-radio"><input type="radio" name="split-method" checked={splitMode === 'ranges'} disabled={busy} onChange={() => { setSplitMode('ranges'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); }} />{t.byRanges}</label>
                   <label className="input-label" htmlFor="ranges-input">{t.pageRanges}</label>
                   <input id="ranges-input" value={ranges} onChange={(event) => { setRanges(event.target.value); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); }} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7-"
-                    aria-invalid={invalidSplitRange ? 'true' : undefined} aria-describedby={splitMode === 'ranges' ? 'split-range-hint split-range-combine-hint split-estimate' : 'split-range-hint split-estimate'} />
+                    aria-invalid={invalidSplitRange ? 'true' : undefined} aria-describedby={splitMode === 'ranges'
+                      ? (invalidSplitRange ? 'split-range-hint split-range-invalid split-range-combine-hint split-estimate' : 'split-range-hint split-range-combine-hint split-estimate')
+                      : 'split-range-hint split-estimate'} />
                   <p className="input-note" id="split-range-hint">{t.rangeHint}</p>
+                  {invalidSplitRange && <p className="input-note range-selection-invalid" id="split-range-invalid"
+                    data-testid="split-range-invalid" role="status">{t.splitRangeInvalidInline}</p>}
                   {splitMode === 'ranges' && <p className="input-note" id="split-range-combine-hint">{t.splitCombineHint}</p>}
                   <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); }} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
