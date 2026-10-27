@@ -45,7 +45,7 @@ jobs:
           test "$(wc -c < dist/pdfjs/pdf.worker.min.mjs)" -gt 100000
           test -f dist/sitemap-index.xml
       - name: Build release-style Docker image
-        run: docker build -t plainmile-pdf-tools:e2e .
+        run: docker build --build-arg SOURCE_SHA="$GITHUB_SHA" -t plainmile-pdf-tools:e2e .
       - name: Verify public image metadata and standalone self-host config
         run: |
           set -euo pipefail
@@ -72,6 +72,10 @@ jobs:
           curl -fsS http://127.0.0.1:18081/workspace/ >/dev/null
           curl -fsS http://127.0.0.1:18081/zh/ >/dev/null
           curl -fsS http://127.0.0.1:18081/zh/workspace/ >/dev/null
+          test "$(curl -fsS http://127.0.0.1:18081/.well-known/plainmile-release)" = "$GITHUB_SHA"
+          curl -fsSI http://127.0.0.1:18081/.well-known/plainmile-release > /tmp/pdf-release-headers.txt
+          grep -iq 'cache-control: no-cache' /tmp/pdf-release-headers.txt
+          grep -iq 'content-type: text/plain' /tmp/pdf-release-headers.txt
           curl -fsS http://127.0.0.1:18081/merge-pdf/ >/dev/null
           curl -fsSI http://127.0.0.1:18081/pdfjs/pdf.worker.min.mjs > /tmp/pdf-worker-headers.txt
           grep -iq 'content-type: application/javascript' /tmp/pdf-worker-headers.txt
