@@ -126,19 +126,25 @@ async function renderPageAsBlob(page, format = 'image/jpeg', scale = 1.5, qualit
   const viewport = page.getViewport({ scale });
   enforceRasterViewport(viewport, rasterCanvasSideLimit(navigator.userAgent, navigator.maxTouchPoints));
   const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(viewport.width));
-  canvas.height = Math.max(1, Math.round(viewport.height));
-  const context = canvas.getContext('2d', { alpha: false });
-  if (!context) throw new Error('Canvas is not available.');
-  context.fillStyle = '#ffffff'; context.fillRect(0, 0, canvas.width, canvas.height);
   try {
+    // Include context acquisition in finally. Some browsers return null
+    // after allocating a large backing store under memory pressure.
+    canvas.width = Math.max(1, Math.round(viewport.width));
+    canvas.height = Math.max(1, Math.round(viewport.height));
+    const context = canvas.getContext('2d', { alpha: false });
+    if (!context) throw new Error('Canvas is not available.');
+    context.fillStyle = '#ffffff'; context.fillRect(0, 0, canvas.width, canvas.height);
     const task = page.render({ canvasContext: context, canvas, viewport, background: '#ffffff' });
     const abort = () => task.cancel();
     signal?.addEventListener('abort', abort, { once: true });
     try { await task.promise; checkCancelled(signal); }
     catch (error) { checkCancelled(signal); throw error; }
     finally { signal?.removeEventListener('abort', abort); }
-    return await new Promise((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Image encoding failed.')), format, quality));
+    // Canvas encoders can stall even after PDF.js rendering has finished.
+    // Do not hold Cancel/Retry hostage to an unresolved toBlob callback.
+    return await abortableWait(new Promise((resolve, reject) => canvas.toBlob(
+      value => value ? resolve(value) : reject(new Error('Image encoding failed.')),
+      format, quality)), signal);
   } finally { freeCanvas(canvas); }
 }
 
