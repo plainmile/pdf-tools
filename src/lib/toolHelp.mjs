@@ -7,6 +7,7 @@ export const toolHelp = {
       ['Does the workspace change my original files?', 'No. Rotate, delete and reorder your copies in the browser, then download a new PDF. Your source documents stay untouched.'],
       ['Can I duplicate pages or add a blank separator?', 'Yes. Select pages and choose Duplicate selected to copy each right after its original. Insert blank page after one selected page, or at the end when none is selected. Each blank matches the adjacent page size.'],
       ['What happens if I type an invalid page selection?', 'The workspace marks reversed, out-of-bounds or too many page ranges before you apply them, and disables Select pages. Your previously selected pages are not changed; fix the input and apply it to update the selection.'],
+      ['Can I leave after only viewing an unchanged PDF?', 'Yes. Opening one original PDF without changes does not create unsaved work, so you can switch tools freely. If you select pages, enter ranges, combine documents or edit a page, export your work before leaving or switching languages.'],
     ],
     'merge-pdf': [
       ['Can I interleave pages from different PDFs?', 'Yes. Add your PDFs, then drag individual pages between documents before exporting a single PDF.'],
@@ -89,6 +90,7 @@ export const toolHelp = {
       ['会修改原始 PDF 吗？', '不会。旋转、删除和调整顺序只影响浏览器中的工作副本；导出时会生成新的 PDF。'],
       ['能复制选中的页面或插入空白分隔页吗？', '可以。复制的页面紧跟原页面，插入空白页时，选择一页则插在其后，不选择则追加到末尾；空白页使用相邻页的尺寸。'],
       ['输入了错误的选择页码会怎样？', '工作台会在应用前标记反向、越界或超过 50 段的页码范围，并禁用「选择页面」。之前已经选中的页面不会改变；修正输入后再应用即可。'],
+      ['只打开 PDF 看看，切换工具会丢失原文件吗？', '不会。只打开一份未修改的原始 PDF 并预览，可以直接切换工具，原文件仍在您的设备上。但如果选中了页面、输入了拆分范围、合并多个文件或编辑了页面，请先导出结果再离开或切换语言。'],
     ],
     'merge-pdf': [
       ['可以将不同 PDF 中的页面交叉合并吗？', '可以。先添加多个 PDF，再拖动每一页到需要的位置，最后导出一个 PDF。'],
