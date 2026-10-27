@@ -66,9 +66,9 @@ test('unchanged source PDF can be previewed and left freely; selected pages stil
   await page.goto('/workspace/');
   await expect(page.getByTestId('unsaved-navigation-dialog')).toHaveCount(0);
   await page.locator('.language-link').click();
-  await expect(page).toHaveURL(/\\/zh\\/workspace\\/$/);
+  await expect(page).toHaveURL(/\/zh\/workspace\/$/);
   await page.locator('.language-link').click();
-  await expect(page).toHaveURL(/\\/workspace\\/$/);
+  await expect(page).toHaveURL(/\/workspace\/$/);
 
   await page.getByTestId('file-input').setInputFiles({
     name: 'synthetic.pdf', mimeType: 'application/pdf', buffer: await syntheticPdf(),
@@ -78,7 +78,7 @@ test('unchanged source PDF can be previewed and left freely; selected pages stil
   // Switching languages should not force a misleading unsaved-work warning.
   await expect(page.getByTestId('workspace-original-preserved')).toBeVisible();
   await page.locator('.language-link').click();
-  await expect(page).toHaveURL(/\\/zh\\/workspace\\/$/);
+  await expect(page).toHaveURL(/\/zh\/workspace\/$/);
   await expect(page.getByTestId('unsaved-navigation-dialog')).toHaveCount(0);
 
   await page.getByTestId('file-input').setInputFiles({
@@ -90,14 +90,14 @@ test('unchanged source PDF can be previewed and left freely; selected pages stil
   const dialog = page.getByTestId('unsaved-navigation-dialog');
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText('仅保存在当前浏览器标签页');
-  await expect(page).toHaveURL(/\\/zh\\/workspace\\/$/);
+  await expect(page).toHaveURL(/\/zh\/workspace\/$/);
 
   await page.getByTestId('unsaved-keep').click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByTestId('page-tile')).toHaveCount(1);
   await page.locator('.language-link').click();
   await page.getByTestId('unsaved-leave').click();
-  await expect(page).toHaveURL(/\\/workspace\\/$/);
+  await expect(page).toHaveURL(/\/workspace\/$/);
 });
 
 test('unexported split choices and an untouched multi-file merge still protect browser-only work', async ({ page }) => {
