@@ -560,7 +560,7 @@ export async function composePdf(sources, pageRefs, options = {}) {
       const key = `${placement.visualWidth}x${placement.visualHeight}`;
       let watermarkImage = watermarkImages.get(key);
       if (!watermarkImage) {
-        const png = await waitForExport(renderWatermarkPng(watermarkText, placement.visualWidth, placement.visualHeight));
+        const png = await waitForExport(renderWatermarkPng(watermarkText, placement.visualWidth, placement.visualHeight, options.signal));
         watermarkImage = await waitForExport(destination.embedPng(png));
         watermarkImages.set(key, watermarkImage);
       }
