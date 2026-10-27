@@ -337,6 +337,14 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     Boolean(ranges.trim()) && !splitPlan;
   const invalidChunkSize = splitMode === 'chunks' && pages.length > 0 &&
     Boolean(chunkSize.trim()) && !splitPlan;
+  // The split page can also export ONE PDF from these exact entered ranges.
+  // Share Extract's strict parser, first-occurrence de-duplication and output order;
+  // do not mutate the existing per-range ZIP plan or page checkbox selections.
+  const combinedSplitPositions = useMemo(() => {
+    if (splitMode !== 'ranges' || !pages.length || !ranges.trim()) return null;
+    try { return pagePositionsForCombinedRanges(ranges, pages.length); }
+    catch { return null; }
+  }, [splitMode, ranges, pages.length]);
   // Titles only describe an explicitly applied bookmark-derived plan for
   // this exact original PDF and exact current ranges. No names survive a
   // manual range edit, page reorder, source change or different split mode.
@@ -822,6 +830,18 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     } catch (_invalidRanges) {
       setNotice('');
       setError(t.rangeSelectInvalid);
+    }
+  };
+  const exportSplitCombinedRanges = () => {
+    if (busyRef.current || busy || !pages.length) return;
+    try {
+      const positions = pagePositionsForCombinedRanges(ranges, pages.length);
+      const chosen = positions.map(position => pages[position - 1]);
+      return exportPages(chosen, `${outputBase}-combined-${chosen.length}-pages.pdf`,
+        interpolate(t.rangeCombineSaved, { pages: chosen.length }));
+    } catch (_invalidRanges) {
+      setNotice('');
+      setError(t.invalidRange);
     }
   };
   const downloadSplit = () => withBusy(async () => {
@@ -1591,8 +1611,9 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <label className="option-radio"><input type="radio" name="split-method" checked={splitMode === 'ranges'} disabled={busy} onChange={() => { setSplitMode('ranges'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); }} />{t.byRanges}</label>
                   <label className="input-label" htmlFor="ranges-input">{t.pageRanges}</label>
                   <input id="ranges-input" value={ranges} onChange={(event) => { setRanges(event.target.value); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); }} disabled={splitMode !== 'ranges' || busy} placeholder="1-3, 4-6, 7-"
-                    aria-invalid={invalidSplitRange ? 'true' : undefined} aria-describedby="split-range-hint split-estimate" />
+                    aria-invalid={invalidSplitRange ? 'true' : undefined} aria-describedby={splitMode === 'ranges' ? 'split-range-hint split-range-combine-hint split-estimate' : 'split-range-hint split-estimate'} />
                   <p className="input-note" id="split-range-hint">{t.rangeHint}</p>
+                  {splitMode === 'ranges' && <p className="input-note" id="split-range-combine-hint">{t.splitCombineHint}</p>}
                   <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); }} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
                   <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} placeholder="5"
@@ -1782,9 +1803,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                     : interpolate(splitPlan?.batch ? t.splitBatchEstimate : t.estimate, { files: splitEstimate })}</div>
                   {splitMode === 'ranges' && splitPlan?.parts.length > 1 && <p className="utility-note"
                     data-testid="split-multiple-ranges-hint">
-                    {interpolate(t.multipleRangeFilesHint, { files: splitPlan.parts.length })}{' '}
-                    <a href={locale === 'zh' ? '/zh/extract-pages/' : '/extract-pages/'}>{t.multipleRangeExtractLink}</a>
-                    {' '}{t.multipleRangeExtractReload}
+                    {interpolate(t.multipleRangeFilesHint, { files: splitPlan.parts.length })}
                   </p>}
                   {splitPlan && <div className="split-coverage-review" aria-live="polite" data-testid="split-coverage-review">
                     {splitPlan.coverage.complete && <p className="input-note" data-testid="split-coverage-complete">{interpolate(t.splitCoverageComplete, { total: splitPlan.coverage.total })}</p>}
@@ -1813,6 +1832,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                           })}</li>)}</ol>
                     </details>
                   </div>}
+                   {splitMode === 'ranges' && combinedSplitPositions && <p className="input-note split-combined-preview"
+                     data-testid="split-combined-preview">{interpolate(t.splitCombinePreview, {
+                       pages: combinedSplitPositions.length,
+                       positions: combinedSplitPositions.slice(0, 10).join(', ') +
+                         (combinedSplitPositions.length > 10 ? ', …' : ''),
+                     })}</p>}
                    <p className="input-note" data-testid="split-output-budget">{t.splitOutputBudget}</p>
                    {splitProgress && <div className="split-progress-container" data-testid="split-progress-container">
                      <p className="utility-note" role="status" data-testid="split-progress" aria-live="polite" aria-atomic="true">{splitProgress.phase === 'parts'
@@ -1827,7 +1852,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                        max={splitProgress.phase === 'parts' ? splitProgress.pagesTotal : 100} />
                    </div>}
                    {busy && splitProgress && <button type="button" className="button button-secondary button-small" data-testid="split-cancel" disabled={splitCancelling} onClick={() => { splitAbortRef.current?.abort(); setSplitCancelling(true); }}>{splitCancelling ? t.splitCancelling : t.splitCancel}</button>}
-                  <button type="button" className="button button-primary split-download" onClick={downloadSplit} disabled={busy || splitEstimate === null || imageLayoutDirty}>{busy ? t.creating : splitEstimate === 1 ? t.downloadSingle : splitPlan?.batch ? t.splitBatchDownload : t.downloadZip} ↓</button>
+                  <div className="split-download-actions">
+                    <button type="button" className="button button-primary split-download" onClick={downloadSplit}
+                      disabled={busy || splitEstimate === null || imageLayoutDirty}>{busy ? t.creating : splitEstimate === 1 ? t.downloadSingle : splitPlan?.batch ? t.splitBatchDownload : t.downloadZip} ↓</button>
+                    {splitMode === 'ranges' && <button type="button" className="button button-secondary split-combine-action"
+                      data-testid="split-combine-download" onClick={exportSplitCombinedRanges}
+                      disabled={busy || !combinedSplitPositions || imageLayoutDirty}>{busy ? t.creating : t.splitCombineAction} ↓</button>}
+                  </div>
                 </div>
               </section>
             )}

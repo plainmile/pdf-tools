@@ -783,7 +783,7 @@ test('odd/even split follows reordered output pages and downloads two exact PDFs
   await expect(first).toHaveAttribute('data-original-page', '7');
 });
 
-test('Chinese 375px split explains separate ranges versus extract, odd/even single-page guard', async ({ page }) => {
+test('Chinese 375px split offers separate or combined ranges in-place, odd/even guard', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/zh/split-pdf/');
   await page.getByTestId('file-input').setInputFiles({
@@ -793,13 +793,13 @@ test('Chinese 375px split explains separate ranges versus extract, odd/even sing
   await expect(page.locator('.file-count')).toContainText('5 页');
   await page.locator('#ranges-input').fill('１－２，４－５');
   const hint = page.getByTestId('split-multiple-ranges-hint');
-  await expect(hint).toContainText('2 个范围会生成 2 份独立 PDF');
-  await expect(hint.getByRole('link', { name: '提取 PDF 页面' }))
-    .toHaveAttribute('href', '/zh/extract-pages/');
-  await expect(hint).toContainText('重新添加文件');
+  await expect(hint).toContainText('2 个范围生成 2 份 PDF');
+  await expect(hint).toContainText('无需切换工具或重新导入');
+  await expect(page.getByTestId('split-combine-download')).toBeEnabled();
   const parity = page.getByRole('radio', { name: '按奇偶页分别生成 PDF' });
   await parity.check();
   await expect(hint).toHaveCount(0);
+  await expect(page.getByTestId('split-combine-download')).toHaveCount(0);
   await expect(page.getByTestId('split-coverage-complete')).toContainText('5 页');
   await page.getByTestId('split-output-preview').locator('summary').click();
   await expect(page.getByTestId('split-output-preview')).toContainText('奇数位页面');
@@ -818,6 +818,7 @@ test('Chinese 375px split explains separate ranges versus extract, odd/even sing
   await page.getByRole('radio', { name: '按页码范围拆分' }).check();
   await expect(page.locator('#ranges-input')).toHaveValue('１－２，４－５');
   await expect(hint).toBeVisible();
+  await expect(page.getByTestId('split-combine-download')).toBeVisible();
 });
 
 test('odd/even split cannot create an empty even PDF for one-page documents', async ({ page }) => {
