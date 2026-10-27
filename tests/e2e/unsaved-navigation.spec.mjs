@@ -641,3 +641,50 @@ test('complete TXT auto-download can be acknowledged without re-downloading; no 
   await page.locator('.language-link').click();
   await expect(page).toHaveURL(/\/zh\/pdf-to-txt\/$/);
 });
+
+
+test('a browser-thrown automatic download cleans the temporary anchor and preserves a manual JPG retry', async ({ page }) => {
+  await page.goto('/pdf-to-images/');
+  const pdf = await PDFDocument.create();
+  pdf.addPage([72, 72]).drawText('BROWSER BLOCKED DOWNLOAD');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'blocked.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await pdf.save()),
+  });
+  await expect(page.getByTestId('utility-file-summary')).toBeVisible();
+  await page.evaluate(() => {
+    window.__pdfOriginalAnchorClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function simulateBlockedDownload() {
+      throw new Error('simulated browser download restriction');
+    };
+  });
+  try {
+    await page.getByTestId('utility-run').click();
+    await expect(page.getByTestId('image-result')).toBeVisible();
+    await expect(page.getByRole('alert')).toBeVisible();
+    // The anchor must be removed even though the browser threw from click().
+    await expect(page.locator('a[download]')).toHaveCount(0);
+    const nativeGuard = () => page.evaluate(() => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+    await expect.poll(nativeGuard).toBe(true);
+    await page.evaluate(() => {
+      HTMLAnchorElement.prototype.click = window.__pdfOriginalAnchorClick;
+    });
+    const retry = page.waitForEvent('download');
+    await page.getByTestId('image-download-again').click();
+    const downloaded = await retry;
+    expect(downloaded.suggestedFilename()).toMatch(/\.jpg$/);
+    const bytes = Buffer.from(await readFile(await downloaded.path()));
+    expect(Array.from(bytes.slice(0, 3))).toEqual([255, 216, 255]);
+    await expect.poll(nativeGuard).toBe(false);
+  } finally {
+    await page.evaluate(() => {
+      if (window.__pdfOriginalAnchorClick) {
+        HTMLAnchorElement.prototype.click = window.__pdfOriginalAnchorClick;
+      }
+      delete window.__pdfOriginalAnchorClick;
+    });
+  }
+});
