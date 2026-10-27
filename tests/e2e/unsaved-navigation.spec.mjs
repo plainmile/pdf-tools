@@ -425,3 +425,143 @@ test('Chinese saved PDF becomes unsaved after deleting the final page; deliberat
   await page.locator('.language-link').click();
   await expect(page).toHaveURL(/\/workspace\/$/);
 });
+
+
+test('English and Chinese image downloads keep the in-tab retry until a deliberate manual download', async ({ page }) => {
+  for (const [route, widthList, confirmationText, nextRoute] of [
+    ['/pdf-to-images/', [320], 'browser may have blocked it', '/zh/pdf-to-images/'],
+    ['/zh/pdf-to-images/', [320, 340], '浏览器可能拦截了下载', '/pdf-to-images/'],
+  ]) {
+    const doc = await PDFDocument.create();
+    for (const width of widthList) doc.addPage([width, 420]);
+    await page.goto(route);
+    await page.getByTestId('utility-file-input').setInputFiles({
+      name: 'scan.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await doc.save()),
+    });
+    await expect(page.getByTestId('utility-file-summary')).toBeVisible();
+    await page.locator('.utility-options select').first().selectOption('png');
+
+    const initialDownload = page.waitForEvent('download');
+    await page.getByTestId('utility-run').click();
+    const downloaded = await initialDownload;
+    const originalBytes = Buffer.from(await readFile(await downloaded.path()));
+    if (widthList.length === 1) {
+      expect(Array.from(originalBytes.slice(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    } else {
+      const archive = await JSZip.loadAsync(originalBytes);
+      expect(Object.keys(archive.files).sort()).toEqual(['page-001.png', 'page-002.png']);
+    }
+
+    await expect(page.getByTestId('image-download-again')).toBeVisible();
+    // A programmatic download event is only an ATTEMPT; a browser can block
+    // it without notifying the application. The fallback must stay protected.
+    const beforeUnloadBlocked = () => page.evaluate(() => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+    await expect.poll(beforeUnloadBlocked).toBe(true);
+    await page.getByTestId('utility-file-summary').getByRole('button').click();
+    const clearConfirmation = page.getByTestId('utility-clear-confirm');
+    await expect(clearConfirmation).toContainText('JPG/PNG/ZIP');
+    await page.getByTestId('utility-clear-keep').click();
+    await expect(page.getByTestId('image-download-again')).toBeVisible();
+    await page.locator('.language-link').click();
+    const warning = page.getByTestId('unsaved-navigation-dialog');
+    await expect(warning).toContainText(confirmationText);
+    await page.getByTestId('unsaved-keep').click();
+    await expect(page.getByTestId('image-download-again')).toBeVisible();
+
+    const repeatedDownload = page.waitForEvent('download');
+    await page.getByTestId('image-download-again').click();
+    const repeated = await repeatedDownload;
+    expect(repeated.suggestedFilename()).toBe(downloaded.suggestedFilename());
+    expect(Buffer.from(await readFile(await repeated.path())).equals(originalBytes)).toBe(true);
+    await expect.poll(beforeUnloadBlocked).toBe(false);
+    await page.locator('.language-link').click();
+    await expect(page).toHaveURL(url => url.pathname === nextRoute);
+    await expect(page.getByTestId('unsaved-navigation-dialog')).toHaveCount(0);
+  }
+});
+
+test('image download fallback and browser-blocking caveat are visible in prerendered bilingual SEO HTML', async ({ request }) => {
+  for (const [route, question, explanation] of [
+    ['/pdf-to-images/', 'What if my JPG, PNG or ZIP download did not appear?', 'browser may block it'],
+    ['/zh/pdf-to-images/', 'JPG、PNG 或 ZIP 下载后没有出现怎么办？', '浏览器可能拦截'],
+  ]) {
+    const response = await request.get(route);
+    expect(response.status(), route).toBe(200);
+    const html = await response.text();
+    expect(html, route).toContain(question);
+    expect(html, route).toContain(explanation);
+    expect(html, route).toContain('rel="canonical"');
+    expect(html, route).toContain('hreflang="zh-CN"');
+    expect(html, route).not.toContain('"@type":"FAQPage"');
+  }
+});
+
+
+test('automatic TXT and Markdown downloads keep unsaved fallback until manual retry in both languages', async ({ page }) => {
+  const pdf = await PDFDocument.create();
+  pdf.addPage([480, 620]).drawText('AUTO DOWNLOAD RECOVERY', { x: 40, y: 550, size: 12 });
+  const original = Buffer.from(await pdf.save());
+
+  for (const [route, extension, warningText, nextRoute] of [
+    ['/pdf-to-txt/', '.txt', 'TXT or Markdown download', '/zh/pdf-to-txt/'],
+    ['/zh/pdf-to-markdown/', '.md', 'TXT 或 Markdown 自动下载', '/pdf-to-markdown/'],
+  ]) {
+    await page.goto(route);
+    await page.getByTestId('utility-file-input').setInputFiles({
+      name: 'recovery.pdf', mimeType: 'application/pdf', buffer: original,
+    });
+    await expect(page.getByTestId('utility-file-summary')).toBeVisible();
+
+    const autoDownload = page.waitForEvent('download');
+    await page.getByTestId('utility-run').click();
+    const first = await autoDownload;
+    expect(first.suggestedFilename()).toMatch(new RegExp('\\' + extension + '$'));
+    const bytes = Buffer.from(await readFile(await first.path()));
+    expect(bytes.toString('utf8')).toContain('AUTO DOWNLOAD RECOVERY');
+    await expect(page.getByTestId('complete-text-result')).toBeVisible();
+    await expect(page.getByTestId('text-auto-download-hint')).toBeVisible();
+
+    const nativeGuard = () => page.evaluate(() => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+    await expect.poll(nativeGuard).toBe(true);
+    await page.getByTestId('utility-file-summary').getByRole('button').click();
+    await expect(page.getByTestId('utility-clear-confirm')).toContainText('TXT/MD');
+    await page.getByTestId('utility-clear-keep').click();
+    await page.locator('.language-link').click();
+    await expect(page.getByTestId('unsaved-navigation-dialog')).toContainText(warningText);
+    await page.getByTestId('unsaved-keep').click();
+
+    const retry = page.waitForEvent('download');
+    await page.getByTestId('complete-text-download').click();
+    const repeated = await retry;
+    expect(repeated.suggestedFilename()).toBe(first.suggestedFilename());
+    expect(Buffer.from(await readFile(await repeated.path())).equals(bytes)).toBe(true);
+    await expect.poll(nativeGuard).toBe(false);
+    await page.locator('.language-link').click();
+    await expect(page).toHaveURL(url => url.pathname === nextRoute);
+  }
+});
+
+test('static PDF text conversion pages explain missing browser downloads without unearned rich-results schema', async ({ request }) => {
+  for (const [path, question] of [
+    ['/pdf-to-txt/', 'What if the automatic TXT download did not appear?'],
+    ['/pdf-to-markdown/', 'What if the Markdown download is blocked?'],
+    ['/zh/pdf-to-txt/', '自动下载的 TXT 没有出现怎么办？'],
+    ['/zh/pdf-to-markdown/', 'Markdown 文件没有自动下载怎么办？'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    expect(html, path).toContain(question);
+    expect(html, path).toContain('rel="canonical"');
+    expect(html, path).toContain('hreflang="zh-CN"');
+    expect(html, path).not.toContain('"@type":"FAQPage"');
+  }
+});

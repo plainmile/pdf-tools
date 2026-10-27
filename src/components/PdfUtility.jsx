@@ -7,10 +7,10 @@ import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 const COPY = {
   en: {
     label: 'Browser-local processing', file: 'Choose a PDF', textFile: 'Import TXT / Markdown', uploaded: 'Loaded', pages: 'pages', choose: 'Choose file', start: 'Process file', run: 'Convert and download', busy: 'Working on your device…',
-    privacy: 'No files are uploaded. Processing may use significant device memory on large documents.', clear: 'Clear', loadingFile: 'Opening file locally…', cancelLoad: 'Cancel opening', fileLoadCancelled: 'File opening cancelled. Your previous file and unsaved work were kept.', replaceConfirmTitle: 'Replace the current file?', replaceConfirmHint: 'Opening {name} will discard your unsaved PDF result or edited text. Download or copy your current work first, or cancel this replacement.', replaceKeep: 'Keep current work', replaceAccept: 'Replace file', clearConfirmTitle: 'Discard unsaved conversion?', clearConfirmHint: 'The generated PDF preview or edited text has not been safely saved. Clearing now will remove it from this browser.', clearKeep: 'Keep my work', clearConfirm: 'Discard and clear',
+    privacy: 'No files are uploaded. Processing may use significant device memory on large documents.', clear: 'Clear', loadingFile: 'Opening file locally…', cancelLoad: 'Cancel opening', fileLoadCancelled: 'File opening cancelled. Your previous file and unsaved work were kept.', replaceConfirmTitle: 'Replace the current file?', replaceConfirmHint: 'Opening {name} may discard an undownloaded PDF, a JPG/PNG/ZIP/TXT/MD automatic download not yet verified, or edited text. Verify or download your current work first, or cancel this replacement.', replaceKeep: 'Keep current work', replaceAccept: 'Replace file', clearConfirmTitle: 'Discard unsaved conversion?', clearConfirmHint: 'Some work has not been safely saved. This may include a JPG/PNG/ZIP/TXT/MD download retry, a generated PDF or edited text. Clearing now removes the in-tab copy.', clearKeep: 'Keep my work', clearConfirm: 'Discard and clear',
     pageRange: 'Pages (blank selects all if ≤60)', imageRangeInvalid: 'Enter valid pages from 1 to {pages} (for example 1-3, 5). Each range must go forward.', imageRangeTooMany: 'Select at most 60 pages per conversion. Use the page batches for a longer PDF.', rangeHint: 'Example: 301- or 301-360. A trailing dash selects through the final PDF page (still at most 60 images per batch). Long PDFs start with pages 1-60; use Next pages for later batches. Repeated or overlapping page numbers are exported only once. For custom orders like 3,1, ZIP entries get order-001, order-002 prefixes so extracted files stay in your chosen order.', imageType: 'Image format', quality: 'Render resolution',
     low: 'Smaller (72 DPI)', medium: 'Balanced (108 DPI)', high: 'Sharper (144 DPI)', print: 'Print quality (220 DPI)', printHint: 'Best for printing. Large pages may be rejected to protect your device memory.',
-    download: 'Download result', downloadAgain: 'Download again', imageDownloadStarted: 'Automatic image download started.', imageDownloadFallback: 'If the download did not appear, use the button below without converting again.', compressionMethod: 'Compression method', compressionLevel: 'Compression level', compressionStructure: 'Keep selectable text (try document optimization)', compressionRaster: 'Smaller images (convert pages to JPEG)', compressionLow: 'Smaller size (lossier)', compressionMid: 'Balanced', compressionHigh: 'Clearer (larger)',
+    download: 'Download result', downloadAgain: 'Download again', imageDownloadStarted: 'Automatic image download started.', imageDownloadFallback: 'Check the JPG, PNG or ZIP in your Downloads folder. If it did not appear, use Download again without converting again.', textAutoDownloadFallback: 'Check Downloads for the TXT or Markdown file. If the automatic download was blocked, use Download again.', compressionMethod: 'Compression method', compressionLevel: 'Compression level', compressionStructure: 'Keep selectable text (try document optimization)', compressionRaster: 'Smaller images (convert pages to JPEG)', compressionLow: 'Smaller size (lossier)', compressionMid: 'Balanced', compressionHigh: 'Clearer (larger)',
     structureWarning: 'Tries smaller PDF object streams without turning text into images. Results may not shrink. PDF bytes are rewritten, so digital signatures become invalid and complex forms, links, bookmarks or attachments must be checked. Keep your original.', structureReady: 'The optimized PDF is smaller. Text remains selectable; compare important links and form fields with your original.', structureNoSaving: 'Rewriting the document did not make it smaller. No download is offered; keep the original or explicitly choose image-based compression.', compressionWarning: 'This method converts every PDF page into a JPEG image. Text stops being searchable or selectable. Forms, annotations, hyperlinks and signatures are not preserved. Keep the original and inspect the output.',
     original: 'Original', result: 'Result', saved: 'Saved', increased: 'Size increase', unchanged: 'No change', noSaving: 'No size reduction. This file was not downloaded; try a lower resolution or keep the original.',
     compressionReady: 'The output is smaller. Check text sharpness before using it.', compressionResultStale: 'This is the previous result, made with different compression settings. You can still download it, or run again with the new setting.', compressionRetryKept: 'The new attempt did not reduce file size. The numbers and download below still belong to your previous successful result.', previewCompressed: 'Preview compressed page 1', hidePreview: 'Hide preview',
@@ -34,10 +34,10 @@ const COPY = {
   },
   zh: {
     label: '仅在浏览器本地处理', file: '选择 PDF 文件', textFile: '导入 TXT / Markdown', uploaded: '已读取', pages: '页', choose: '选择文件', start: '开始处理', run: '转换并下载', busy: '正在本机处理…',
-    privacy: '文件不上传服务器。大文件可能消耗较多设备内存。', clear: '清空', loadingFile: '正在本机读取文件…', cancelLoad: '取消读取', fileLoadCancelled: '已取消读取文件，原文件和未保存的内容均已保留。', replaceConfirmTitle: '确定替换当前文件？', replaceConfirmHint: '打开 {name} 将丢弃尚未下载的 PDF 结果或未保存的文字修改。请先下载或复制当前内容，也可以取消替换。', replaceKeep: '保留当前工作', replaceAccept: '确认替换文件', clearConfirmTitle: '确定丢弃未保存的转换结果？', clearConfirmHint: '当前生成的 PDF 预览或编辑后的文字尚未妥善保存。清空将从浏览器删除这些内容。', clearKeep: '继续编辑', clearConfirm: '丢弃并清空',
+    privacy: '文件不上传服务器。大文件可能消耗较多设备内存。', clear: '清空', loadingFile: '正在本机读取文件…', cancelLoad: '取消读取', fileLoadCancelled: '已取消读取文件，原文件和未保存的内容均已保留。', replaceConfirmTitle: '确定替换当前文件？', replaceConfirmHint: '打开 {name} 可能丢弃尚未下载的 PDF、尚未确认保存的 JPG/PNG/ZIP/TXT/MD 自动下载结果或文字修改。请先检查或下载当前内容，也可以取消替换。', replaceKeep: '保留当前工作', replaceAccept: '确认替换文件', clearConfirmTitle: '确定丢弃未保存的转换结果？', clearConfirmHint: 'JPG/PNG/ZIP/TXT/MD 补救下载副本、生成的 PDF 结果或编辑后的文字可能尚未妥善保存。清空将从当前标签页删除这些内容。', clearKeep: '继续编辑', clearConfirm: '丢弃并清空',
     pageRange: '选择页码（总页数不超过 60 时可留空）', imageRangeInvalid: '请输入 1 至 {pages} 范围内的页码（例如 1-3, 5），每段范围不能反向。', imageRangeTooMany: '每次最多选择 60 页，请使用页码批次分批导出。', rangeHint: '例如 301- 或 301-360。页码末尾的短横线表示一直选到 PDF 最后一页，但每批仍最多 60 张图片。长 PDF 默认选前 60 页，可用“下一批”继续。重复或重叠页码只导出一次。若输入 3,1 等自定义顺序，ZIP 内图片文件名前会加上 order-001、order-002 前缀，解压排序后仍保持指定顺序。', imageType: '图片格式', quality: '渲染清晰度',
     low: '更小（72 DPI）', medium: '平衡（108 DPI）', high: '高清（144 DPI）', print: '打印高清（220 DPI）', printHint: '适合打印。超大页面可能因设备内存安全限制而无法转换。',
-    download: '下载结果', downloadAgain: '再次下载', imageDownloadStarted: '已发起图片自动下载。', imageDownloadFallback: '如果没有看到下载文件，可以点击下面的按钮直接再次下载，无需重新转换。', compressionMethod: '压缩方式', compressionLevel: '图片化压缩强度', compressionStructure: '保留可搜索文字（尝试优化文档结构）', compressionRaster: '图片化压缩（将页面转为 JPEG）', compressionLow: '更小体积（画质较低）', compressionMid: '平衡', compressionHigh: '画质较清晰（体积较大）',
+    download: '下载结果', downloadAgain: '再次下载', imageDownloadStarted: '已发起图片自动下载。', imageDownloadFallback: '请检查“下载”文件夹内是否已有 JPG、PNG 或 ZIP。如未出现，点击下面的“再次下载”，无需重新转换。', textAutoDownloadFallback: '请检查“下载”文件夹是否已有 TXT 或 Markdown 文件。如自动下载被拦截，请点击“再次下载”。', compressionMethod: '压缩方式', compressionLevel: '图片化压缩强度', compressionStructure: '保留可搜索文字（尝试优化文档结构）', compressionRaster: '图片化压缩（将页面转为 JPEG）', compressionLow: '更小体积（画质较低）', compressionMid: '平衡', compressionHigh: '画质较清晰（体积较大）',
     structureWarning: '此模式尝试重新组织 PDF 对象，不会主动把文字图片化；不一定能缩小文件。文件会被重写，数字签名将失效，复杂表单、链接、书签及附件需要重新核对。请保留原文件。', structureReady: '文档结构优化后文件确实变小，文字仍可搜索；请核对重要链接、表单和书签。', structureNoSaving: '文档结构优化未能让文件变小，因此不提供下载。请保留原文件，或主动选择图片化压缩。', compressionWarning: '此压缩方式会将 PDF 各页重新渲染为 JPEG 图片。输出将失去文本搜索和选中能力，也无法保留表单、注释、链接及数字签名。请保存原文件并检查输出画质。',
     original: '原文件', result: '输出文件', saved: '节省', increased: '体积增加', unchanged: '无变化', noSaving: '未缩小文件，因此没有自动下载。可尝试降低清晰度，或保留原文件。',
     compressionReady: '输出文件确实更小。请先核对文字清晰度。', compressionResultStale: '这是之前压缩设置生成的结果。您仍可下载，或按当前设置重新处理。', compressionRetryKept: '新一轮处理未能缩小文件。下方的大小比较和下载按钮仍对应上一次成功的压缩结果。', previewCompressed: '预览压缩后的首页', hidePreview: '收起预览',
@@ -416,6 +416,10 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         // selecting a batch, replacing the file or clearing releases this data.
         setOutput({ ...result });
         save(result);
+        // A programmatic download click is NOT proof the browser saved bytes.
+        // Preserve the navigation/replace protection until the user explicitly
+        // retries the download or explicitly chooses to leave the page.
+        setNotDownloaded(true);
         setNotice(`${t.imageDownloadStarted} ${result.count} ${t.pages} · ${formatBytes(result.bytes.length)}`);
       } else if (isCompress) {
         const options = {
@@ -490,6 +494,9 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         } else {
           // Only fully ordinary text extraction auto-downloads as before.
           save(result);
+          // A programmatic download may be suppressed by browser settings;
+          // do not assume the extracted TXT/MD has reached the user's disk.
+          setNotDownloaded(true);
           setNotice(`${t.ready}: ${formatBytes(result.bytes.length)}`);
         }
       } else if (isTextInput) {
@@ -559,7 +566,9 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   return (
     <section className="pdf-workspace pdf-utility" data-testid="pdf-utility">
       <UnsavedNavigationGuard active={Boolean(busy || (notDownloaded && (pdf || textFileName || sourceText.trim() || output?.bytes)))}
-         processing={busy} locale={locale} />
+         processing={busy} imageOutputPending={Boolean(isImages && output?.bytes && notDownloaded)}
+         textOutputPending={Boolean(isTextOutput && output?.bytes && notDownloaded &&
+           !output.partialText && !output.suspectText && !output.hasFormFields)} locale={locale} />
       <div className="workspace-bar"><div className="workspace-heading"><span className="workspace-app-icon" aria-hidden="true">▤</span><div><strong>{t.label}</strong><span>{t.privacy}</span></div></div></div>
       <div className="utility-main">
         <div className={`utility-dropzone${dragging ? ' is-dragging-over' : ''}`} data-testid="utility-dropzone"
@@ -763,6 +772,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           {output.suspectText && <p className="utility-note">{t.imageOnlyTextReady}</p>}
           {output.hasFormFields && <p className="utility-note">{t.formFieldReady}</p>}
           {output.readingOrder !== readingOrder && <p className="utility-note" role="status" data-testid="text-reading-order-stale">{t.textOrderStale}</p>}
+          {notDownloaded && !output.partialText && !output.suspectText && !output.hasFormFields &&
+            <p className="utility-note" data-testid="text-auto-download-hint">{t.textAutoDownloadFallback}</p>}
           <button type="button" className="button button-primary"
             data-testid={output.partialText ? 'partial-text-download' : output.suspectText ? 'suspect-text-download' : output.hasFormFields ? 'form-text-download' : 'complete-text-download'}
             onClick={() => save(output)}>{output.partialText || output.suspectText || output.hasFormFields ? t.download : t.downloadAgain} ↓</button>

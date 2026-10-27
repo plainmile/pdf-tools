@@ -111,6 +111,12 @@ test('numbered PDF pending preview survives changed options, invalid retries and
   expect(first).toMatch(/\b13\b/);
   expect(first).not.toMatch(/\b41\b/);
   await upload(page, updatedNumbering);
+  // The first auto-extracted TXT may have been blocked by browser policy;
+  // the user must explicitly authorize discarding the old fallback.
+  await expect(page.getByTestId('utility-replace-confirm')).toBeVisible();
+  await page.getByTestId('utility-replace-accept').click();
+  await expect(page.getByTestId('utility-file-summary')).toContainText('4 pages');
+  await expect(page.getByTestId('utility-run')).toBeEnabled();
   const second = (await download(page, () => page.getByTestId('utility-run').click())).toString('utf8');
   expect(second).toMatch(/\b41\b/);
   expect(second).not.toMatch(/\b11\b/);

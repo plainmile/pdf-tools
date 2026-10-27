@@ -106,6 +106,11 @@ test('open-ended PDF image selection names the resolved ZIP and still enforces 6
     name: 'long-book.pdf', mimeType: 'application/pdf',
     buffer: await syntheticPdf(Array.from({ length: 65 }, (_, i) => 301 + i)),
   });
+  // Automatic ZIP downloads may be blocked, so replacing the in-tab retry
+  // must require explicit consent before the new 65-page book can load.
+  await expect(page.getByTestId('utility-replace-confirm')).toBeVisible();
+  await expect(page.getByTestId('image-download-again')).toBeVisible();
+  await page.getByTestId('utility-replace-accept').click();
   await expect(page.getByTestId('utility-file-summary')).toContainText('65 pages');
   await range.fill('1-');
   await expect(page.getByTestId('image-range-error')).toContainText('at most 60 pages');
