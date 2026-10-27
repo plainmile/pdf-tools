@@ -276,8 +276,17 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   // in the Undo history, but there is no nonempty PDF left to export until
   // restored. Leaving the tab must not silently destroy the last Undo chance.
   const recoverableDeletedPages = pages.length === 0 && history.past.some(snapshot => snapshot.length > 0);
+  // Merely opening ONE untouched source PDF is a preview, not an unsaved
+  // document edit: the original bytes already exist on disk. Do still protect
+  // user choices that live only in this tab (selection, ranges, filename).
+  // Merges, image imports, actual page edits and recoverable deletion stay guarded.
+  const hasUndownloadedPlan = selectedCount > 0 || Boolean(
+    selectionRanges.trim() || ranges.trim() || chunkSize.trim() ||
+    moveTargetInput.trim() || downloadNameInput.trim() || bookmarkDraft ||
+    (tab === 'split' && splitMode === 'parity'));
   const navigationWouldLoseWork = recoverableDeletedPages ||
-    Boolean(pages.length && documentRevision !== lastDownloadedRevision);
+    Boolean(pages.length && documentRevision !== lastDownloadedRevision &&
+      (!pristineOutput || hasUndownloadedPlan));
   const splitNeedsInput = splitMode === 'ranges' ? !ranges.trim() : splitMode === 'chunks' ? !chunkSize.trim() : false;
   // Every-N splitting behaves consistently whether N=1 or N=2, 3, etc.
   // Above 50 output PDFs, page-aligned batches keep each download bounded.
