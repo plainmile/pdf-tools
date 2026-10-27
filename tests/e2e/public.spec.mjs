@@ -31,6 +31,21 @@ test('real task descriptions are the prerendered bilingual headings, not vague m
   }
 });
 
+test('image-to-PDF SEO states animation and browser limits consistently in both languages', async ({ request }) => {
+  for (const [path, format, animated] of [
+    ['/image-to-pdf/', 'static PNG, WebP or AVIF', 'Animated PNG (APNG), WebP and AVIF are rejected'],
+    ['/zh/image-to-pdf/', '静态 PNG、静态 WebP 和静态 AVIF', '动态 PNG（APNG）、WebP、AVIF 会被拒绝'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    expect(html, path).toContain(format);
+    expect(html, path).toContain(animated);
+    expect(html, path).toContain('rel="canonical"');
+    expect(html, path).not.toContain('"@type":"FAQPage"');
+  }
+});
+
 test('workspace bilingual SEO explains when navigation is safe without misleading unsaved warnings', async ({ request }) => {
   for (const [path, phrase] of [
     ['/workspace/', 'Opening one original PDF without changes does not create unsaved work'],
