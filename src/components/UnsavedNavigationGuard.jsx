@@ -7,6 +7,7 @@ const COPY = {
     recoverableDeletedMessage: 'All pages have been deleted, but you can still Undo to restore them. Leaving now permanently loses that Undo history and the documents held only in this browser tab. Keep editing to restore the pages, or explicitly clear the workspace.',
     processingMessage: 'A file is still loading or being processed in this browser tab. Leaving now interrupts that operation and may also discard edits or results you have not downloaded. Stay to finish, or cancel the operation first.',
     imageOutputMessage: 'The automatic image download was started, but your browser may have blocked it. Verify the JPG, PNG or ZIP is in Downloads before leaving. Stay and use Download again if it is missing; leaving discards the in-tab retry copy.',
+    textOutputMessage: 'The automatic TXT or Markdown download was started, but your browser may have blocked it. Check Downloads before leaving. Stay and use Download again if it is missing; leaving discards the in-tab text result.',
     stay: 'Keep editing',
     leave: 'Leave without saving',
   },
@@ -16,6 +17,7 @@ const COPY = {
     recoverableDeletedMessage: '所有页面已删除，但仍可通过“撤销”恢复。现在离开会永久丢失撤销历史及当前标签页保存的文档。请先继续编辑并撤销，或明确清空整个工作台。',
     processingMessage: '当前标签页仍在读取或处理文件。现在离开会中断本次操作，并可能丢失尚未下载的编辑结果。请继续处理至完成，或者先取消操作。',
     imageOutputMessage: '已发起图片自动下载，但浏览器可能拦截了下载。离开前请检查“下载”文件夹内是否有 JPG、PNG 或 ZIP。若文件缺失，请留在本页点击“再次下载”；离开将丢失本页保留的补救下载副本。',
+    textOutputMessage: '已发起 TXT 或 Markdown 自动下载，但浏览器可能拦截了下载。离开前请检查“下载”文件夹；若文件缺失，请留在本页点击“再次下载”，否则会丢失本页保留的文字结果。',
     stay: '继续编辑',
     leave: '放弃并离开',
   },
@@ -29,7 +31,7 @@ const COPY = {
  * each browser's user-interaction and dialog restrictions). Downloads, new-tab
  * links, Ctrl/Cmd-click and same-document fragment navigation are untouched.
  */
-export default function UnsavedNavigationGuard({ active = false, locale = 'en', recoverableDeletedPages = false, processing = false, imageOutputPending = false }) {
+export default function UnsavedNavigationGuard({ active = false, locale = 'en', recoverableDeletedPages = false, processing = false, imageOutputPending = false, textOutputPending = false }) {
   const [pendingHref, setPendingHref] = useState(null);
   const allowLeave = useRef(false);
   const previousLink = useRef(null);
@@ -110,7 +112,7 @@ export default function UnsavedNavigationGuard({ active = false, locale = 'en', 
           }
         }}>
         <h2 id="unsaved-title">{t.title}</h2>
-        <p id="unsaved-message">{recoverableDeletedPages ? t.recoverableDeletedMessage : processing ? t.processingMessage : imageOutputPending ? t.imageOutputMessage : t.message}</p>
+        <p id="unsaved-message">{recoverableDeletedPages ? t.recoverableDeletedMessage : processing ? t.processingMessage : imageOutputPending ? t.imageOutputMessage : textOutputPending ? t.textOutputMessage : t.message}</p>
         <div className="unsaved-actions">
           <button ref={stayButton} type="button" className="button button-primary"
             data-testid="unsaved-keep" onClick={stay}>{t.stay}</button>
