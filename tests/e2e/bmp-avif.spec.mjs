@@ -79,6 +79,44 @@ test('Chinese mobile interface safely imports BMP and still AVIF', async ({ page
   expect(imageSize(pdf, 1)).toEqual(expect.arrayContaining([{ width: 9, height: 7 }]));
 });
 
+test('unsupported AVIF decoder errors preserve loaded pages and allow a real retry in both languages', async ({ page }) => {
+  await page.addInitScript(() => {
+    const nativeDecoder = window.createImageBitmap.bind(window);
+    window.__simulateAvifDecodeError = null;
+    window.createImageBitmap = (input, ...args) => {
+      if (window.__simulateAvifDecodeError && input instanceof Blob && input.type === 'image/avif') {
+        return Promise.reject(new DOMException('Codec is unavailable', window.__simulateAvifDecodeError));
+      }
+      return nativeDecoder(input, ...args);
+    };
+  });
+  for (const [route, errorName, expectedMessage, exportLabel] of [
+    ['/image-to-pdf/', 'NotSupportedError', 'This AVIF could not be decoded in your browser', 'Export PDF'],
+    ['/zh/image-to-pdf/', 'EncodingError', '当前浏览器无法解码此 AVIF 图片', '导出 PDF'],
+  ]) {
+    await page.goto(route);
+    const picker = page.getByTestId('file-input');
+    await picker.setInputFiles({ name: 'first.bmp', mimeType: 'image/bmp', buffer: makeBmp() });
+    await expect(page.getByTestId('page-tile')).toHaveCount(1);
+
+    await page.evaluate(name => { window.__simulateAvifDecodeError = name; }, errorName);
+    await picker.setInputFiles({
+      name: 'modern.avif', mimeType: 'image/avif', buffer: Buffer.from(AVIF_BASE64, 'base64'),
+    });
+    await expect(page.getByRole('alert')).toContainText(expectedMessage);
+    await expect(page.getByTestId('page-tile')).toHaveCount(1);
+
+    await page.evaluate(() => { window.__simulateAvifDecodeError = null; });
+    await picker.setInputFiles({
+      name: 'modern.avif', mimeType: 'image/avif', buffer: Buffer.from(AVIF_BASE64, 'base64'),
+    });
+    await expect(page.getByTestId('page-tile')).toHaveCount(2);
+    const output = await downloadPdf(page, exportLabel);
+    expect(output.getPageCount()).toBe(2);
+    expect(imageSize(output, 1)).toEqual(expect.arrayContaining([{ width: 9, height: 7 }]));
+  }
+});
+
 test('malformed BMP and spoofed AVIF do not delete an already loaded PDF', async ({ page }) => {
   await page.goto('/image-to-pdf/');
   await page.getByTestId('file-input').setInputFiles({
