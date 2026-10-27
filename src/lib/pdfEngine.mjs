@@ -5,7 +5,7 @@ import {
 import { renderWatermarkPng, watermarkTextFromOptions, watermarkPagePlacement, WATERMARK_OPACITY } from './watermark.mjs';
 import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement, stripJpegPrivateMetadata } from './jpegExif.mjs';
 import { imagePdfPageLayout, IMAGE_PDF_LAYOUT_DEFAULT, shouldReflowImageSource } from './imagePdfLayout.mjs';
-import { readFileArrayBuffer } from './pdfUtilities.mjs';
+import { readFileArrayBuffer, abortableWait } from './pdfUtilities.mjs';
 import { checkCancelled } from './utilityCore.mjs';
 
 /**
@@ -415,7 +415,12 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}, sig
       const context = canvas.getContext('2d');
       if (!context) throw new Error('Image canvas is unavailable.');
       context.drawImage(bitmap, 0, 0);
-      const blob = await new Promise((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Could not convert image to PNG.')), 'image/png'));
+      // Import cancellation must also interrupt an encoder that never invokes
+      // toBlob's callback. The finally block still closes the ImageBitmap
+      // and releases the canvas, without committing a partial photo source.
+      const blob = await abortableWait(new Promise((resolve, reject) => canvas.toBlob(
+        value => value ? resolve(value) : reject(new Error('Could not convert image to PNG.')),
+        'image/png')), signal);
       // The encoded Blob no longer depends on the decoded canvas pixels.
       // Release them BEFORE pdf-lib embeds/serializes the image so successful
       // large imports do not keep a second full-size RGBA buffer alive.
