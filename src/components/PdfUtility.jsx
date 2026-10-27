@@ -379,9 +379,11 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     // Keep successfully generated PDF bytes available while adjusting text
     // or retrying a conversion. Failed/cancelled attempts cannot erase the
     // last undownloaded result. Replacing a valid source still requires consent.
-    if (isCompress || isTextInput || isTextOutput || mode === 'add-page-numbers') {
+    if (isImages || isCompress || isTextInput || isTextOutput || mode === 'add-page-numbers') {
+      // A failed or cancelled retry must not destroy a previously generated
+      // JPG/ZIP fallback when the browser blocked its automatic download.
+      // Changing source, range, format or quality still clears stale bytes.
       // Retain an incomplete text extraction until the user downloads or replaces it.
-      // A failed/cancelled retry must not erase the only recoverable result.
       setClearConfirm(false); setNotice(''); setError(''); setProgress(null);
       setShowCompressionPreview(false);
     } else {
