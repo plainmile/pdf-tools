@@ -707,7 +707,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           </p>
           {(output.compressionStrategy !== compressStrategy ||
             (compressStrategy === 'raster' && output.compressionMode !== compressMode)) &&
-            <p className="utility-note" role="status" data-testid="compression-result-stale">{t.compressionResultStale}</p>
+            <p className="utility-note" role="status" data-testid="compression-result-stale">{t.compressionResultStale}</p>}
           {compressionRetryKept && <p className="utility-note" role="status" data-testid="compression-retry-kept">{t.compressionRetryKept}</p>}
           {output.bytes && <button type="button" className="button button-secondary" data-testid="compression-preview-action"
             aria-expanded={showCompressionPreview} aria-controls="compression-preview-content"
