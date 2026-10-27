@@ -39,7 +39,7 @@ test('split page exports one combined PDF in typed order while preserving separa
   await expect(page.getByTestId('split-combine-download')).toBeEnabled();
 
   const combined = await capture(page, () => page.getByTestId('split-combine-download').click());
-  expect(combined.name).toMatch(/book-combined-4-pages\\.pdf$/);
+  expect(combined.name.endsWith('book-combined-4-pages.pdf')).toBe(true);
   expect(await outputWidths(combined.bytes)).toEqual([305, 302, 303, 301]);
   await expect(page.locator('#ranges-input')).toHaveValue('5, 2-3, 5, 1');
 
@@ -88,7 +88,7 @@ test('Chinese mobile: fullwidth and overlapping ranges combine without duplicate
   await expect(page.getByTestId('split-combined-preview')).toContainText('5, 1, 2');
   await expect(combinedButton).toBeEnabled();
   const combined = await capture(page, () => combinedButton.click());
-  expect(combined.name).toMatch(/-combined-3-pages\\.pdf$/);
+  expect(combined.name.endsWith('-combined-3-pages.pdf')).toBe(true);
   expect(await outputWidths(combined.bytes)).toEqual([305, 301, 302]);
   await expect(page.getByTestId('page-tile')).toHaveCount(5);
   const viewport = await page.evaluate(() => ({
