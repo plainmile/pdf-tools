@@ -8,6 +8,29 @@ const slugs = ['', 'workspace/', 'merge-pdf/', 'split-pdf/', 'organize-pdf/',
  'rotate-pdf/', 'extract-pages/', 'delete-pages/', 'image-to-pdf/', 'watermark-pdf/', 'pdf-to-images/', 'compress-pdf/', 'pdf-to-txt/', 'pdf-to-markdown/', 'txt-to-pdf/', 'markdown-to-pdf/', 'add-page-numbers/', 'privacy/'];
 const indexablePaths = new Set(slugs.flatMap(slug => ['/' + slug, '/zh/' + slug]));
 
+test('real task descriptions are the prerendered bilingual headings, not vague marketing copy', async ({ request }) => {
+  for (const [path, heading] of [
+    ['/', 'Merge, split and organize PDF pages'],
+    ['/zh/', '合并、拆分与整理 PDF 页面'],
+    ['/workspace/', 'Reorder, rotate and organize PDF pages.'],
+    ['/zh/workspace/', '拖动排序、旋转和整理 PDF 页面。'],
+    ['/rotate-pdf/', 'Rotate PDF pages in 90° steps.'],
+    ['/zh/rotate-pdf/', '将 PDF 页面旋转 90°。'],
+    ['/image-to-pdf/', 'Convert JPG, PNG and other images to PDF.'],
+    ['/zh/image-to-pdf/', '将 JPG、PNG 等图片转换为 PDF。'],
+    ['/txt-to-pdf/', 'Convert TXT or pasted text into a PDF.'],
+    ['/watermark-pdf/', 'Add a custom text watermark to a PDF.'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    expect(html, path).toContain('<h1>' + heading + '</h1>');
+    expect(html, path).toContain('rel="canonical"');
+    expect(html, path).toContain('hreflang="zh-CN"');
+    expect(html, path).not.toContain('"@type":"FAQPage"');
+  }
+});
+
 test('workspace bilingual SEO explains when navigation is safe without misleading unsaved warnings', async ({ request }) => {
   for (const [path, phrase] of [
     ['/workspace/', 'Opening one original PDF without changes does not create unsaved work'],
