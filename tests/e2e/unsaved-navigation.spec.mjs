@@ -461,6 +461,11 @@ test('English and Chinese image downloads keep the in-tab retry until a delibera
       return event.defaultPrevented;
     });
     await expect.poll(beforeUnloadBlocked).toBe(true);
+    await page.getByTestId('utility-file-summary').getByRole('button').click();
+    const clearConfirmation = page.getByTestId('utility-clear-confirm');
+    await expect(clearConfirmation).toContainText('JPG/PNG/ZIP');
+    await page.getByTestId('utility-clear-keep').click();
+    await expect(page.getByTestId('image-download-again')).toBeVisible();
     await page.locator('.language-link').click();
     const warning = page.getByTestId('unsaved-navigation-dialog');
     await expect(warning).toContainText(confirmationText);
