@@ -77,6 +77,8 @@ test('Chinese mobile: fullwidth and overlapping ranges combine without duplicate
 
   await input.fill('５－２');
   await expect(input).toHaveAttribute('aria-invalid', 'true');
+  await expect(input).toHaveAttribute('aria-describedby', /split-range-invalid/);
+  await expect(page.getByTestId('split-range-invalid')).toContainText('不能越界、倒序或有空段');
   await expect(combinedButton).toBeDisabled();
   await expect(page.getByRole('button', { name: '下载拆分文件（ZIP）' })).toBeDisabled();
   await input.fill(Array(51).fill('1').join(','));
@@ -84,6 +86,7 @@ test('Chinese mobile: fullwidth and overlapping ranges combine without duplicate
   expect(otherDownloads).toEqual([]);
 
   await input.fill('５，１－２，５');
+  await expect(page.getByTestId('split-range-invalid')).toHaveCount(0);
   await expect(input).not.toHaveAttribute('aria-invalid', 'true');
   await expect(page.getByTestId('split-combined-preview')).toContainText('5, 1, 2');
   await expect(combinedButton).toBeEnabled();
@@ -124,4 +127,21 @@ test('combined-range help is server-rendered on the bilingual canonical split pa
     expect(html, path).toContain('hreflang="zh-CN"');
     expect(html, path).toContain('https://image.plainmile.com/');
   }
+});
+
+test('English invalid split ranges show nearby accessible feedback, then recover for single-PDF export', async ({ page }) => {
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'validation.pdf', mimeType: 'application/pdf', buffer: await samplePdf(),
+  });
+  const field = page.locator('#ranges-input');
+  await field.fill('2,,3');
+  await expect(page.getByTestId('split-range-invalid')).toContainText('no empty segments');
+  await expect(field).toHaveAttribute('aria-describedby', /split-range-invalid/);
+  await expect(page.getByTestId('split-combine-download')).toBeDisabled();
+  await field.fill('3,1-2');
+  await expect(page.getByTestId('split-range-invalid')).toHaveCount(0);
+  await expect(field).not.toHaveAttribute('aria-invalid', 'true');
+  const exported = await capture(page, () => page.getByTestId('split-combine-download').click());
+  expect(await outputWidths(exported.bytes)).toEqual([303, 301, 302]);
 });
