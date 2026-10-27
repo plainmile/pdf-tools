@@ -672,7 +672,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
               <option value="balanced">{t.compressionMid}</option>
               <option value="clearer">{t.compressionHigh}</option>
             </select></label>}
-        </div>
+        </div>}
         {mode === 'add-page-numbers' && <div className="utility-options">
           <label><span>{t.pageStart}</span><input data-testid="number-start" type="number" min="1" max="99999" step="1" value={start}
             aria-invalid={numberingErrorType === 'start' || numberingErrorType === 'overflow'}
