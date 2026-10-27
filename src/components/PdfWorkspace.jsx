@@ -754,15 +754,17 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     const controller = new AbortController();
     exportAbortRef.current = controller;
     setExportCancelling(false);
-    const largeExport = chosen.length >= 24;
-    if (largeExport) setExportProgress({ done: 0, total: chosen.length });
+    // Even a single-page source can stall inside pdf-lib or watermark PNG
+    // encoding. Keep Cancel available for ALL non-pristine exports, not just
+    // 24+ page documents. Fast unchanged-byte downloads show no lingering UI.
+    setExportProgress({ done: 0, total: chosen.length });
     try {
       const allPages = chosen.length === pages.length &&
         chosen.every((page, index) => page === pages[index]);
       const pristine = allPages ? pristinePdfBytes(sources, chosen, watermark) : null;
       const bytes = pristine ?? await composePdf(sources, chosen, {
         watermark, signal: controller.signal, cancelMessage: 'PDF export cancelled.',
-        onProgress: (done, total) => { if (largeExport && !controller.signal.aborted) setExportProgress({ done, total }); },
+        onProgress: (done, total) => { if (!controller.signal.aborted) setExportProgress({ done, total }); },
       });
       if (controller.signal.aborted) throw new Error('PDF export cancelled.');
       saveDownload(bytes, outputName);
