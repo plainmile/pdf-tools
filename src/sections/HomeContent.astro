@@ -142,7 +142,8 @@ const desc = zh
         // One atomic live region conveys either the match count or no-results.
         results.hidden = !query;
         results.textContent = query ? results.dataset.countTemplate.replace('{count}', String(matches)) : '';
-        clear.disabled = !query;
+        // A whitespace-only search still contains characters the user should be able to clear.
+        clear.disabled = search.value.length === 0;
       };
       search.addEventListener('input', update);
       clear.addEventListener('click', () => { search.value = ''; update(); search.focus(); });
