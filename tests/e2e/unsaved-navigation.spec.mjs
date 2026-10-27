@@ -157,6 +157,42 @@ test('successful full export allows normal navigation; a new page edit warns aga
   await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
 });
 
+test('a new selected-page plan after a successful full export re-arms the leave guard', async ({ page }) => {
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'already-exported.pdf', mimeType: 'application/pdf', buffer: await syntheticPdf(),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  const guard = () => page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  await expect.poll(guard).toBe(false);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export PDF' }).click();
+  await download;
+  await expect.poll(guard).toBe(false);
+
+  // The original/saved output remains intact, but the new selection exists
+  // only in this tab and must not be marked saved by the earlier full export.
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  await expect.poll(guard).toBe(true);
+  await page.locator('.language-link').click();
+  await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
+  await page.getByTestId('unsaved-keep').click();
+  const selectedDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Extract selected pages' }).click();
+  await selectedDownload;
+  await expect.poll(guard).toBe(false);
+
+  // Changing only the output name after that download is also a new plan.
+  await page.getByTestId('download-name-input').fill('second version');
+  await expect.poll(guard).toBe(true);
+  await page.getByTestId('download-name-input').fill('');
+  await expect.poll(guard).toBe(false);
+});
+
 test('partial extract keeps the unsaved warning, but extracting every page releases it', async ({ page }) => {
   const doc = await PDFDocument.create();
   for (const width of [320, 340, 360]) doc.addPage([width, 420]);
