@@ -281,6 +281,28 @@ test('every standalone converter has visible bilingual file-drop guidance', asyn
   }
 });
 
+test('localized footer links to sister image tools without leaving the PDF editor', async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  try {
+    for (const [route, label] of [
+      ['/', 'Image tools'],
+      ['/zh/', '图片工具'],
+      ['/merge-pdf/', 'Image tools'],
+      ['/zh/split-pdf/', '图片工具'],
+    ]) {
+      await page.goto(route);
+      const link = page.locator('footer a[data-image-tools]');
+      await expect(link).toHaveCount(1);
+      await expect(link).toBeVisible();
+      await expect(link).toHaveAttribute('href', 'https://image.plainmile.com/');
+      await expect(link).toHaveAttribute('target', '_blank');
+      await expect(link).toHaveAttribute('rel', /noopener noreferrer/);
+      await expect(link).toContainText(label);
+    }
+  } finally { await context.close(); }
+});
+
 test('localized footer provides a clear privacy-safe issue reporting route', async ({ page }) => {
   for (const [route, label] of [['/', 'Report an issue'], ['/zh/', '反馈问题']]) {
     await page.goto(route);
