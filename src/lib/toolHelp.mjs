@@ -60,10 +60,12 @@ export const toolHelp = {
     'pdf-to-txt': [
       ['Can I extract text from a 500-page book?', 'Yes, for PDFs containing selectable text, subject to a 100 MiB and 1,000-page limit and your device memory.'],
       ['Will this read a scanned PDF?', 'Not if it contains only page images. This tool does not perform OCR, and multi-column reading order may need manual corrections.'],
+      ['What if the automatic TXT download did not appear?', 'Check Downloads: browsers can block automatic downloads. Use Download again for the same locally extracted TXT without running extraction again. The page warns before you leave while that retry copy remains unconfirmed.'],
     ],
     'pdf-to-markdown': [
       ['Will headings be reproduced exactly?', 'No. Heading levels are inferred from text sizes. Tables, images and complex layouts may not transfer reliably.'],
       ['Can I convert a scanned textbook?', 'Only text already embedded in a PDF is extracted. Scanned pages without a text layer need OCR from a separate tool.'],
+      ['What if the Markdown download is blocked?', 'If the automatically requested .md file is missing from Downloads, use Download again without extracting the PDF a second time. The existing browser-local result is protected from accidental navigation until you retry.'],
     ],
     'txt-to-pdf': [
       ['Can I turn a book-length TXT file into PDF?', 'You can import up to 5 MiB of UTF-8 or BOM-marked UTF-16 text. Output is limited to 1,000 total pages, including at most 300 image-based pages requiring unsupported glyphs.'],
@@ -147,10 +149,12 @@ export const toolHelp = {
     'pdf-to-txt': [
       ['可以提取 500 页电子书的文字吗？', '可以，但 PDF 必须有可选择的文字层，且文件不超过 100 MiB、页数不超过 1000 页，实际还受设备内存限制。'],
       ['扫描版电子书可以直接提取吗？', '没有文字层的图片型扫描件不能提取文字。当前不包含 OCR，多栏排版的顺序也可能需要检查。'],
+      ['自动下载的 TXT 没有出现怎么办？', '浏览器可能拦截自动下载。请检查“下载”文件夹，并点击“再次下载”获取同一份本地提取结果，不必重新处理 PDF。完成再次下载前，页面会提醒您避免意外离开导致结果丢失。'],
     ],
     'pdf-to-markdown': [
       ['Markdown 标题和表格能保持原样吗？', '不能保证。标题依据文字大小推测；图片、表格和复杂排版不一定能正确还原。'],
       ['扫描版教材能转换吗？', '只能提取 PDF 中已有的文字层。没有文字层的扫描件需要先进行 OCR。'],
+      ['Markdown 文件没有自动下载怎么办？', '如果“下载”文件夹内找不到自动下载的 .md 文件，可以点击“再次下载”，无需重新提取 PDF。当前标签页内的结果在主动重试前有离开确认保护。'],
     ],
     'txt-to-pdf': [
       ['可以将长篇 TXT 电子书转换成 PDF 吗？', '支持 UTF-8 或带 BOM 的 UTF-16 文本，文件最多 5 MiB。输出总计最多 1000 页，其中需要特殊字体的图片化页面最多 300 页。'],
