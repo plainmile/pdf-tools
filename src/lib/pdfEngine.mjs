@@ -299,7 +299,9 @@ export async function readSourceFile(file, options = {}) {
 
   let doc;
   try {
-    doc = await PDFDocument.load(bytes, { updateMetadata: false });
+    // A stalled third-party PDF parser must not keep Cancel/Retry disabled.
+    // A late result cannot be committed after the AbortSignal has fired.
+    doc = await abortableWait(PDFDocument.load(bytes, { updateMetadata: false }), signal);
     checkCancelled(signal);
   } catch (error) {
     checkCancelled(signal);
@@ -405,7 +407,21 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}, sig
     if (imageType === 'image/jpeg') embedded = await doc.embedJpg(stripJpegPrivateMetadata(originalBytes));
     else if (imageType === 'image/png') embedded = await doc.embedPng(originalBytes);
     else {
-      bitmap = await createImageBitmap(new Blob([originalBytes], { type: imageType }));
+      // Browser decoders can remain pending even after the file has loaded.
+      // Race decoding against Cancel, but also close a *late* ImageBitmap:
+      // abortableWait alone would drop the decoded bitmap and leak its pixels.
+      const decoded = Promise.resolve(
+        createImageBitmap(new Blob([originalBytes], { type: imageType })),
+      ).then(value => {
+        bitmap = value;
+        if (signal?.aborted) {
+          value.close();
+          bitmap = null;
+          throw new Error('Processing cancelled.');
+        }
+        return value;
+      });
+      await abortableWait(decoded, signal);
       checkCancelled(signal);
       if (bitmap.width * bitmap.height > LIMITS.maxImagePixels) throw new Error('Image dimensions are too large.');
       const canvas = document.createElement('canvas');
@@ -452,7 +468,8 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}, sig
       rotate: degrees(placement.angle),
     });
     if (layout.clip) page.pushOperators(popGraphicsState());
-    const output = new Uint8Array(await doc.save({ useObjectStreams: true }));
+    const output = new Uint8Array(await abortableWait(
+      doc.save({ useObjectStreams: true }), signal));
     checkCancelled(signal);
     return output;
   } catch (error) {
