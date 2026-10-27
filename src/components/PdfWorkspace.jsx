@@ -1623,7 +1623,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} placeholder="5"
                     onChange={(event) => { setChunkSize(event.target.value); setSplitBatchIndex(0); }}
                     disabled={splitMode !== 'chunks' || busy}
-                    aria-invalid={invalidChunkSize ? 'true' : undefined} aria-describedby="split-estimate" />
+                    aria-invalid={invalidChunkSize ? 'true' : undefined}
+                    aria-describedby={invalidChunkSize ? 'split-chunk-invalid split-estimate' : 'split-estimate'} />
+                  {invalidChunkSize && <p className="input-note range-selection-invalid" id="split-chunk-invalid"
+                    data-testid="split-chunk-invalid" role="status">
+                    {interpolate(t.splitChunkInvalidInline, { pages: pages.length })}
+                  </p>}
                   <div className="split-quick-action">
                     <button type="button" className="button button-secondary button-small"
                       data-testid="split-each-page" aria-pressed={splitMode === 'chunks' && Number(chunkSize) === 1}
