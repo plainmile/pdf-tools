@@ -294,6 +294,8 @@ test('220 DPI PDF-to-PNG export matches real pixel dimensions and keeps safety l
 test('compression never auto-downloads, blocks a larger PDF, and shows actual byte sizes', async ({ page }) => {
   const small = await fixturePdf('Small page', 1);
   await page.goto('/compress-pdf/');
+  // This legacy test targets the explicitly lossy JPEG method.
+  await page.getByTestId('compression-strategy').selectOption('raster');
   await upload(page, small);
   await page.getByTestId('utility-run').click();
   await expect(page.getByTestId('compression-result')).toBeVisible({ timeout: 3000 }).catch(async () => {
@@ -354,6 +356,8 @@ test('compression never auto-downloads, blocks a larger PDF, and shows actual by
 test('unsuccessful compression retry keeps an undownloaded earlier, genuinely smaller PDF', async ({ page }) => {
   test.setTimeout(70000);
   await page.goto('/compress-pdf/');
+  // This legacy test targets the explicitly lossy JPEG method.
+  await page.getByTestId('compression-strategy').selectOption('raster');
   // Source JPEG is small at low quality. Downsampled compact recompression
   // saves bytes, while clearer 1.5x high-quality rasterization is larger.
   const base64 = await page.evaluate(() => {
@@ -833,6 +837,8 @@ test('rasterizer refuses a giant page before allocating a large canvas', async (
 
 test('compression has its own 120-page limit rather than blocking all PDF tools at 50', async ({ page }) => {
   await page.goto('/compress-pdf/');
+  // This legacy test targets the explicitly lossy JPEG method.
+  await page.getByTestId('compression-strategy').selectOption('raster');
   await page.getByTestId('utility-file-input').setInputFiles({
     name: 'long-compression.pdf', mimeType: 'application/pdf',
     buffer: await fixturePdf('large scanner', 121),
@@ -1467,6 +1473,7 @@ test('changing page numbering settings marks the preserved preview stale and cle
 
 test('Chinese compression honestly calls larger raster PDFs an increase, never a saving', async ({ page }) => {
   await page.goto('/zh/compress-pdf/');
+  await page.getByTestId('compression-strategy').selectOption('raster');
   await upload(page, await fixturePdf('Small text report', 1));
   await page.getByTestId('utility-run').click();
   await expect(page.getByTestId('compression-result')).toBeVisible();
@@ -1935,6 +1942,8 @@ test('Chinese text-to-PDF replacement protects edited text and an undownloaded r
 test('unsaved compressed PDF survives accidental replacement drop, but a downloaded result does not add friction', async ({ page }) => {
   test.setTimeout(65000);
   await page.goto('/compress-pdf/');
+  // This legacy test targets the explicitly lossy JPEG method.
+  await page.getByTestId('compression-strategy').selectOption('raster');
   const rawPng = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 620; canvas.height = 620;
