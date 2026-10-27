@@ -193,12 +193,17 @@ export async function convertPdfToImages(pdf, options = {}, reportProgress = () 
 export async function compressPdfStructure(pdf, options = {}, reportProgress = () => {}) {
   enforceUtilityPdfLimits(pdf, 'compress-pdf', options.locale);
   checkCancelled(options.signal);
-  const source = await PDFDocument.load(pdf.bytes, { updateMetadata: false });
+  // Parsing and saving yield asynchronously inside pdf-lib but cannot be
+  // force-stopped. Race their promises against Cancel so a stalled phase
+  // does not lock the UI; any late result is deliberately ignored.
+  const source = await abortableWait(
+    PDFDocument.load(pdf.bytes, { updateMetadata: false }), options.signal);
   checkCancelled(options.signal);
   if (source.getPageCount() !== pdf.count) throw new Error('The PDF page count changed while opening it.');
   // Allow the browser to handle Cancel between object serialization batches.
   // The resulting file is exposed only after a completed save and size check.
-  const bytes = new Uint8Array(await source.save({ useObjectStreams: true, objectsPerTick: 25 }));
+  const bytes = new Uint8Array(await abortableWait(
+    source.save({ useObjectStreams: true, objectsPerTick: 25 }), options.signal));
   checkCancelled(options.signal);
   reportProgress(pdf.count, pdf.count);
   const stats = compressionStats(pdf.size, bytes.length);

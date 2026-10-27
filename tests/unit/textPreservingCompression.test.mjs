@@ -47,3 +47,52 @@ test('structure optimizer rejects cancelled operation and never reports inflated
   if (!next.stats.smaller) assert.equal(next.bytes, null);
   else assert.ok(next.bytes.length < small.size);
 });
+
+
+test('cancel promptly rejects a stalled PDF parsing promise without returning output', async () => {
+  const input = await source();
+  const originalLoad = PDFDocument.load;
+  const controller = new AbortController();
+  let loadStarted = false;
+  const progress = [];
+  try {
+    PDFDocument.load = () => {
+      loadStarted = true;
+      return new Promise(() => {}); // The third-party parse never settles.
+    };
+    const pending = compressPdfStructure(input, { signal: controller.signal },
+      (done, total) => progress.push([done, total]));
+    assert.equal(loadStarted, true);
+    controller.abort();
+    await assert.rejects(pending, /Processing cancelled/);
+    assert.deepEqual(progress, []);
+  } finally {
+    PDFDocument.load = originalLoad;
+  }
+});
+
+test('cancel promptly rejects a stalled PDF object serialization and ignores late output', async () => {
+  const input = await source();
+  const originalLoad = PDFDocument.load;
+  const controller = new AbortController();
+  const progress = [];
+  let saveStarted = false;
+  try {
+    PDFDocument.load = async () => ({
+      getPageCount: () => input.count,
+      save: () => {
+        saveStarted = true;
+        return new Promise(() => {}); // Simulate an unresponsive async save.
+      },
+    });
+    const pending = compressPdfStructure(input, { signal: controller.signal },
+      (done, total) => progress.push([done, total]));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(saveStarted, true);
+    controller.abort();
+    await assert.rejects(pending, /Processing cancelled/);
+    assert.deepEqual(progress, []);
+  } finally {
+    PDFDocument.load = originalLoad;
+  }
+});
