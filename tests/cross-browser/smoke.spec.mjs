@@ -107,6 +107,9 @@ test('converter opens unchanged source freely, while unsaved workspace edits ask
     name: 'work.pdf', mimeType: 'application/pdf', buffer: await pdfFixture([355]),
   });
   await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  // Viewing this one original PDF is safe; selecting a page creates
+  // browser-only work and must still warn in Firefox and WebKit.
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
   await page.locator('.language-link').click();
   await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
   await page.getByTestId('unsaved-keep').click();
