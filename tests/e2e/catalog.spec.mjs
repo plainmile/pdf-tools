@@ -12,6 +12,40 @@ test('English tool catalog presents grouped static links and four popular shortc
   await expect(page.getByRole('heading', { name: 'Convert from PDF' })).toBeVisible();
 });
 
+test('no-JavaScript homepage keeps all 16 crawlable PDF tools without a misleading inert search', async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  try {
+    for (const [route, tool, description] of [
+      ['/', '/merge-pdf/', 'Search needs JavaScript'],
+      ['/zh/', '/zh/merge-pdf/', '搜索需要启用 JavaScript'],
+    ]) {
+      const response = await page.goto(route);
+      expect(response.status()).toBe(200);
+      await expect(page.locator('[data-tool-finder]')).toBeHidden();
+      await expect(page.locator('[data-theme-switch]')).toBeHidden();
+      await expect(page.getByTestId('tool-finder-nojs')).toContainText(description);
+      await expect(page.locator('[data-tool-card]:visible')).toHaveCount(16);
+      await expect(page.locator('[data-category-link]:visible')).toHaveCount(4);
+      await page.locator('a.tool-card[href="' + tool + '"]').click();
+      await expect(page).toHaveURL(url => url.pathname === tool);
+      await expect(page.getByTestId('tool-js-required')).toBeVisible();
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test('JavaScript-enabled homepage reveals interactive finder and keeps all tool links', async ({ page }) => {
+  for (const [route, label] of [['/', 'Find a PDF tool'], ['/zh/', '搜索工具']]) {
+    await page.goto(route);
+    await expect(page.locator('[data-tool-finder]')).toBeVisible();
+    await expect(page.locator('[data-theme-switch]')).toBeVisible();
+    await expect(page.getByRole('searchbox', { name: label })).toBeVisible();
+    await expect(page.locator('[data-tool-card]:visible')).toHaveCount(16);
+  }
+});
+
 test('tool search filters only relevant tools and clear restores all options', async ({ page }) => {
   await page.goto('/');
   const search = page.getByRole('searchbox', { name: 'Find a PDF tool' });

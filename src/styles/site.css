@@ -518,6 +518,9 @@ summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .section-heading { margin-bottom: 21px; }
 .section-heading h2 { font-size: clamp(27px, 3.1vw, 36px); margin: 0; }
 .tool-finder { margin-bottom: 17px; max-width: 650px; }
+.tool-finder[hidden] { display: none !important; }
+.theme-switch[hidden] { display: none !important; }
+.tool-finder-nojs { color: var(--muted); font-size: 13px; margin: 0 0 17px; line-height: 1.6; }
 .tool-finder label { display: block; font-size: 13px; font-weight: 680; margin-bottom: 8px; }
 .tool-search-row { display: flex; gap: 8px; }
 .tool-search-row input { min-width: 0; flex: 1; min-height: 45px; background: var(--surface);

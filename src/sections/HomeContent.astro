@@ -54,7 +54,7 @@ const desc = zh
       <div><h2 id="all-tools-title">{p.toolsTitle}</h2></div>
       <p>{p.toolsLead}</p>
     </div>
-    <div class="tool-finder" data-tool-finder>
+    <div class="tool-finder" data-tool-finder hidden>
       <label for="tool-search">{labels.search}</label>
       <div class="tool-search-row">
         <input id="tool-search" type="search" data-tool-search autocomplete="off" placeholder={labels.placeholder} />
@@ -63,6 +63,9 @@ const desc = zh
       <p class="tool-empty" data-tool-empty hidden>{labels.noResults}</p>
       <p class="tool-search-status" data-tool-results data-count-template={labels.results} role="status" aria-live="polite" aria-atomic="true" hidden></p>
     </div>
+    <noscript><p class="tool-finder-nojs" data-testid="tool-finder-nojs">
+      {zh ? '搜索需要启用 JavaScript。下方全部工具与分类链接无需 JavaScript 也可直接打开。' : 'Search needs JavaScript. Every tool and category link below remains available without it.'}
+    </p></noscript>
     <nav class="category-jump" data-category-jump aria-label={labels.categories}>
       {toolGroups.map((group) => <a data-category-link href={'#group-' + group.id}>{zh ? group.zh : group.en}</a>)}
     </nav>
@@ -95,12 +98,13 @@ const desc = zh
   <section class="bottom-cta site-container"><div><h2>{p.closing}</h2><p>{p.closingText}</p></div><a class="button button-primary" href={href('/workspace/')}>{p.start} <span aria-hidden="true">→</span></a></section>
   <script is:inline>
     (() => {
+      const finder = document.querySelector('[data-tool-finder]');
       const search = document.querySelector('[data-tool-search]');
       const catalog = document.querySelector('[data-tool-catalog]');
       const clear = document.querySelector('[data-tool-clear]');
       const empty = document.querySelector('[data-tool-empty]');
       const results = document.querySelector('[data-tool-results]');
-      if (!search || !catalog || !clear || !empty || !results) return;
+      if (!finder || !search || !catalog || !clear || !empty || !results) return;
       const cards = [...catalog.querySelectorAll('[data-tool-card]')];
       const groups = [...catalog.querySelectorAll('[data-tool-group]')];
       const categoryNav = document.querySelector('[data-category-jump]');
@@ -148,6 +152,7 @@ const desc = zh
       search.addEventListener('input', update);
       clear.addEventListener('click', () => { search.value = ''; update(); search.focus(); });
       update();
+      finder.hidden = false;
     })();
   </script>
 </Base>
