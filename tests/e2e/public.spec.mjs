@@ -8,6 +8,24 @@ const slugs = ['', 'workspace/', 'merge-pdf/', 'split-pdf/', 'organize-pdf/',
  'rotate-pdf/', 'extract-pages/', 'delete-pages/', 'image-to-pdf/', 'watermark-pdf/', 'pdf-to-images/', 'compress-pdf/', 'pdf-to-txt/', 'pdf-to-markdown/', 'txt-to-pdf/', 'markdown-to-pdf/', 'add-page-numbers/', 'privacy/'];
 const indexablePaths = new Set(slugs.flatMap(slug => ['/' + slug, '/zh/' + slug]));
 
+test('workspace bilingual SEO explains when navigation is safe without misleading unsaved warnings', async ({ request }) => {
+  for (const [path, phrase] of [
+    ['/workspace/', 'Opening one original PDF without changes does not create unsaved work'],
+    ['/zh/workspace/', '只打开一份未修改的原始 PDF 并预览'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    // A real, visible FAQ belongs in the static HTML, not in hidden React
+    // client-only copy or unsupported FAQPage schema.
+    expect(html, path).toContain(phrase);
+    expect(html).toContain('rel="canonical"');
+    expect(html).toContain('hreflang="en"');
+    expect(html).toContain('hreflang="zh-CN"');
+    expect(html).not.toContain('"@type":"FAQPage"');
+  }
+});
+
 test('bilingual extract SEO explains the two real ways to create one PDF', async ({ request }) => {
   for (const [path, description, detail] of [
     ['/extract-pages/', 'combine multiple typed page ranges into one PDF', 'Overlapping page numbers are included only once'],
