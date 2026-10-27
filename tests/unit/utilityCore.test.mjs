@@ -546,6 +546,19 @@ test('oversized PDFs and 1001-page PDFs fail before expensive rasterization', ()
   assert.equal(enforceUtilityPdfLimits({ size: 2000, count: 120 }, 'compress-pdf'), true);
   assert.throws(() => enforceUtilityPdfLimits({ size: 2000, count: 121 }, 'compress-pdf', 'zh'),
     error => /120 页/.test(error.message) && /包括保留文字与 JPEG 图片化模式/.test(error.message));
+  // A 601-1,000-page source cannot be passed to the separate 600-page Split PDF workspace.
+  for (const count of [121, 600]) {
+    assert.throws(() => enforceUtilityPdfLimits({ size: 2000, count }, 'compress-pdf'),
+      error => /our Split PDF tool/.test(error.message) && /600 pages/.test(error.message));
+    assert.throws(() => enforceUtilityPdfLimits({ size: 2000, count }, 'compress-pdf', 'zh'),
+      error => /本站拆分 PDF 工具/.test(error.message) && /600 页/.test(error.message));
+  }
+  for (const count of [601, 1000]) {
+    assert.throws(() => enforceUtilityPdfLimits({ size: 2000, count }, 'compress-pdf'),
+      error => /another local PDF application/.test(error.message) && /600 pages/.test(error.message));
+    assert.throws(() => enforceUtilityPdfLimits({ size: 2000, count }, 'compress-pdf', 'zh'),
+      error => /其他本地 PDF 软件/.test(error.message) && /600 页/.test(error.message));
+  }
 });
 
 test('220 DPI image export scale is exact and untrusted scales fall back safely', () => {
