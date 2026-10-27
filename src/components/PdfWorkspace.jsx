@@ -1144,8 +1144,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
 
   return (
     <div className="pdf-workspace" data-testid="pdf-workspace">
-      <UnsavedNavigationGuard active={navigationWouldLoseWork} locale={locale}
-        recoverableDeletedPages={recoverableDeletedPages} />
+      <UnsavedNavigationGuard active={navigationWouldLoseWork || busy} locale={locale}
+        processing={busy} recoverableDeletedPages={recoverableDeletedPages} />
       {zoomPageRef && zoomSource && <PageZoomDialog
         source={zoomSource} pageRef={zoomPageRef} position={zoomPageIndex + 1}
         pageCount={pages.length} getPreviewDoc={getPreviewDoc}

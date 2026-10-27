@@ -558,7 +558,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const description = isCompress ? (compressStrategy === 'structure' ? t.structureWarning : t.compressionWarning) : isTextOutput ? `${t.textWarning} ${mode === 'pdf-to-markdown' ? t.markdownWarning : ''}` : isTextInput ? mode === 'markdown-to-pdf' ? t.markdownInputHint : t.textInputHint : mode === 'add-page-numbers' ? t.numbersHint : t.privacy;
   return (
     <section className="pdf-workspace pdf-utility" data-testid="pdf-utility">
-      <UnsavedNavigationGuard active={Boolean(notDownloaded && (pdf || textFileName || sourceText.trim() || output?.bytes))} locale={locale} />
+      <UnsavedNavigationGuard active={Boolean(busy || (notDownloaded && (pdf || textFileName || sourceText.trim() || output?.bytes)))}
+         processing={busy} locale={locale} />
       <div className="workspace-bar"><div className="workspace-heading"><span className="workspace-app-icon" aria-hidden="true">▤</span><div><strong>{t.label}</strong><span>{t.privacy}</span></div></div></div>
       <div className="utility-main">
         <div className={`utility-dropzone${dragging ? ' is-dragging-over' : ''}`} data-testid="utility-dropzone"

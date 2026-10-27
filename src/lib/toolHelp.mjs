@@ -7,6 +7,7 @@ export const toolHelp = {
       ['Does the workspace change my original files?', 'No. Rotate, delete and reorder your copies in the browser, then download a new PDF. Your source documents stay untouched.'],
       ['Can I duplicate pages or add a blank separator?', 'Yes. Select pages and choose Duplicate selected to copy each right after its original. Insert blank page after one selected page, or at the end when none is selected. Each blank matches the adjacent page size.'],
       ['What happens if I type an invalid page selection?', 'The workspace marks reversed, out-of-bounds or too many page ranges before you apply them, and disables Select pages. Your previously selected pages are not changed; fix the input and apply it to update the selection.'],
+      ['What happens if I switch tools while a file is still loading or exporting?', 'The workspace warns before leaving during an active import or PDF export. You can continue processing, cancel first, or deliberately leave. An incomplete PDF is never downloaded.'],
       ['Can I leave after only viewing an unchanged PDF?', 'Yes. Opening one original PDF without changes does not create unsaved work, so you can switch tools freely. If you select pages, enter ranges, combine documents or edit a page, export your work before leaving or switching languages.'],
     ],
     'merge-pdf': [
@@ -47,6 +48,7 @@ export const toolHelp = {
       ['Can I export pages 301 to 360 from a book?', 'Yes. Open a PDF of up to 1,000 pages and choose a page range. Type 301- for page 301 through the end, provided it selects no more than 60 pages; larger selections require smaller batches. You can export up to 60 images per batch. Invalid, reversed and oversized selections are shown before conversion rather than starting an unusable export.'],
       ['Does PNG or JPG keep selectable text?', 'No. PNG and JPG are images of the rendered pages, so their text cannot be selected as PDF text.'],
       ['Do repeated or overlapping page ranges export a page twice?', 'No. Each PDF page is rendered once in the order it first appears in your selection. The ZIP name reflects the pages actually exported; non-ascending output files use order-number prefixes.'],
+      ['What happens if I leave while pages are converting?', 'The browser asks for confirmation when a PDF is loading or image conversion is running. Stay to finish the batch or cancel first; leaving discards unfinished work without downloading incomplete images.'],
       ['Does this extract the original photos embedded inside a PDF?', 'No. This converts whole PDF pages into new JPG or PNG images, including any text or graphics on those pages. It does not separately extract embedded photos or preserve their original image data.'],
     ],
     'compress-pdf': [
@@ -90,6 +92,7 @@ export const toolHelp = {
       ['会修改原始 PDF 吗？', '不会。旋转、删除和调整顺序只影响浏览器中的工作副本；导出时会生成新的 PDF。'],
       ['能复制选中的页面或插入空白分隔页吗？', '可以。复制的页面紧跟原页面，插入空白页时，选择一页则插在其后，不选择则追加到末尾；空白页使用相邻页的尺寸。'],
       ['输入了错误的选择页码会怎样？', '工作台会在应用前标记反向、越界或超过 50 段的页码范围，并禁用「选择页面」。之前已经选中的页面不会改变；修正输入后再应用即可。'],
+      ['文件正在导入或导出时切换工具会怎样？', '当前仍在读取或导出 PDF 时会先询问是否离开。可以继续处理、先取消操作，或者明确选择离开；不会下载未完成的 PDF。'],
       ['只打开 PDF 看看，切换工具会丢失原文件吗？', '不会。只打开一份未修改的原始 PDF 并预览，可以直接切换工具，原文件仍在您的设备上。但如果选中了页面、输入了拆分范围、合并多个文件或编辑了页面，请先导出结果再离开或切换语言。'],
     ],
     'merge-pdf': [
@@ -130,6 +133,7 @@ export const toolHelp = {
       ['可以把一本书的第 301 至 360 页导出为图片吗？', '可以。支持打开最多 1000 页的 PDF。输入 301- 可选择第 301 页至文档末页，但如果超过每批 60 张图片的限制，仍需分批导出。范围反向、页码越界或一次选择超过 60 页时，会在转换前提示修改。'],
       ['转换成 PNG 或 JPG 后还能复制文字吗？', '不能。PNG 和 JPG 是页面的图片，不包含原 PDF 的可选择文字。'],
       ['页码范围重复或重叠，会导出重复图片吗？', '不会。同一 PDF 页面只在首次出现的位置导出一次，并保留自定义顺序。ZIP 名称对应实际导出的页面；倒序或交错的图片文件名前会加顺序前缀。'],
+      ['正在转换 PDF 页面时离开会怎样？', '文件仍在读取或图片转换未完成时，浏览器会先询问是否离开。可以继续转换或先取消；明确离开将放弃未完成的图片批次，不会下载不完整的结果。'],
       ['能从 PDF 中单独提取原始照片吗？', '不能。这里是把整个 PDF 页面重新渲染为 JPG 或 PNG，包含页面上的文字和图形；并非单独提取 PDF 内嵌照片，也不保留原始图片数据。'],
     ],
     'compress-pdf': [
