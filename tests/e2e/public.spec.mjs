@@ -190,15 +190,16 @@ test('bilingual split SEO explains real nested bookmark limits without duplicate
   }
 });
 
-test('bilingual compression SEO offers a real split-first path for PDFs over 120 pages', async ({ request }) => {
+test('bilingual compression SEO explains real 120/600-page limits and links to splitting', async ({ request }) => {
   for (const [route, splitRoute, pattern] of [
-    ['/compress-pdf/', '/split-pdf/', /PDFs over 120 pages cannot be compressed/],
-    ['/zh/compress-pdf/', '/zh/split-pdf/', /超过 120 页的 PDF 无法直接压缩/],
+    ['/compress-pdf/', '/split-pdf/', /Compression accepts up to 120 pages per run/],
+    ['/zh/compress-pdf/', '/zh/split-pdf/', /每次压缩最多支持 120 页/],
   ]) {
     const response = await request.get(route);
     expect(response.status()).toBe(200);
     const html = await response.text();
     expect(html).toMatch(pattern);
+    expect(html).toMatch(/600/);
     expect(html).toContain(`href="${splitRoute}"`);
     expect(html).toContain('data-testid="compression-split-guidance"');
   }
