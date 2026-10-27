@@ -416,6 +416,12 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}, sig
       if (!context) throw new Error('Image canvas is unavailable.');
       context.drawImage(bitmap, 0, 0);
       const blob = await new Promise((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Could not convert image to PNG.')), 'image/png'));
+      // The encoded Blob no longer depends on the decoded canvas pixels.
+      // Release them BEFORE pdf-lib embeds/serializes the image so successful
+      // large imports do not keep a second full-size RGBA buffer alive.
+      canvas.width = 1;
+      canvas.height = 1;
+      conversionCanvas = null;
       checkCancelled(signal);
       embedded = await doc.embedPng(await blob.arrayBuffer());
       checkCancelled(signal);
