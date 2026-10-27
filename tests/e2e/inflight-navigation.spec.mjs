@@ -20,14 +20,14 @@ test('workspace warns before leaving during a still-loading PDF; cancel releases
   const prompt = page.getByTestId('unsaved-navigation-dialog');
   await expect(prompt).toBeVisible();
   await expect(prompt).toContainText('still loading or being processed');
-  await expect(page).toHaveURL(/\\/workspace\\/$/);
+  await expect(page).toHaveURL(url => url.pathname === '/workspace/');
   await page.getByTestId('unsaved-keep').click();
   await expect(prompt).toHaveCount(0);
   await expect(page.getByTestId('workspace-import-cancel')).toBeVisible();
   await page.getByTestId('workspace-import-cancel').click();
   await expect(page.getByTestId('workspace-import-progress')).toHaveCount(0);
   await page.locator('.language-link').click();
-  await expect(page).toHaveURL(/\\/zh\\/workspace\\/$/);
+  await expect(page).toHaveURL(url => url.pathname === '/zh/workspace/');
 });
 
 test('Chinese PDF utility warns during file load without falsely claiming a saved result', async ({ page }) => {
@@ -47,7 +47,7 @@ test('Chinese PDF utility warns during file load without falsely claiming a save
   await page.getByTestId('utility-load-cancel').click();
   await expect(page.getByTestId('utility-load-cancel')).toHaveCount(0);
   await page.locator('.language-link').click();
-  await expect(page).toHaveURL(/\\/pdf-to-txt\\/$/);
+  await expect(page).toHaveURL(url => url.pathname === '/pdf-to-txt/');
 });
 
 test('active PDF-to-image conversion needs confirmation; cancelling safely restores navigation', async ({ page }) => {
@@ -82,7 +82,7 @@ test('active PDF-to-image conversion needs confirmation; cancelling safely resto
   await expect(page.getByTestId('utility-run')).toBeEnabled();
   expect(downloads).toEqual([]);
   await page.locator('.language-link').click();
-  await expect(page).toHaveURL(/\\/zh\\/pdf-to-images\\/$/);
+  await expect(page).toHaveURL(url => url.pathname === '/zh/pdf-to-images/');
 });
 
 test('bilingual loading/processing explanation is present in HTML before JavaScript runs', async ({ request }) => {
