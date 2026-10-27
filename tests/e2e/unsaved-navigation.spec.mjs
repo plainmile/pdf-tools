@@ -62,32 +62,42 @@ test('partial two-part split ZIP never claims the omitted pages were saved', asy
   await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
 });
 
-test('empty PDF workspace navigates freely, but an imported unsaved PDF asks before switching language', async ({ page }) => {
+test('unchanged source PDF can be previewed and left freely; selected pages still require confirmation', async ({ page }) => {
   await page.goto('/workspace/');
   await expect(page.getByTestId('unsaved-navigation-dialog')).toHaveCount(0);
   await page.locator('.language-link').click();
-  await expect(page).toHaveURL(/\/zh\/workspace\/$/);
+  await expect(page).toHaveURL(/\\/zh\\/workspace\\/$/);
   await page.locator('.language-link').click();
-  await expect(page).toHaveURL(/\/workspace\/$/);
+  await expect(page).toHaveURL(/\\/workspace\\/$/);
 
   await page.getByTestId('file-input').setInputFiles({
     name: 'synthetic.pdf', mimeType: 'application/pdf', buffer: await syntheticPdf(),
   });
   await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  // A simple preview of the original does not create any edited file.
+  // Switching languages should not force a misleading unsaved-work warning.
+  await expect(page.getByTestId('workspace-original-preserved')).toBeVisible();
+  await page.locator('.language-link').click();
+  await expect(page).toHaveURL(/\\/zh\\/workspace\\/$/);
+  await expect(page.getByTestId('unsaved-navigation-dialog')).toHaveCount(0);
 
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'selected.pdf', mimeType: 'application/pdf', buffer: await syntheticPdf(),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  await page.getByRole('checkbox', { name: '选择第 1 页' }).check();
   await page.locator('.language-link').click();
   const dialog = page.getByTestId('unsaved-navigation-dialog');
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText('only in this browser tab');
-  await expect(page).toHaveURL(/\/workspace\/$/);
+  await expect(dialog).toContainText('仅保存在当前浏览器标签页');
+  await expect(page).toHaveURL(/\\/zh\\/workspace\\/$/);
 
   await page.getByTestId('unsaved-keep').click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByTestId('page-tile')).toHaveCount(1);
-
   await page.locator('.language-link').click();
   await page.getByTestId('unsaved-leave').click();
-  await expect(page).toHaveURL(/\/zh\/workspace\/$/);
+  await expect(page).toHaveURL(/\\/workspace\\/$/);
 });
 
 test('successful full export allows normal navigation; a new page edit warns again', async ({ page }) => {
@@ -153,7 +163,10 @@ test('native Back/Reload/Close warning is registered only for unsaved work', asy
   // make it slower than the local Docker runner, so never assert on a React
   // guard before the source pages have finished importing.
   await expect(page.getByTestId('page-tile')).toHaveCount(1);
-  await expect.poll(cancelled, { message: 'loaded PDF should register native leave protection' }).toBe(true);
+  await expect.poll(cancelled, { message: 'unchanged single PDF must not trigger a false leave warning' }).toBe(false);
+  // Page selection is valuable browser-only work, even when PDF bytes stay untouched.
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  await expect.poll(cancelled, { message: 'unexported page selection must stay protected' }).toBe(true);
   await page.getByRole('button', { name: 'Clear', exact: true }).click();
   await page.getByTestId('confirm-clear').click();
   await expect(page.getByTestId('page-tile')).toHaveCount(0);
