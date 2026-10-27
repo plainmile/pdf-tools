@@ -64,6 +64,11 @@ export function retainedSourcesBytes(sources) {
 // bytes in the parsers rather than rejecting otherwise valid .jpg/.png/.webp files.
 export function imageTypeFor(file) {
   const type = (file.type || '').toLowerCase();
+  // A valid PDF may arrive with a stale image MIME type (or an image-like
+  // filename with application/pdf). Parsing it as a picture would reject it.
+  // PDFDocument.load still validates the bytes, so this does not accept
+  // damaged files or bypass the normal 100 MB / 600-page safeguards.
+  if (/\.pdf$/i.test(file.name || '') || type === 'application/pdf') return null;
   if (['image/x-ms-bmp', 'image/x-bmp'].includes(type)) return 'image/bmp';
   if (IMAGE_TYPES.has(type)) return type;
   if (/\.jpe?g$/i.test(file.name || '')) return 'image/jpeg';
