@@ -425,3 +425,72 @@ test('Chinese saved PDF becomes unsaved after deleting the final page; deliberat
   await page.locator('.language-link').click();
   await expect(page).toHaveURL(/\/workspace\/$/);
 });
+
+
+test('English and Chinese image downloads keep the in-tab retry until a deliberate manual download', async ({ page }) => {
+  for (const [route, widthList, confirmationText, nextRoute] of [
+    ['/pdf-to-images/', [320], 'browser may have blocked it', '/zh/pdf-to-images/'],
+    ['/zh/pdf-to-images/', [320, 340], '浏览器可能拦截了下载', '/pdf-to-images/'],
+  ]) {
+    const doc = await PDFDocument.create();
+    for (const width of widthList) doc.addPage([width, 420]);
+    await page.goto(route);
+    await page.getByTestId('utility-file-input').setInputFiles({
+      name: 'scan.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await doc.save()),
+    });
+    await expect(page.getByTestId('utility-file-summary')).toBeVisible();
+    await page.locator('.utility-options select').first().selectOption('png');
+
+    const initialDownload = page.waitForEvent('download');
+    await page.getByTestId('utility-run').click();
+    const downloaded = await initialDownload;
+    const originalBytes = Buffer.from(await readFile(await downloaded.path()));
+    if (widthList.length === 1) {
+      expect(Array.from(originalBytes.slice(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    } else {
+      const archive = await JSZip.loadAsync(originalBytes);
+      expect(Object.keys(archive.files).sort()).toEqual(['page-001.png', 'page-002.png']);
+    }
+
+    await expect(page.getByTestId('image-download-again')).toBeVisible();
+    // A programmatic download event is only an ATTEMPT; a browser can block
+    // it without notifying the application. The fallback must stay protected.
+    const beforeUnloadBlocked = () => page.evaluate(() => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+    await expect.poll(beforeUnloadBlocked).toBe(true);
+    await page.locator('.language-link').click();
+    const warning = page.getByTestId('unsaved-navigation-dialog');
+    await expect(warning).toContainText(confirmationText);
+    await page.getByTestId('unsaved-keep').click();
+    await expect(page.getByTestId('image-download-again')).toBeVisible();
+
+    const repeatedDownload = page.waitForEvent('download');
+    await page.getByTestId('image-download-again').click();
+    const repeated = await repeatedDownload;
+    expect(repeated.suggestedFilename()).toBe(downloaded.suggestedFilename());
+    expect(Buffer.from(await readFile(await repeated.path())).equals(originalBytes)).toBe(true);
+    await expect.poll(beforeUnloadBlocked).toBe(false);
+    await page.locator('.language-link').click();
+    await expect(page).toHaveURL(url => url.pathname === nextRoute);
+    await expect(page.getByTestId('unsaved-navigation-dialog')).toHaveCount(0);
+  }
+});
+
+test('image download fallback and browser-blocking caveat are visible in prerendered bilingual SEO HTML', async ({ request }) => {
+  for (const [route, question, explanation] of [
+    ['/pdf-to-images/', 'What if my JPG, PNG or ZIP download did not appear?', 'browser may block it'],
+    ['/zh/pdf-to-images/', 'JPG、PNG 或 ZIP 下载后没有出现怎么办？', '浏览器可能拦截'],
+  ]) {
+    const response = await request.get(route);
+    expect(response.status(), route).toBe(200);
+    const html = await response.text();
+    expect(html, route).toContain(question);
+    expect(html, route).toContain(explanation);
+    expect(html, route).toContain('rel="canonical"');
+    expect(html, route).toContain('hreflang="zh-CN"');
+    expect(html, route).not.toContain('"@type":"FAQPage"');
+  }
+});
