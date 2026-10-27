@@ -25,12 +25,12 @@ const href = (path) => langPath(path, locale);
     <p>{tool.description}</p>
     {tool.slug === 'compress-pdf' && <p class="tool-task-tip" data-testid="compression-split-guidance">
       {locale === 'zh'
-        ? '超过 120 页的 PDF 无法直接压缩。为控制浏览器内存占用，请先'
-        : 'PDFs over 120 pages cannot be compressed in one run. To limit browser memory usage, first '}
-      <a href={href('/split-pdf/')}>{locale === 'zh' ? '拆分成较小的 PDF' : 'split the PDF into smaller files'}</a>
+        ? '每次压缩最多支持 120 页。121–600 页的 PDF 可先使用'
+        : 'Compression accepts up to 120 pages per run. For 121–600-page PDFs, first use '}
+      <a href={href('/split-pdf/')}>{locale === 'zh' ? '站内拆分 PDF' : 'our Split PDF tool'}</a>
       {locale === 'zh'
-        ? '，再回到本工具分别压缩。文件不会在工具之间自动传递。'
-        : ', then return and compress each part. Files are not transferred automatically between tools.'}
+        ? '分段，再分别压缩；也需符合文件大小限制。超过 600 页请先使用其他本地 PDF 软件拆分，因为本站拆分工具也最多支持 600 页。文件不会在工具之间自动传递。'
+        : ' to create smaller parts, then compress each one (file-size limits still apply). For PDFs over 600 pages, use another local PDF application to divide the source first: our Split PDF tool also has a 600-page limit. Files are not transferred automatically between tools.'}
     </p>}
   </section>
   <section class="site-container workspace-outer">
