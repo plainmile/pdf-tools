@@ -146,6 +146,50 @@ test('failed BMP canvas encoding frees backing pixels, keeps original PDF, and p
   expect(recovered.getPageCount()).toBe(2);
 });
 
+test('stalled BMP encoder can be cancelled without losing existing PDF pages or retry ability', async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.toBlob;
+    window.__stallNextPhotoImport = false;
+    window.__stalledPhotoCanvas = null;
+    HTMLCanvasElement.prototype.toBlob = function (callback, mime, quality) {
+      if (window.__stallNextPhotoImport && mime === 'image/png' &&
+          this.width === 4 && this.height === 3) {
+        window.__stallNextPhotoImport = false;
+        window.__stalledPhotoCanvas = this;
+        return; // Browser PNG encoder never invokes the callback.
+      }
+      return original.call(this, callback, mime, quality);
+    };
+  });
+  await page.goto('/image-to-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'keep-this.bmp', mimeType: 'image/bmp', buffer: makeBmp(),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  await page.evaluate(() => { window.__stallNextPhotoImport = true; });
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'stalled-import.bmp', mimeType: 'image/bmp', buffer: makeBmp(),
+  });
+  await expect.poll(() => page.evaluate(() => Boolean(window.__stalledPhotoCanvas))).toBe(true);
+  await expect(page.getByTestId('workspace-import-cancel')).toBeVisible();
+  await page.getByTestId('workspace-import-cancel').click();
+  await expect(page.getByTestId('workspace-import-progress')).toHaveCount(0);
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  expect(await page.evaluate(() => ({
+    width: window.__stalledPhotoCanvas?.width,
+    height: window.__stalledPhotoCanvas?.height,
+  }))).toEqual({ width: 1, height: 1 });
+
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'successful-retry.bmp', mimeType: 'image/bmp', buffer: makeBmp(),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(2);
+  const exported = await downloadPdf(page);
+  expect(exported.getPageCount()).toBe(2);
+  expect(imageSize(exported, 0)).toContainEqual({ width: 4, height: 3 });
+  expect(imageSize(exported, 1)).toContainEqual({ width: 4, height: 3 });
+});
+
 function pngChunk(type, data) {
   const chunk = Buffer.alloc(12 + data.length);
   chunk.writeUInt32BE(data.length, 0);
