@@ -62,7 +62,7 @@ test('partial two-part split ZIP never claims the omitted pages were saved', asy
   await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
 });
 
-test('empty PDF workspace navigates freely, but an imported unsaved PDF asks before switching language', async ({ page }) => {
+test('unchanged source PDF can be previewed and left freely; selected pages still require confirmation', async ({ page }) => {
   await page.goto('/workspace/');
   await expect(page.getByTestId('unsaved-navigation-dialog')).toHaveCount(0);
   await page.locator('.language-link').click();
@@ -74,20 +74,70 @@ test('empty PDF workspace navigates freely, but an imported unsaved PDF asks bef
     name: 'synthetic.pdf', mimeType: 'application/pdf', buffer: await syntheticPdf(),
   });
   await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  // A simple preview of the original does not create any edited file.
+  // Switching languages should not force a misleading unsaved-work warning.
+  await expect(page.getByTestId('workspace-original-preserved')).toBeVisible();
+  await page.locator('.language-link').click();
+  await expect(page).toHaveURL(/\/zh\/workspace\/$/);
+  await expect(page.getByTestId('unsaved-navigation-dialog')).toHaveCount(0);
 
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'selected.pdf', mimeType: 'application/pdf', buffer: await syntheticPdf(),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  await page.getByRole('checkbox', { name: '选择第 1 页' }).check();
   await page.locator('.language-link').click();
   const dialog = page.getByTestId('unsaved-navigation-dialog');
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText('only in this browser tab');
-  await expect(page).toHaveURL(/\/workspace\/$/);
+  await expect(dialog).toContainText('仅保存在当前浏览器标签页');
+  await expect(page).toHaveURL(/\/zh\/workspace\/$/);
 
   await page.getByTestId('unsaved-keep').click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByTestId('page-tile')).toHaveCount(1);
-
   await page.locator('.language-link').click();
   await page.getByTestId('unsaved-leave').click();
-  await expect(page).toHaveURL(/\/zh\/workspace\/$/);
+  await expect(page).toHaveURL(/\/workspace\/$/);
+});
+
+test('unexported split choices and an untouched multi-file merge still protect browser-only work', async ({ page }) => {
+  const doc = await PDFDocument.create();
+  doc.addPage([320, 420]);
+  doc.addPage([330, 430]);
+  const bytes = Buffer.from(await doc.save());
+  const nativeGuard = () => page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+
+  await page.goto('/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'chapters.pdf', mimeType: 'application/pdf', buffer: bytes,
+  });
+  // Split mode shows its own range controls; the Organize thumbnail grid
+  // is intentionally hidden until its tab is selected.
+  await expect(page.locator('.file-count')).toContainText('2 pages');
+  await expect.poll(nativeGuard).toBe(false);
+  await page.locator('#ranges-input').fill('1');
+  await expect.poll(nativeGuard).toBe(true);
+  await page.locator('.language-link').click();
+  await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
+  await page.getByTestId('unsaved-keep').click();
+  await page.locator('#ranges-input').fill('');
+  await expect.poll(nativeGuard).toBe(false);
+
+  await page.goto('/zh/merge-pdf/');
+  await page.getByTestId('file-input').setInputFiles([
+    { name: 'front.pdf', mimeType: 'application/pdf', buffer: bytes },
+    { name: 'back.pdf', mimeType: 'application/pdf', buffer: bytes },
+  ]);
+  await expect(page.getByTestId('page-tile')).toHaveCount(4);
+  // The two source PDFs still exist, but their assembled combination has
+  // never been downloaded. This is not a "single untouched PDF" preview.
+  await expect.poll(nativeGuard).toBe(true);
+  await page.locator('.language-link').click();
+  await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
 });
 
 test('successful full export allows normal navigation; a new page edit warns again', async ({ page }) => {
@@ -107,6 +157,45 @@ test('successful full export allows normal navigation; a new page edit warns aga
   await page.getByRole('button', { name: 'Rotate clockwise' }).click();
   await page.locator('.language-link').click();
   await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
+});
+
+test('a new selected-page plan after a successful full export re-arms the leave guard', async ({ page }) => {
+  await page.goto('/workspace/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'already-exported.pdf', mimeType: 'application/pdf', buffer: await syntheticPdf(),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  const guard = () => page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  await expect.poll(guard).toBe(false);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export PDF' }).click();
+  await download;
+  await expect.poll(guard).toBe(false);
+
+  // The original/saved output remains intact, but the new selection exists
+  // only in this tab and must not be marked saved by the earlier full export.
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  await expect.poll(guard).toBe(true);
+  await page.locator('.language-link').click();
+  await expect(page.getByTestId('unsaved-navigation-dialog')).toBeVisible();
+  await page.getByTestId('unsaved-keep').click();
+  const selectedDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Extract selected pages' }).click();
+  await selectedDownload;
+  await expect.poll(guard).toBe(false);
+
+  // The optional download name lives inside a native disclosure.
+  // Open the panel before interacting so Playwright exercises real user input.
+  await page.getByTestId('download-name-panel').locator('summary').click();
+  // Changing only the output name after that download is also a new plan.
+  await page.getByTestId('download-name-input').fill('second version');
+  await expect.poll(guard).toBe(true);
+  await page.getByTestId('download-name-input').fill('');
+  await expect.poll(guard).toBe(false);
 });
 
 test('partial extract keeps the unsaved warning, but extracting every page releases it', async ({ page }) => {
@@ -153,7 +242,10 @@ test('native Back/Reload/Close warning is registered only for unsaved work', asy
   // make it slower than the local Docker runner, so never assert on a React
   // guard before the source pages have finished importing.
   await expect(page.getByTestId('page-tile')).toHaveCount(1);
-  await expect.poll(cancelled, { message: 'loaded PDF should register native leave protection' }).toBe(true);
+  await expect.poll(cancelled, { message: 'unchanged single PDF must not trigger a false leave warning' }).toBe(false);
+  // Page selection is valuable browser-only work, even when PDF bytes stay untouched.
+  await page.getByRole('checkbox', { name: 'Select page 1' }).check();
+  await expect.poll(cancelled, { message: 'unexported page selection must stay protected' }).toBe(true);
   await page.getByRole('button', { name: 'Clear', exact: true }).click();
   await page.getByTestId('confirm-clear').click();
   await expect(page.getByTestId('page-tile')).toHaveCount(0);

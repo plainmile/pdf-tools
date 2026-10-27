@@ -142,6 +142,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [layoutCancelling, setLayoutCancelling] = useState(false);
   const [imageLayout, setImageLayout] = useState(() => ({ ...IMAGE_PDF_LAYOUT_DEFAULT }));
   const [lastDownloadedRevision, setLastDownloadedRevision] = useState(null);
+  const [lastDownloadedPlanRevision, setLastDownloadedPlanRevision] = useState(null);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [dragged, setDragged] = useState(null);
@@ -276,8 +277,28 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   // in the Undo history, but there is no nonempty PDF left to export until
   // restored. Leaving the tab must not silently destroy the last Undo chance.
   const recoverableDeletedPages = pages.length === 0 && history.past.some(snapshot => snapshot.length > 0);
+  // Merely opening ONE untouched source PDF is a preview, not an unsaved
+  // document edit: the original bytes already exist on disk. Do still protect
+  // user choices that live only in this tab (selection, ranges, filename).
+  // Merges, image imports, actual page edits and recoverable deletion stay guarded.
+  const hasUndownloadedPlan = selectedCount > 0 || Boolean(
+    selectionRanges.trim() || ranges.trim() || chunkSize.trim() ||
+    moveTargetInput.trim() || downloadNameInput.trim() || bookmarkDraft ||
+    (tab === 'split' && splitMode === 'parity'));
+  // A full export saves the plan at that moment, not every selection/range/name
+  // the user might type *after* the download. Keep these lightweight browser
+  // choices distinct from the actual PDF document revision.
+  const workspacePlanRevision = useMemo(() => JSON.stringify({
+    selected: [...selected].sort(), selectionRanges, ranges, chunkSize,
+    parity: tab === 'split' && splitMode === 'parity',
+    moveTargetInput, downloadNameInput,
+    scannedBookmarkRange: bookmarkDraft?.ranges ?? null,
+  }), [selected, selectionRanges, ranges, chunkSize, tab, splitMode,
+    moveTargetInput, downloadNameInput, bookmarkDraft]);
   const navigationWouldLoseWork = recoverableDeletedPages ||
-    Boolean(pages.length && documentRevision !== lastDownloadedRevision);
+    Boolean(pages.length && (
+      (!pristineOutput && documentRevision !== lastDownloadedRevision) ||
+      (hasUndownloadedPlan && workspacePlanRevision !== lastDownloadedPlanRevision)));
   const splitNeedsInput = splitMode === 'ranges' ? !ranges.trim() : splitMode === 'chunks' ? !chunkSize.trim() : false;
   // Every-N splitting behaves consistently whether N=1 or N=2, 3, etc.
   // Above 50 output PDFs, page-aligned batches keep each download bounded.
@@ -773,6 +794,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       // Only a genuinely partial extraction must keep the unsaved-work guard.
       if (chosen.length === pages.length && chosen.every((page, index) => page === pages[index])) {
         setLastDownloadedRevision(documentRevision);
+        setLastDownloadedPlanRevision(workspacePlanRevision);
       }
       setNotice(successMessage);
     } finally {
@@ -865,7 +887,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           markBatchRequested();
           // A one-piece export covering the entire edited workspace is
           // equivalent to Export PDF; don't warn about work already saved.
-          if (completeSplit) setLastDownloadedRevision(documentRevision);
+          if (completeSplit) {
+            setLastDownloadedRevision(documentRevision);
+            setLastDownloadedPlanRevision(workspacePlanRevision);
+          }
           setNotice(batch ? interpolate(
             batch.index + 1 === batch.total ? t.splitFinalBatchDownloaded : t.splitBatchDownloaded,
             { index: batch.index + 1, total: batch.total },
@@ -902,7 +927,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         ? `${outputBase}-pages-${batch.start}-${batch.end}-split.zip`
         : splitMode === 'parity' ? `${outputBase}-odd-even.zip` : `${outputBase}-split.zip`, 'application/zip');
       markBatchRequested();
-      if (completeSplit) setLastDownloadedRevision(documentRevision);
+      if (completeSplit) {
+            setLastDownloadedRevision(documentRevision);
+            setLastDownloadedPlanRevision(workspacePlanRevision);
+          }
       setNotice(batch
         ? interpolate(batch.index + 1 === batch.total ? t.splitFinalBatchDownloaded : t.splitBatchDownloaded,
           { index: batch.index + 1, total: batch.total })
@@ -1028,6 +1056,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     setSources([]); setHistory(makeHistoryState()); resetSelection(); setError(''); setNotice(t.cleared);
     setPageView('order'); setCollapsedSources(new Set());
     setLastDownloadedRevision(null);
+    setLastDownloadedPlanRevision(null);
     setRanges(''); setChunkSize(''); setSplitBatchIndex(0); setSplitMode('ranges'); setSplitVisualJumpInput(''); setPendingVisualCut(null);
     setBookmarkDraft(null); setBookmarkLevel(1); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); setBookmarkReplaceConfirm(false);
     setSelectionRanges(''); setMoveTargetInput(''); setMovePlacement('before'); setDownloadNameInput(''); setJumpInput(''); setPendingJump(null);
