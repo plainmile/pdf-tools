@@ -12,13 +12,15 @@ function deferred() {
 
 async function enteredPhase(phase) {
   // Never silently hang this test when implementation changes which phase runs.
-  await Promise.race([
-    phase.promise,
-    new Promise((_, reject) => {
-      const timer = setTimeout(() => reject(new Error('Export did not reach the stalled phase.')), 5000);
-      timer.unref?.();
-    }),
-  ]);
+  let timer;
+  try {
+    await Promise.race([
+      phase.promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Export did not reach the stalled phase.')), 5000);
+      }),
+    ]);
+  } finally { clearTimeout(timer); }
 }
 
 async function sourceFixture() {
