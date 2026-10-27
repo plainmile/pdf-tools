@@ -273,6 +273,9 @@ test('220 DPI PDF-to-PNG export matches real pixel dimensions and keeps safety l
   const oversized = await PDFDocument.create();
   oversized.addPage([1800, 1800]);
   await upload(page, Buffer.from(await oversized.save()));
+  await expect(page.getByTestId('utility-replace-confirm')).toBeVisible();
+  await page.getByTestId('utility-replace-accept').click();
+  await expect(resolution).toBeEnabled();
   await resolution.selectOption({ label: 'Print quality (220 DPI)' });
   const downloads = [];
   const track = result => downloads.push(result);
@@ -1646,6 +1649,8 @@ test('invalid replacement keeps previously generated undownloaded text PDF', asy
   await page.getByTestId('utility-file-input').setInputFiles({
     name: 'broken.pdf', mimeType: 'application/pdf', buffer: Buffer.from('corrupt pdf'),
   });
+  await expect(page.getByTestId('utility-replace-confirm')).toBeVisible();
+  await page.getByTestId('utility-replace-accept').click();
   await expect(page.getByRole('alert')).toContainText('Previous file remains: fixture.pdf');
   await expect(page.getByRole('textbox', { name: 'Extracted text preview' })).toHaveValue(/Retained extracted text/);
 });

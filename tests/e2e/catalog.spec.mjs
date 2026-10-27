@@ -262,7 +262,8 @@ test('tool landing page contains contextual related links and indexable FAQ when
     const response = await page.goto('/zh/pdf-to-txt/');
     expect(response?.status()).toBe(200);
     await expect(page.getByRole('heading', { name: '常见问题' })).toBeVisible();
-    await expect(page.locator('.faq-item')).toHaveCount(2);
+    await expect(page.locator('.faq-item')).toHaveCount(3);
+    await expect(page.locator('.faq-item')).toContainText(['自动下载的 TXT 没有出现怎么办？']);
     await expect(page.locator('.below-tools a[href="/zh/pdf-to-images/"]')).toHaveCount(1);
     const ld = await page.locator('script[type="application/ld+json"]').textContent();
     expect(JSON.parse(ld).find(x => x['@type'] === 'WebApplication').name).toBe('PDF 转 TXT');
