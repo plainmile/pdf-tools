@@ -89,8 +89,8 @@ export function demoForTool(mode, locale = 'en') {
     expected: scenarios[mode][locale === 'zh' ? 'zh' : 'en'],
     title: locale === 'zh' ? '使用示例 PDF 验证结果' : 'Try a PDF example and check the result',
     privacy: locale === 'zh'
-      ? '这些文件是公开的非私人示例。可在下方点击“载入示例”直接试用，或先下载到设备后手动选择；自己的文件仍只在浏览器中处理。'
-      : 'These are public, non-personal files. Choose Load example below to try one immediately, or download the PDF and select it yourself. Your files are still processed only in your browser.',
+      ? '这些文件是公开的非私人示例。可在上方工具中点击“载入示例 PDF”直接试用，或在此下载后手动选择；自己的文件仍只在浏览器中处理。'
+      : 'These are public, non-personal files. Choose Load example PDF in the tool above to try one immediately, or download the PDF here and select it yourself. Your files are still processed only in your browser.',
   };
 }
 
