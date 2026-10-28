@@ -35,17 +35,7 @@ const href = (path) => langPath(path, locale);
         : ' to create smaller parts, then compress each one (file-size limits still apply). For PDFs over 600 pages, use another local PDF application to divide the source first: our Split PDF tool also has a 600-page limit. Files are not transferred automatically between tools.'}
     </p>}
   </section>
-  {demo && <section class="site-container sample-guide" data-testid="demo-guidance" aria-label={demo.title}>
-    <div class="sample-guide-copy">
-      <h2>{demo.title}</h2>
-      <p data-testid="demo-expected">{demo.expected}</p>
-      <p class="sample-guide-privacy">{demo.privacy}</p>
-    </div>
-    <div class="sample-guide-links">
-      {demo.files.map(file => <a href={file.path} download={file.name}>{locale === 'zh' ? file.zh : file.en}</a>)}
-    </div>
-  </section>}
-  <section class="site-container workspace-outer">
+  <section class={'site-container workspace-outer' + (demo ? ' workspace-with-demo' : '')}>
     {utilitySlugs.includes(tool.slug)
       ? <PdfUtility client:only="react" locale={locale} mode={tool.slug} />
       : <PdfWorkspace client:only="react" locale={locale} mode={tool.slug} />}
@@ -57,6 +47,16 @@ const href = (path) => langPath(path, locale);
       </p>
     </noscript>
   </section>
+  {demo && <section class="site-container sample-guide" data-testid="demo-guidance" aria-label={demo.title}>
+    <div class="sample-guide-copy">
+      <h2>{demo.title}</h2>
+      <p data-testid="demo-expected">{demo.expected}</p>
+      <p class="sample-guide-privacy">{demo.privacy}</p>
+    </div>
+    <div class="sample-guide-links">
+      {demo.files.map(file => <a href={file.path} download={file.name}>{locale === 'zh' ? file.zh : file.en}</a>)}
+    </div>
+  </section>}
   <section class="site-container tool-explanation">
     <div class="explanation-intro">
       <h2>{page.how}</h2>
