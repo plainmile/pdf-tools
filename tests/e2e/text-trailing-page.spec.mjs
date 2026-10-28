@@ -3,11 +3,13 @@ import { PDFDocument } from 'pdf-lib';
 import { readFile } from 'node:fs/promises';
 
 for (const mode of ['txt-to-pdf', 'markdown-to-pdf']) {
-  test(`${mode} ignores trailing newlines instead of generating blank PDF pages`, async ({ page }) => {
+  test(`${mode} trims outer blank lines without adding empty PDF pages`, async ({ page }) => {
     test.setTimeout(60000);
     await page.goto(`/${mode}/`);
     const body = mode === 'markdown-to-pdf' ? '# First entry\n\nLast entry' : 'First entry\n\nLast entry';
-    await page.getByTestId('utility-text').fill(body + '\n'.repeat(150));
+    // Leading blank lines from pasted documents must not consume entire
+    // pages before the first actual paragraph. Interior spacing stays.
+    await page.getByTestId('utility-text').fill('\n'.repeat(180) + body + '\n'.repeat(150));
     await page.getByTestId('utility-run').click();
     await expect(page.getByTestId('text-pdf-result')).toBeVisible({ timeout: 20000 });
     const pdfEvent = page.waitForEvent('download');
