@@ -154,6 +154,45 @@ test('conversion search accepts arrows and Chinese verbs without reversing direc
   await expect(page.locator('a.tool-card[href="/zh/image-to-pdf/"]')).toBeVisible();
 });
 
+test('ordinary bilingual search questions resolve to existing tasks, never reverse conversions', async ({ page }) => {
+  await page.goto('/');
+  const en = page.getByRole('searchbox', { name: 'Find a PDF tool' });
+  for (const query of [
+    'convert PDF to JPG', 'How to convert PDF into JPG online',
+    'PDFs to JPG', 'PDF to JPG converter',
+  ]) {
+    await en.fill(query);
+    await expect(page.locator('a.tool-card[href="/pdf-to-images/"]')).toBeVisible();
+    await expect(page.locator('a.tool-card[href="/image-to-pdf/"]')).toBeHidden();
+  }
+  for (const query of ['Convert JPG to PDF for free', 'JPG to PDF converter']) {
+    await en.fill(query);
+    await expect(page.locator('a.tool-card[href="/image-to-pdf/"]')).toBeVisible();
+    await expect(page.locator('a.tool-card[href="/pdf-to-images/"]')).toBeHidden();
+  }
+  await en.fill('How can I merge PDFs');
+  await expect(page.locator('a.tool-card[href="/merge-pdf/"]')).toBeVisible();
+  await en.fill('PDF to Word online');
+  await expect(page.getByText('No tools match that search')).toBeVisible();
+  await en.fill('free');
+  await expect(page.getByText('No tools match that search')).toBeVisible();
+
+  await page.goto('/zh/');
+  await page.setViewportSize({ width: 375, height: 812 });
+  const zh = page.getByRole('searchbox', { name: '搜索工具' });
+  for (const query of ['如何将 PDF 转换为 JPG', '怎么把PDF转JPG']) {
+    await zh.fill(query);
+    await expect(page.locator('a.tool-card[href="/zh/pdf-to-images/"]')).toBeVisible();
+    await expect(page.locator('a.tool-card[href="/zh/image-to-pdf/"]')).toBeHidden();
+  }
+  await zh.fill('请把 JPG 转换为 PDF');
+  await expect(page.locator('a.tool-card[href="/zh/image-to-pdf/"]')).toBeVisible();
+  await expect(page.locator('a.tool-card[href="/zh/pdf-to-images/"]')).toBeHidden();
+  await zh.fill('PDF转Word');
+  await expect(page.getByText('没有匹配的工具')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 test('reciprocal converter navigation is crawlable with localized breadcrumbs', async ({ browser }) => {
   const context = await browser.newContext({ javaScriptEnabled: false });
   const page = await context.newPage();
