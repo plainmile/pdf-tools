@@ -115,3 +115,46 @@ test('wide numbering margin fails safely on tiny PDFs and retains the prior gene
   const widths = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
   expect(widths.scroll).toBeLessThanOrEqual(widths.client + 2);
 });
+
+
+test('both locales reject exponent page inputs, recover and export a valid PDF without changing an earlier preview', async ({ page }) => {
+  test.setTimeout(90000);
+  for (const route of ['/add-page-numbers/', '/zh/add-page-numbers/']) {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto(route);
+    await upload(page, await fixture(3));
+    const start = page.getByTestId('number-start');
+    const first = page.getByTestId('number-first-pdf-page');
+    const run = page.getByTestId('utility-run');
+    await start.fill('2e0');
+    await expect(start).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByTestId('numbering-plan-error')).toBeVisible();
+    await expect(run).toBeDisabled();
+    await start.fill('2.0');
+    await expect(run).toBeDisabled();
+    await start.fill('2');
+    await first.fill('1e0');
+    await expect(first).toHaveAttribute('aria-invalid', 'true');
+    await expect(run).toBeDisabled();
+    await first.fill('1');
+    await expect(page.getByTestId('numbering-plan-error')).toHaveCount(0);
+    await expect(run).toBeEnabled();
+    await run.click();
+    await expect(page.getByTestId('numbered-pdf-result')).toBeVisible();
+    await page.getByTestId('number-preview-page').selectOption('custom');
+    const previewInput = page.getByTestId('number-preview-custom');
+    await previewInput.fill('2e0');
+    await expect(page.getByTestId('number-preview-invalid')).toBeVisible();
+    await expect(page.getByTestId('utility-pdf-preview')).toHaveCount(0);
+    await previewInput.fill('2');
+    await expect(page.getByTestId('number-preview-invalid')).toHaveCount(0);
+    await expect(page.getByTestId('utility-pdf-preview')).toBeVisible();
+    const source = await download(page);
+    expect((await PDFDocument.load(source)).getPageCount()).toBe(3);
+    const size = await page.evaluate(() => ({
+      content: document.documentElement.scrollWidth,
+      viewport: document.documentElement.clientWidth,
+    }));
+    expect(size.content, route).toBeLessThanOrEqual(size.viewport + 2);
+  }
+});
