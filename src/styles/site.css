@@ -622,6 +622,10 @@ summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .utility-quick-hint { color: var(--muted); margin: -6px 0 0; font-size: 12px; line-height: 1.6; }
 .utility-range-more summary { color: var(--accent); font-size: 12px; cursor: pointer; }
 .utility-range-more .utility-helper { color: var(--muted); margin: 7px 0 0; font-size: 12px; line-height: 1.6; }
+/* Simple extraction first; two-column controls stay available on request. */
+.utility-text-order-more > summary { width: fit-content; color: var(--accent); cursor: pointer; font-size: 12px; font-weight: 650; line-height: 1.6; }
+.utility-text-order-more > .utility-options { margin-top: 11px; max-width: 460px; }
+.utility-text-order-more > .utility-note { margin-top: 11px; max-width: 620px; overflow-wrap: anywhere; }
 .utility-batch-nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
   gap: 10px 18px; border: 1px solid var(--border); padding: 10px 12px; border-radius: 6px; }
 .utility-batch-nav > span { font-size: 12px; color: var(--muted); }
