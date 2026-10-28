@@ -126,12 +126,19 @@ const desc = zh
           .replace(/\s+/g, ' ')
           .replace(/\s*转\s*/g, '转')
           .replace(/^(?:how\s+(?:to|can\s+i|do\s+i)|please)\s+/, '')
+          // Everyday questions need no special query syntax: "How do I
+          // split a PDF?" should lead to the existing Split PDF tool.
+          .replace(/^(?:how\s+(?:do|can)\s+i|could\s+you|can\s+you)\s+/, '')
           .replace(/^(?:convert|change|turn)\s+/, '')
           .replace(/^(?:(?:如何|怎么|怎样)(?:把|将)?|(?:请)?(?:把|将))\s*/, '')
           .replace(/\bpdfs\b/g, 'pdf')
           .replace(/\b(?:into)\b/g, 'to')
           .replace(/(?:\s+(?:online|for\s+free|free))+$/, '')
           .replace(/\s+(?:converter|conversion)$/, '')
+          .replace(/^(?:a|an|the)\s+/, '')
+          .replace(/\s+(?:a|an|the)\s+/g, ' ')
+          .replace(/\s+(?:file|files|document|documents)$/, '')
+          .replace(/(?:文件|文档)$/, '')
           .trim();
         // Searching only "free" or "online" must not silently display all tools.
         return query || original;

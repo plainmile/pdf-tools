@@ -193,6 +193,34 @@ test('ordinary bilingual search questions resolve to existing tasks, never rever
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
+test('everyday English and Chinese PDF questions find the existing tools', async ({ page }) => {
+  await page.goto('/');
+  const en = page.getByRole('searchbox', { name: 'Find a PDF tool' });
+  for (const [query, slug] of [
+    ['How do I split a PDF?', 'split-pdf'],
+    ['Could you merge PDF files?', 'merge-pdf'],
+    ['How can I compress a PDF document?', 'compress-pdf'],
+  ]) {
+    await en.fill(query);
+    await expect(page.locator('a.tool-card[href="/' + slug + '/"]')).toBeVisible();
+  }
+  await en.fill('How do I convert PDF to Word?');
+  await expect(page.getByText('No tools match that search')).toBeVisible();
+
+  await page.goto('/zh/');
+  const zh = page.getByRole('searchbox', { name: '搜索工具' });
+  for (const [query, slug] of [
+    ['如何合并 PDF 文件？', 'merge-pdf'],
+    ['怎么拆分PDF文档？', 'split-pdf'],
+    ['如何把PDF转换为JPG文件？', 'pdf-to-images'],
+  ]) {
+    await zh.fill(query);
+    await expect(page.locator('a.tool-card[href="/zh/' + slug + '/"]')).toBeVisible();
+  }
+  await zh.fill('如何把PDF转换成Word文件？');
+  await expect(page.getByText('没有匹配的工具')).toBeVisible();
+});
+
 test('reciprocal converter navigation is crawlable with localized breadcrumbs', async ({ browser }) => {
   const context = await browser.newContext({ javaScriptEnabled: false });
   const page = await context.newPage();
