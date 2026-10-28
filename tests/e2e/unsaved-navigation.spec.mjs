@@ -661,8 +661,9 @@ test('a browser-thrown automatic download cleans the temporary anchor and preser
     await page.getByTestId('utility-run').click();
     await expect(page.getByTestId('image-result')).toBeVisible();
     await expect(page.getByRole('alert')).toBeVisible();
-    // The anchor must be removed even though the browser threw from click().
-    await expect(page.locator('a[download]')).toHaveCount(0);
+    // The temporary blob anchor must be removed even if click() throws.
+    // The visible public sample-PDF download link is intentionally retained.
+    await expect(page.locator('a[download][href^="blob:"]')).toHaveCount(0);
     const nativeGuard = () => page.evaluate(() => {
       const event = new Event('beforeunload', { cancelable: true });
       window.dispatchEvent(event);
