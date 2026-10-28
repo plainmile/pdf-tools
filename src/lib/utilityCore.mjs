@@ -1,4 +1,5 @@
-import { parsePageRanges } from './pageOperations.mjs';
+import { parsePageRanges, decimalPageInteger } from './pageOperations.mjs';
+export { decimalPageInteger } from './pageOperations.mjs';
 
 const MiB = 1024 * 1024;
 // PDF coordinates are expressed as 72 points per inch. Print export uses
@@ -191,18 +192,6 @@ export function compressionStats(original, candidate) {
  * Returns a reason code instead of a translated string for bilingual UI.
  * Empty number fields are invalid (Number('') would otherwise become 0).
  */
-/** Input[type=number] accepts scientific notation (e.g. 2e0), but a PDF
- * page field should represent a written decimal integer, not an expression.
- * Return null for exponents, fractions, hex strings and unsafe integers.
- * Keep this parser shared by preflight and generated-PDF preview controls.
- */
-export function decimalPageInteger(value) {
-  const text = String(value ?? '').trim();
-  if (!/^[0-9]+$/.test(text)) return null;
-  const number = Number(text);
-  return Number.isSafeInteger(number) ? number : null;
-}
-
 export function validateNumberingPlan(startInput, firstPageInput, pageCount) {
   const start = decimalPageInteger(startInput);
   const firstPage = decimalPageInteger(firstPageInput);

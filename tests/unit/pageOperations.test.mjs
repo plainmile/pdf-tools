@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   movePage, movePageGroup, pageDropSide, moveSelectedPagesToPosition, shiftPage, rotatePages, deletePages, parsePageRanges,
-  chunkPageRanges, splitChunkBatch, splitSinglePageBatch, oddEvenSplitParts, getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, splitRangesFromBookmarkStarts, bookmarkItemsAtLevel, commitHistory, makeHistoryState, undoHistory, redoHistory,
+  chunkPageRanges, decimalPageInteger, splitChunkBatch, splitSinglePageBatch, oddEvenSplitParts, getRangePages, splitCoversAllPagesExactlyOnce, splitCoverageDetails, splitCutsFromRanges, splitRangesFromCuts, splitRangesFromBookmarkStarts, bookmarkItemsAtLevel, commitHistory, makeHistoryState, undoHistory, redoHistory,
   MAX_SPLIT_ZIP_BYTES, enforceSplitZipBudget, countActiveSources, historyReferencedSourceIds,
   reversePages, sortPagesByFilename, interleaveDuplexPages, duplicatePages, insertPageAfter, groupPagesBySource, pageIdsForRanges, pagePositionsForCombinedRanges, pageIdsForParity, invertPageIdSelection,
 } from '../../src/lib/pageOperations.mjs';
@@ -135,6 +135,14 @@ test('split explicit ranges and preserve workspace page order', () => {
 
 test('split into fixed-size chunks', () => {
   assert.deepEqual(chunkPageRanges(7, 3), [{start:1,end:3},{start:4,end:6},{start:7,end:7}]);
+});
+
+test('every-N split rejects exponent, fractional and hex page counts before export', () => {
+  assert.equal(decimalPageInteger('002'), 2);
+  assert.deepEqual(chunkPageRanges(7, '03'), [{ start: 1, end: 3 }, { start: 4, end: 6 }, { start: 7, end: 7 }]);
+  for (const invalid of ['2e0', '2.0', '0x2', '2.5', '1e309', '+2', '-2', '0', '', ' ', '8', null, true]) {
+    assert.throws(() => chunkPageRanges(7, invalid), /valid pages-per-file/, String(invalid));
+  }
 });
 
 test('nested PDF outlines select only the chosen depth and bound cyclic or hostile inputs', () => {

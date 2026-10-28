@@ -1,6 +1,17 @@
 /** Pure, deterministic page operations; none of these mutate their arguments. */
 export const MAX_SPLIT_ZIP_BYTES = 128 * 1024 * 1024;
 
+/** Strict decimal whole-number input shared by page numbering and Split every N.
+ * HTML number inputs also accept exponent notation (e.g. 2e0), which looks
+ * like a count but is not a plain page number. Fail closed before export.
+ */
+export function decimalPageInteger(value) {
+  const text = String(value ?? '').trim();
+  if (!/^[0-9]+$/.test(text)) return null;
+  const number = Number(text);
+  return Number.isSafeInteger(number) ? number : null;
+}
+
 // ZIP assembly holds generated PDF buffers plus archive buffers in browser memory.
 export function enforceSplitZipBudget(totalBytes, nextBytes) {
   if (!Number.isSafeInteger(totalBytes) || !Number.isSafeInteger(nextBytes) ||
@@ -430,7 +441,7 @@ export function splitSinglePageBatch(pageCount, batchIndex) {
 }
 
 export function chunkPageRanges(pageCount, chunkSize) {
-  const n = Number(chunkSize);
+  const n = decimalPageInteger(chunkSize);
   if (!Number.isSafeInteger(n) || n < 1 || n > pageCount) throw new Error('Choose a valid pages-per-file value.');
   const result = [];
   for (let start = 1; start <= pageCount; start += n) {

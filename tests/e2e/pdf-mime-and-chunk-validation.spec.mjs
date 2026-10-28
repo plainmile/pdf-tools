@@ -36,7 +36,7 @@ test('bilingual 375px split chunks reject invalid counts inline and recover with
     await page.getByTestId('file-input').setInputFiles({ name: 'chapters.pdf', mimeType: 'application/pdf', buffer: input });
     await page.getByRole('radio', { name: radio }).check();
     const count = page.locator('#chunk-input');
-    for (const invalidValue of ['0', '4', '1.5']) {
+    for (const invalidValue of ['0', '4', '1.5', '2e0', '2.0']) {
       await count.fill(invalidValue);
       await expect(count).toHaveAttribute('aria-invalid', 'true');
       await expect(count).toHaveAttribute('aria-describedby', /split-chunk-invalid/);

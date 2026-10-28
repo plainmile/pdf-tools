@@ -8,6 +8,21 @@ const slugs = ['', 'workspace/', 'merge-pdf/', 'split-pdf/', 'organize-pdf/',
  'rotate-pdf/', 'extract-pages/', 'delete-pages/', 'image-to-pdf/', 'watermark-pdf/', 'pdf-to-images/', 'compress-pdf/', 'pdf-to-txt/', 'pdf-to-markdown/', 'txt-to-pdf/', 'markdown-to-pdf/', 'add-page-numbers/', 'privacy/'];
 const indexablePaths = new Set(slugs.flatMap(slug => ['/' + slug, '/zh/' + slug]));
 
+test('split every N documents strict decimal input before JavaScript in both locales', async ({ request }) => {
+  for (const [path, phrase] of [
+    ['/split-pdf/', 'Exponent notation (2e0), decimal fractions (2.0)'],
+    ['/zh/split-pdf/', '不支持 2e0、2.0、十六进制'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    expect(html, path).toContain(phrase);
+    expect(html, path).toContain('rel="canonical"');
+    expect(html, path).toContain('hreflang="en"');
+    expect(html, path).toContain('hreflang="zh-CN"');
+  }
+});
+
 test('real task descriptions are the prerendered bilingual headings, not vague marketing copy', async ({ request }) => {
   for (const [path, heading] of [
     ['/', 'Merge, split and organize PDF pages'],
