@@ -50,7 +50,7 @@ test('English and Chinese PDF landing pages prerender usable example instruction
     const html = await response.text();
     expect(html, path).toContain('data-testid="demo-guidance"');
     expect(html, path).toContain(expected);
-    expect((html.match(/href="\/samples\/plainmile-demo[^"]+\.pdf"/g) || []).length, path).toBe(count);
+    expect((html.match(/href="\/samples\/plainmile-demo(?:-part-[ab])?\.pdf"/g) || []).length, path).toBe(count);
     expect(html, path).toContain('rel="canonical"');
     expect(html, path).toContain('hreflang="en"');
     expect(html, path).toContain('hreflang="zh-CN"');
