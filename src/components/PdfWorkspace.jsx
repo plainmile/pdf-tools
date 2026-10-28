@@ -6,6 +6,7 @@ import PageZoomDialog from './PageZoomDialog.jsx';
 import { LIMITS, composePdf, pristinePdfBytes, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId, createBlankPageSource, retainedSourceBytes, retainedSourcesBytes } from '../lib/pdfEngine.mjs';
 import { sanitizeFilename, workspaceFilenameStem, bookmarkSplitPartFilenames } from '../lib/utilityCore.mjs';
 import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLayout.mjs';
+import { demoForTool, loadDemoPdfFiles } from '../lib/demoScenarios.mjs';
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
 import { workspaceCopy, interpolate, translateProcessingError } from '../lib/i18n.mjs';
 import {
@@ -127,6 +128,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const [downloadNameInput, setDownloadNameInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const demoImportRef = useRef(false);
   const [importCancelling, setImportCancelling] = useState(false);
   // `setBusy` is a UI update, not a lock. Same-tick file drops can both read
   // stale busy=false and individually pass limits before either import finishes.
@@ -702,6 +705,29 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
       if (importAbortRef.current === controller) importAbortRef.current = null;
       setImporting(false); setImportCancelling(false);
       busyRef.current = false; setBusy(false);
+    }
+  };
+
+  // No hidden demo documents or retained browsing data. Read a small public
+  // same-origin PDF and pass it through the regular validated import pipeline.
+  // Existing Undo-only pages receive the same explicit replacement confirmation.
+  const importDemo = async () => {
+    if (busyRef.current || demoImportRef.current || pendingReimportRef.current || pages.length || !demoForTool(mode)) return;
+    demoImportRef.current = true;
+    setDemoLoading(true);
+    setError('');
+    try {
+      const files = await loadDemoPdfFiles(mode);
+      // A regular user import may have started while the public GET completed.
+      // Never add the example on top of that unrequested import.
+      if (!busyRef.current) await addFiles(files);
+    } catch (_error) {
+      setError(locale === 'zh'
+        ? '示例 PDF 暂时无法载入。请尝试上方的下载链接，再手动选择文件。'
+        : 'The example PDF could not be loaded. Use the download link above and then select the file.');
+    } finally {
+      demoImportRef.current = false;
+      setDemoLoading(false);
     }
   };
 
@@ -1353,6 +1379,12 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
             <div className="drop-icon" aria-hidden="true">＋</div>
             <h2>{t.dropTitle}</h2><p>{t.dropSub}</p>
             <button type="button" className="button button-primary" disabled={busy || pendingReimportCount > 0} onClick={() => inputRef.current?.click()}>{busy ? t.opening : t.choose}</button>
+            {demoForTool(mode) && <button type="button" className="button button-secondary demo-load-action"
+              data-testid="workspace-load-demo" disabled={busy || demoLoading || pendingReimportCount > 0}
+              onClick={() => { void importDemo(); }}>
+              {demoLoading ? (locale === 'zh' ? '正在载入示例…' : 'Loading example…')
+                : (locale === 'zh' ? '载入示例 PDF 试用' : 'Load example PDF to try')}
+            </button>}
             <p className="drop-limits">{t.limits}</p><div className="empty-privacy">✓ {t.private}</div>
             {sources.length > 0 && <p className="utility-note" data-testid="empty-history-hint">{t.emptyHistoryHint}</p>}
             {history.past.length > 0 && <button type="button" className="button button-secondary button-small" data-testid="undo-all-deleted" disabled={busy || pendingReimportCount > 0} onClick={() => { setHistory(undoHistory); setSplitBatchIndex(0); resetSelection(); setError(''); setNotice(''); }}>{t.undo}</button>}
