@@ -190,6 +190,9 @@ test('custom PDF image order survives ZIP extraction and alphabetical sorting', 
   await upload(page, await fixturePdf('Source image pages', 5));
   await page.getByRole('combobox', { name: 'Image format' }).selectOption('png');
   await page.getByTestId('utility-page-ranges').fill('3,1,2');
+  const advancedHelp = page.getByTestId('image-range-more');
+  await expect(advancedHelp).not.toHaveAttribute('open');
+  await advancedHelp.locator('summary').click();
   await expect(page.getByText('order-001', { exact: false })).toBeVisible();
   const output = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
   expect(output.name).toMatch(/fixture-pages-3_1_2\.zip$/);
@@ -963,7 +966,7 @@ test('Chinese custom fullwidth range resumes the containing batch on mobile', as
 test('Chinese converter on narrow mobile keeps native file chooser and page batches accessible', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/zh/pdf-to-images/');
-  await expect(page.getByTestId('utility-dropzone')).toContainText('文件拖到这里');
+  await expect(page.getByTestId('utility-dropzone')).toContainText('点击框内任意位置可选择文件');
   await upload(page, await fixturePdf('Chinese batch layout', 61));
   await expect(page.getByTestId('utility-page-ranges')).toHaveValue('1-60');
   await page.getByTestId('utility-batch-next').click();
