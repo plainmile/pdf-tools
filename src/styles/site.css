@@ -378,6 +378,9 @@ main { flex: 1; }
 .split-graphic span { opacity: .65; }
 .split-intro h3 { font-size: 21px; margin-bottom: 10px; }
 .split-intro p { color: var(--muted); font-size: 12px; line-height: 1.8; }
+.split-intro-more { margin-top: 12px; }
+.split-intro-more summary { color: var(--accent); cursor: pointer; font-size: 12px; font-weight: 650; line-height: 1.5; }
+.split-intro-more p { margin: 8px 0 0; overflow-wrap: anywhere; }
 .split-fields { display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
 .split-batch-nav { display: grid; gap: 9px; margin: 12px 0 1px; padding: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 12px; }
 .split-batch-nav strong { color: var(--text); font-size: 13px; }
