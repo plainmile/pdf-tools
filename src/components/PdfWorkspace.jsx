@@ -4,7 +4,7 @@ import { abortableWait } from '../lib/pdfUtilities.mjs';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 import PageZoomDialog from './PageZoomDialog.jsx';
 import { LIMITS, composePdf, pristinePdfBytes, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId, createBlankPageSource, retainedSourceBytes, retainedSourcesBytes } from '../lib/pdfEngine.mjs';
-import { sanitizeFilename, workspaceFilenameStem, bookmarkSplitPartFilenames } from '../lib/utilityCore.mjs';
+import { sanitizeFilename, workspaceFilenameStem, bookmarkSplitPartFilenames, decimalPageInteger } from '../lib/utilityCore.mjs';
 import { IMAGE_PDF_LAYOUT_DEFAULT, sameImagePdfLayout } from '../lib/imagePdfLayout.mjs';
 import { demoForTool, loadDemoPdfFiles } from '../lib/demoScenarios.mjs';
 import { MAX_WATERMARK_CHARS } from '../lib/watermark.mjs';
@@ -306,7 +306,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const splitNeedsInput = splitMode === 'ranges' ? !ranges.trim() : splitMode === 'chunks' ? !chunkSize.trim() : false;
   // Every-N splitting behaves consistently whether N=1 or N=2, 3, etc.
   // Above 50 output PDFs, page-aligned batches keep each download bounded.
-  const chunkSizeNumber = Number(chunkSize);
+  const chunkSizeNumber = decimalPageInteger(chunkSize);
   const chunkOutputCount = splitMode === 'chunks' &&
     Number.isSafeInteger(chunkSizeNumber) && chunkSizeNumber >= 1 && chunkSizeNumber <= pages.length
     ? Math.ceil(pages.length / chunkSizeNumber) : 0;
@@ -1680,7 +1680,7 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   </p>}
                   <div className="split-quick-action">
                     <button type="button" className="button button-secondary button-small"
-                      data-testid="split-each-page" aria-pressed={splitMode === 'chunks' && Number(chunkSize) === 1}
+                      data-testid="split-each-page" aria-pressed={splitMode === 'chunks' && decimalPageInteger(chunkSize) === 1}
                       disabled={busy}
                       onClick={() => { setSplitMode('chunks'); setChunkSize('1'); setSplitBatchIndex(0); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); setError(''); setNotice(''); }}>
                       {t.eachPagePreset}
