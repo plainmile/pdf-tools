@@ -71,10 +71,12 @@ export const toolHelp = {
     'txt-to-pdf': [
       ['Can I turn a book-length TXT file into PDF?', 'You can import up to 5 MiB of UTF-8 or BOM-marked UTF-16 text. Output is limited to 1,000 total pages, including at most 300 image-based pages requiring unsupported glyphs.'],
       ['Will Chinese text be searchable in the output?', 'Pages with Chinese or other unsupported characters are rendered as images, so those pages are not searchable. Pages containing only supported characters remain selectable, even in the same document.'],
+      ['Will pasted blank lines create empty first or last PDF pages?', 'No. Empty lines surrounding the content are skipped; blank lines between paragraphs remain for spacing.'],
     ],
     'markdown-to-pdf': [
       ['What Markdown is supported?', 'Basic headings, paragraphs, lists, block quotes and code blocks. Remote images, HTML and complex tables are not rendered.'],
       ['Which text-file encodings are supported?', 'Import UTF-8 or BOM-marked UTF-16 LE/BE. Invalid encoding is rejected rather than silently corrupting the generated PDF.'],
+      ['Will blank lines at the start of pasted Markdown create empty PDF pages?', 'No. Empty lines before the first content and after the last content are skipped. Blank lines between paragraphs and spaces inside fenced code blocks are retained.'],
       ['Is this a full Word-style layout engine?', 'No. It is a lightweight browser-only converter. Review the downloaded layout, especially for long documents and Chinese text.'],
     ],
     'add-page-numbers': [
@@ -161,10 +163,12 @@ export const toolHelp = {
     'txt-to-pdf': [
       ['可以将长篇 TXT 电子书转换成 PDF 吗？', '支持 UTF-8 或带 BOM 的 UTF-16 文本，文件最多 5 MiB。输出总计最多 1000 页，其中需要特殊字体的图片化页面最多 300 页。'],
       ['中文转换后的 PDF 能搜索吗？', '目前中文文字通过浏览器字体绘制为图片页面，因此不能直接搜索或选择其中的文字。'],
+      ['粘贴内容前后有很多空行，会多出空白 PDF 页吗？', '不会。正文开头与末尾的纯空行会被跳过，正文段落之间的空行仍用于分隔。'],
     ],
     'markdown-to-pdf': [
       ['支持哪些 Markdown 语法？', '支持基本标题、段落、列表、引用及代码块；暂不渲染远程图片、HTML 和复杂表格。'],
       ['导入文本文件支持哪些编码？', '支持 UTF-8 或带 BOM 的 UTF-16 LE/BE。无法正确识别编码时将拒绝导入，避免生成乱码 PDF。'],
+      ['Markdown 开头有空行，会生成空白 PDF 页吗？', '不会。正文首尾的纯空行会被跳过，段落之间的空行以及代码围栏内部的空白内容会保留。'],
       ['可以完全替代 Word 排版吗？', '不能。这是轻量级本地转换工具，较长内容或中文文档导出后应检查分页与排版。'],
     ],
     'add-page-numbers': [
