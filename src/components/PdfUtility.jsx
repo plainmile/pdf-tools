@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { loadPdf, readFileArrayBuffer, convertPdfToImages, compressPdfRaster, compressPdfStructure, extractPdfText, textToPdf, addPageNumbers } from '../lib/pdfUtilities.mjs';
 import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, translateUtilityError, decodeImportedText, textFitsUtf8Budget, IMAGE_PRINT_SCALE, requestedPages, validateNumberingPlan, decimalPageInteger } from '../lib/utilityCore.mjs';
-import { saveDownload } from '../lib/pdfEngine.mjs';
+import { saveDownload } from '../lib/download.mjs';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 import { demoForTool, loadDemoPdfFiles } from '../lib/demoScenarios.mjs';
 
@@ -322,6 +321,10 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     setError('');
     setBusy(true);
     try {
+      // Load PDF parsing only after the user explicitly picks a file.
+      // The landing screen stays interactive without downloading pdf-lib/JSZip.
+      const { readFileArrayBuffer, loadPdf } = await import('../lib/pdfUtilities.mjs');
+      if (loadController.signal.aborted) throw new Error('Processing cancelled.');
       if (isTextInput) {
         if (!/\.(?:txt|md|markdown)$/i.test(file.name) || !file.size || file.size > UTILITY_LIMITS.maxTextBytes) throw new Error(file.size > UTILITY_LIMITS.maxTextBytes ? t.tooMuchText : t.invalidFile);
         const content = decodeImportedText(new Uint8Array(await readFileArrayBuffer(file, loadController.signal)), locale);
@@ -439,6 +442,11 @@ export default function PdfUtility({ mode, locale = 'en' }) {
       if (!controller.signal.aborted && (done === total || done === 1 || done % 10 === 0)) setProgress({ done, total });
     };
     try {
+      // A user can paste text without ever importing a document. Load the
+      // converter only on Run; preserve one shared module cache for later runs.
+      const { convertPdfToImages, compressPdfRaster, compressPdfStructure,
+        extractPdfText, textToPdf, addPageNumbers } = await import('../lib/pdfUtilities.mjs');
+      ensureNotCancelled();
       const pdfName = pdf ? sanitizeFilename(pdf.name) : 'document';
       if (!isTextInput && !pdf) throw new Error(t.noPdf);
       let result;
