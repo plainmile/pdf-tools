@@ -87,7 +87,7 @@ export const tools = [
   {
     slug: 'txt-to-pdf', title: 'TXT to PDF', short: 'Make a PDF from plain text',
     headline: 'Convert TXT or pasted text into a PDF.',
-    description: 'Turn pasted or uploaded TXT into an A4 PDF locally. Pages with unsupported characters use browser fonts as images; other pages retain selectable text.',
+    description: 'Turn pasted or imported TXT into an A4 PDF locally. Pages with unsupported characters use browser fonts as images; other pages retain selectable text.',
     details: 'Write or import .txt content. Only pages requiring Chinese or other unsupported glyphs are rendered as images; the remaining pages stay searchable. Image-only pages cannot be searched.',
     steps: ['Paste or import a TXT file', 'Review the text', 'Download the PDF'],
   },
