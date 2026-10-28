@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, translateUtilityError, decodeImportedText, textFitsUtf8Budget, IMAGE_PRINT_SCALE, requestedPages, validateNumberingPlan, decimalPageInteger } from '../lib/utilityCore.mjs';
 import { saveDownload } from '../lib/download.mjs';
+import { readFileArrayBuffer } from '../lib/fileIo.mjs';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 import { demoForTool, loadDemoPdfFiles } from '../lib/demoScenarios.mjs';
 
@@ -321,10 +322,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     setError('');
     setBusy(true);
     try {
-      // Load PDF parsing only after the user explicitly picks a file.
-      // The landing screen stays interactive without downloading pdf-lib/JSZip.
-      const { readFileArrayBuffer, loadPdf } = await import('../lib/pdfUtilities.mjs');
-      if (loadController.signal.aborted) throw new Error('Processing cancelled.');
+      // Plain TXT/Markdown import only needs a FileReader. Do not make users
+      // download the full PDF parsing/ZIP stack just to preview local text.
       if (isTextInput) {
         if (!/\.(?:txt|md|markdown)$/i.test(file.name) || !file.size || file.size > UTILITY_LIMITS.maxTextBytes) throw new Error(file.size > UTILITY_LIMITS.maxTextBytes ? t.tooMuchText : t.invalidFile);
         const content = decodeImportedText(new Uint8Array(await readFileArrayBuffer(file, loadController.signal)), locale);
@@ -341,6 +340,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         setTextFileName(file.name);
         setTextEdited(false);
       } else {
+        const { loadPdf } = await import('../lib/pdfUtilities.mjs');
+        if (loadController.signal.aborted) throw new Error('Processing cancelled.');
         const loaded = await loadPdf(file, mode, locale, loadController.signal);
         if (loadController.signal.aborted) throw new Error('Processing cancelled.');
         clearOutput();
