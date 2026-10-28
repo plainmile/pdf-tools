@@ -737,8 +737,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     } catch (_error) {
       if (requestId !== demoRequestIdRef.current) return;
       setError(locale === 'zh'
-        ? '示例 PDF 暂时无法载入。请尝试上方的下载链接，再手动选择文件。'
-        : 'The example PDF could not be loaded. Use the download link above and then select the file.');
+        ? '示例 PDF 暂时无法载入。请使用工具下方的示例下载链接，再手动选择文件。'
+        : 'The example PDF could not be loaded. Use the sample download link below the tool, then select the file.');
     } finally {
       if (requestId === demoRequestIdRef.current) {
         demoImportRef.current = false;
