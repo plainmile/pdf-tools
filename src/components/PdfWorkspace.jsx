@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import JSZip from 'jszip';
-import { abortableWait } from '../lib/pdfUtilities.mjs';
+import { abortableWait } from '../lib/fileIo.mjs';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 import PageZoomDialog from './PageZoomDialog.jsx';
 import { LIMITS, composePdf, pristinePdfBytes, isSupportedFile, readSourceFile, reflowImageSources, saveDownload, temporaryWorkspaceId, createBlankPageSource, retainedSourceBytes, retainedSourcesBytes } from '../lib/pdfEngine.mjs';
@@ -928,7 +927,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
     try {
       // A single selected section should be a PDF download, not a ZIP that
       // forces the user to extract the only file. Keep the same output budget.
-      const zip = pieces.length > 1 ? new JSZip() : null;
+      let zip = null;
+      if (pieces.length > 1) {
+        // Merging, rotating and one-piece exports do not need a ZIP encoder.
+        // Import it only when a real multi-file split is requested.
+        const { default: JSZip } = await abortableWait(import('jszip'), controller.signal);
+        zip = new JSZip();
+      }
       for (let index = 0; index < pieces.length; index++) {
         if (controller.signal.aborted) throw new Error('Split cancelled.');
         const range = pieces[index];

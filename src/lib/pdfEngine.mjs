@@ -5,7 +5,7 @@ import {
 import { renderWatermarkPng, watermarkTextFromOptions, watermarkPagePlacement, WATERMARK_OPACITY } from './watermark.mjs';
 import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement, stripJpegPrivateMetadata } from './jpegExif.mjs';
 import { imagePdfPageLayout, IMAGE_PDF_LAYOUT_DEFAULT, shouldReflowImageSource } from './imagePdfLayout.mjs';
-import { readFileArrayBuffer, abortableWait } from './pdfUtilities.mjs';
+import { readFileArrayBuffer, abortableWait } from './fileIo.mjs';
 import { checkCancelled } from './utilityCore.mjs';
 
 /**

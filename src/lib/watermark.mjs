@@ -1,4 +1,4 @@
-import { abortableWait } from './pdfUtilities.mjs';
+import { abortableWait } from './fileIo.mjs';
 import { checkCancelled } from './utilityCore.mjs';
 
 /** Optional watermark text is intentionally disabled unless the user opts in. */
