@@ -61,7 +61,9 @@ const desc = zh
         <button type="button" data-tool-clear>{labels.clear}</button>
       </div>
       <p class="tool-empty" data-tool-empty hidden>{labels.noResults}</p>
-      <p class="tool-search-status" data-tool-results data-count-template={labels.results} role="status" aria-live="polite" aria-atomic="true" hidden></p>
+      <p class="tool-search-status" data-tool-results data-count-template={labels.results}
+        data-count-template-singular={zh ? labels.results : '{count} matching tool.'}
+        role="status" aria-live="polite" aria-atomic="true" hidden></p>
     </div>
     <noscript><p class="tool-finder-nojs" data-testid="tool-finder-nojs">
       {zh ? '搜索需要启用 JavaScript。下方全部工具与分类链接无需 JavaScript 也可直接打开。' : 'Search needs JavaScript. Every tool and category link below remains available without it.'}
@@ -81,6 +83,8 @@ const desc = zh
               const tool = getTool(bySlug[slug], locale);
               return <a class="tool-card" data-tool-card="true"
                 data-search-text={[tool.title, tool.short, tool.description, slug, ...(toolSearchAliases[slug] || [])].join(' ').normalize('NFKC').toLocaleLowerCase()}
+                data-search-compact={[tool.title, tool.short, tool.description, slug, ...(toolSearchAliases[slug] || [])]
+                  .map(term => term.normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, '')).join(' ')}
                 href={href('/' + slug + '/')}
                 aria-label={tool.title + ' — ' + labels.open}>
                 <span class="catalog-icon" aria-hidden="true">{toolSymbols[slug]}</span>
@@ -125,8 +129,15 @@ const desc = zh
           // Directional phrases are order-sensitive: "JPG to PDF" must not
           // accidentally return "PDF to JPG" via unordered word matching.
           const directional = /(?:^|\s)to(?:\s|$)|转/.test(query);
-          const visible = directional ? haystack.includes(query) :
-            words.every(word => haystack.includes(word));
+          // Treat compact mixed Chinese/Latin task names (e.g. "旋转PDF",
+          // "MergePDF") as one phrase without reversing "PDF to JPG".
+          // Compact each *field* separately, never concatenate unrelated
+          // keywords into a false cross-field match.
+          const compactQuery = query.replace(/\s+/g, '');
+          const phraseMatch = haystack.includes(query) ||
+            card.dataset.searchCompact.includes(compactQuery);
+          const visible = directional ? phraseMatch :
+            words.every(word => haystack.includes(word)) || phraseMatch;
           card.hidden = !visible;
           if (visible) matches++;
         }
@@ -145,7 +156,9 @@ const desc = zh
         // Do not announce all tools on initial load; only actual searches.
         // One atomic live region conveys either the match count or no-results.
         results.hidden = !query;
-        results.textContent = query ? results.dataset.countTemplate.replace('{count}', String(matches)) : '';
+        results.textContent = query
+          ? (matches === 1 ? results.dataset.countTemplateSingular : results.dataset.countTemplate)
+            .replace('{count}', String(matches)) : '';
         // A whitespace-only search still contains characters the user should be able to clear.
         clear.disabled = search.value.length === 0;
       };
