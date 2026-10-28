@@ -42,7 +42,9 @@ test('public Chinese split: page ranges export two valid PDFs in a real ZIP', as
   await page.getByTestId('file-input').setInputFiles({
     name: 'book.pdf', mimeType: 'application/pdf', buffer: await fixture([310, 320, 330, 340]),
   });
-  await expect(page.getByTestId('page-tile')).toHaveCount(4, { timeout: 20000 });
+  // The focused Split tool opens its Split tab; organizer tiles are hidden.
+  // Validate the real input page count before verifying downloaded ZIP bytes.
+  await expect(page.locator('.file-count')).toContainText('4 页', { timeout: 20000 });
   await page.locator('#ranges-input').fill('1-2, 3-4');
   await expect(page.getByTestId('split-coverage-complete')).toBeVisible();
   const out = await downloaded(page, () => page.locator('.split-download').click());
