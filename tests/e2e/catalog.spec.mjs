@@ -158,7 +158,7 @@ test('ordinary bilingual search questions resolve to existing tasks, never rever
   await page.goto('/');
   const en = page.getByRole('searchbox', { name: 'Find a PDF tool' });
   for (const query of [
-    'convert PDF to JPG', 'How to convert PDF into JPG online',
+    'convert PDF to JPG', 'How to convert PDF into JPG online?', 'How do I convert PDF to JPG?',
     'PDFs to JPG', 'PDF to JPG converter',
   ]) {
     await en.fill(query);
@@ -180,7 +180,7 @@ test('ordinary bilingual search questions resolve to existing tasks, never rever
   await page.goto('/zh/');
   await page.setViewportSize({ width: 375, height: 812 });
   const zh = page.getByRole('searchbox', { name: '搜索工具' });
-  for (const query of ['如何将 PDF 转换为 JPG', '怎么把PDF转JPG']) {
+  for (const query of ['如何将 PDF 转换为 JPG？', '怎么把PDF转JPG！']) {
     await zh.fill(query);
     await expect(page.locator('a.tool-card[href="/zh/pdf-to-images/"]')).toBeVisible();
     await expect(page.locator('a.tool-card[href="/zh/image-to-pdf/"]')).toBeHidden();
