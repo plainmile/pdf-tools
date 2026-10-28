@@ -110,6 +110,25 @@ test('production Compose deployment uses /opt/compose/pdf-tools and safely migra
   assert.match(agentPolicy, /must live in `\/opt\/compose\/pdf-tools\/`/);
 });
 
+test('public image pull is verified and production never uses stale GHCR credentials or changes desired state before pull', () => {
+  const deploy = readWorkflow('deploy.yml');
+  const publish = readWorkflow('publish.yml');
+  assert.match(publish, /- name: Verify published image allows an anonymous pull/);
+  assert.match(publish, /DOCKER_CONFIG="\$anonymous_docker_config" docker manifest inspect/);
+  assert.match(publish, /Set the package visibility to Public/);
+  const deployStep = deploy.split('- name: Deploy the exact published image and check its health')[1]
+    ?.split('- name: Diagnose origin certificate and local proxy')[0];
+  assert.ok(deployStep);
+  assert.match(deployStep, /anonymous_docker_config=\$\(mktemp -d\)/);
+  assert.match(deployStep, /trap 'rm -rf -- "\$anonymous_docker_config"' EXIT/);
+  assert.match(deployStep, /DOCKER_CONFIG="\$anonymous_docker_config" docker pull "ghcr\.io\/plainmile\/pdf-tools:\$IMAGE_TAG"/);
+  assert.match(deployStep, /docker compose -f compose\.prod\.yaml up -d --pull never/);
+  assert.ok(deployStep.indexOf('docker pull "ghcr.io/plainmile/pdf-tools:$IMAGE_TAG"')
+    < deployStep.indexOf("printf 'IMAGE_TAG=%s\\n'"));
+  assert.doesNotMatch(deploy, /docker logout ghcr.io/);
+  assert.doesNotMatch(deploy, /docker system prune|docker image prune/);
+});
+
 test('production probes exact published SHA instead of copy that SEO updates can legitimately change', () => {
   const docker = readFileSync(new URL('../../Dockerfile', import.meta.url), 'utf8');
   const nginx = readFileSync(new URL('../../deploy/nginx.conf', import.meta.url), 'utf8');

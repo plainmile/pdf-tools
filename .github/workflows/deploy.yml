@@ -143,10 +143,20 @@ jobs:
           cd /opt/compose/pdf-tools
           docker compose -f compose.prod.yaml config --quiet
           docker network inspect edge >/dev/null
+          # Do not use possibly expired credentials in the deploy user's
+          # ~/.docker/config.json. Public GHCR images should pull anonymously.
+          # Never log out the user: unrelated Compose apps may need that login.
+          anonymous_docker_config=$(mktemp -d)
+          trap 'rm -rf -- "$anonymous_docker_config"' EXIT
+          if ! DOCKER_CONFIG="$anonymous_docker_config" docker pull "ghcr.io/plainmile/pdf-tools:$IMAGE_TAG"; then
+            echo 'Anonymous GHCR pull failed. Verify the plainmile/pdf-tools package is public and the registry is reachable.' >&2
+            echo 'The running PDF service was not replaced.' >&2
+            exit 1
+          fi
+          # Only update desired state once the exact image exists locally.
           umask 077
           printf 'IMAGE_TAG=%s\n' "$IMAGE_TAG" > .env
-          docker compose -f compose.prod.yaml pull
-          docker compose -f compose.prod.yaml up -d
+          docker compose -f compose.prod.yaml up -d --pull never
           for i in $(seq 1 24); do
             status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' plainmile-pdf-tools 2>/dev/null || true)
             if [ "$status" = healthy ]; then

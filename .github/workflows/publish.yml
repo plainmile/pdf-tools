@@ -63,3 +63,24 @@ jobs:
           tags: |
             ghcr.io/plainmile/pdf-tools:latest
             ghcr.io/plainmile/pdf-tools:${{ github.event.workflow_run.head_sha }}
+      # The source repository is public and the README promises that the
+      # published image is independently self-hostable without a login.
+      # A successful authenticated push does NOT prove public pull access.
+      - name: Verify published image allows an anonymous pull
+        if: steps.main-head.outputs.current == 'true'
+        env:
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          anonymous_docker_config=$(mktemp -d)
+          trap 'rm -rf -- "$anonymous_docker_config"' EXIT
+          for attempt in $(seq 1 5); do
+            if DOCKER_CONFIG="$anonymous_docker_config" docker manifest inspect \
+              "ghcr.io/plainmile/pdf-tools:$EXPECTED_SHA" >/dev/null 2>&1; then
+              echo "Published image $EXPECTED_SHA is anonymously accessible."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo '::error::GHCR package plainmile/pdf-tools cannot be fetched anonymously. Set the package visibility to Public in GitHub Packages; successful push alone is insufficient.'
+          exit 1
