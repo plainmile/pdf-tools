@@ -1392,7 +1392,16 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         </p>}
         {largeWorkspace && <p className="utility-note" data-testid="workspace-large-warning">{t.bigDocWarning}</p>}
         {!pages.length ? (
-          <div className="dropzone" role="tabpanel" id={`workspace-panel-${tab}`} aria-labelledby={`workspace-tab-${tab}`} data-testid="dropzone" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); void addFiles(event.dataTransfer.files); }}>
+          <div className={`dropzone${busy || pendingReimportCount > 0 ? ' is-disabled' : ''}`} role="tabpanel" id={`workspace-panel-${tab}`} aria-labelledby={`workspace-tab-${tab}`} data-testid="dropzone"
+            onClick={(event) => {
+              // The blank panel is an extra pointer target for the same native
+              // chooser. Never intercept its real buttons (demo, Undo, Clear).
+              if (busy || pendingReimportCount > 0 ||
+                  event.target.closest('button, a, input, label, select, textarea, summary')) return;
+              inputRef.current?.click();
+            }}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => { event.preventDefault(); event.stopPropagation(); void addFiles(event.dataTransfer.files); }}>
             <div className="drop-icon" aria-hidden="true">＋</div>
             <h2>{t.dropTitle}</h2><p>{t.dropSub}</p>
             <button type="button" className="button button-primary" disabled={busy || pendingReimportCount > 0} onClick={() => inputRef.current?.click()}>{busy ? t.opening : t.choose}</button>

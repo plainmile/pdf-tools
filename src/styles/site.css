@@ -234,6 +234,9 @@ main { flex: 1; }
 .workspace-download-settings .utility-note { margin-top: 7px; padding: 8px 11px; overflow-wrap: anywhere; }
 .workspace-content { min-height: 340px; padding: 21px; }
 .dropzone { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; padding: 33px 20px; text-align: center; border: 1.5px dashed var(--border); background: var(--bg); border-radius: 9px; }
+.dropzone:not(.is-disabled) { cursor: pointer; }
+.dropzone:not(.is-disabled):hover { border-color: var(--accent); }
+.dropzone.is-disabled { cursor: default; }
 .drop-icon { display: grid; place-items: center; font-size: 27px; height: 45px; width: 45px; color: var(--accent); border: 1px solid var(--border); background: var(--surface); border-radius: 8px; margin-bottom: 18px; }
 .dropzone h2 { font-size: 20px; letter-spacing: -.025em; margin-bottom: 8px; }
 .dropzone > p { color: var(--muted); font-size: 12px; margin: 0 0 20px; }
