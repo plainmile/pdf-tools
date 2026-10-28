@@ -179,3 +179,47 @@ test('standalone converter: an explicit user PDF wins over delayed example loadi
   await expect(page.getByTestId('utility-file-summary')).toContainText('real-user-file.pdf');
   await expect(page.getByTestId('utility-file-summary')).not.toContainText('plainmile-demo.pdf');
 });
+
+test('task-first bilingual 375px tool layout keeps upload above crawlable example help', async ({ page, request }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  for (const [path, loadTestId] of [
+    ['/split-pdf/', 'workspace-load-demo'],
+    ['/zh/split-pdf/', 'workspace-load-demo'],
+    ['/pdf-to-txt/', 'utility-load-demo'],
+    ['/zh/pdf-to-txt/', 'utility-load-demo'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    const toolIndex = html.indexOf('workspace-with-demo');
+    const sampleIndex = html.indexOf('data-testid="demo-guidance"');
+    expect(toolIndex, path).toBeGreaterThan(-1);
+    expect(sampleIndex, path).toBeGreaterThan(toolIndex);
+    expect(html, path).toContain('rel="canonical"');
+    expect(html, path).toContain('hreflang="en"');
+    expect(html, path).toContain('hreflang="zh-CN"');
+    expect(html, path).toContain('href="/samples/plainmile-demo.pdf"');
+
+    await page.goto(path);
+    await expect(page.getByTestId(loadTestId)).toBeEnabled();
+    const positions = await page.evaluate(() => {
+      const tool = document.querySelector('.workspace-outer');
+      const guide = document.querySelector('[data-testid="demo-guidance"]');
+      return {
+        toolTop: tool?.getBoundingClientRect().top,
+        guideTop: guide?.getBoundingClientRect().top,
+        toolBottom: tool?.getBoundingClientRect().bottom,
+        gap: guide?.getBoundingClientRect().top - tool?.getBoundingClientRect().bottom,
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+        guideText: guide?.textContent || '',
+      };
+    });
+    expect(positions.toolTop, path).toBeLessThan(positions.guideTop);
+    expect(positions.toolBottom, path).toBeLessThanOrEqual(positions.guideTop);
+    expect(positions.gap, path).toBeLessThan(100);
+    expect(positions.scrollWidth, path).toBeLessThanOrEqual(positions.clientWidth + 2);
+    if (path.startsWith('/zh/')) expect(positions.guideText).toContain('上方工具');
+    else expect(positions.guideText).toContain('tool above');
+  }
+});

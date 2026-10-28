@@ -388,8 +388,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     } catch (_error) {
       if (requestId !== demoRequestIdRef.current) return;
       setError(locale === 'zh'
-        ? '示例 PDF 暂时无法载入。请使用上方下载链接后手动选择。'
-        : 'The example PDF could not be loaded. Download it above and select it manually.');
+        ? '示例 PDF 暂时无法载入。请使用工具下方的示例下载链接，再手动选择文件。'
+        : 'The example PDF could not be loaded. Use the sample download link below the tool, then select the file manually.');
     } finally {
       if (requestId === demoRequestIdRef.current) {
         demoLoadRef.current = false;
