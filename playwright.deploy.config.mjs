@@ -9,7 +9,7 @@ export default defineConfig({
   testMatch: ['**/public.spec.mjs', '**/public-release-smoke.spec.mjs'],
   fullyParallel: false,
   workers: 1,
-  retries: 1,
+  retries: 0, // CI is always strict; deploy requests one public-only network retry.
   timeout: 45000,
   globalTimeout: 8 * 60 * 1000,
   reporter: 'list',

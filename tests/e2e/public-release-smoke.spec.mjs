@@ -96,3 +96,69 @@ test('public mobile Chinese PDF-to-TXT exports real UTF-8 data without POST', as
   expect(width.scroll).toBeLessThanOrEqual(width.client + 2);
   expect(posted).toEqual([]);
 });
+
+// Simulate genuine user drag-and-drop into the browser-local converter without
+// uploading a customer document or clicking the native file input.
+async function dropSyntheticFile(page, selector, file) {
+  const base64 = Buffer.from(file.bytes).toString('base64');
+  await page.locator(selector).evaluate((node, data) => {
+    const bytes = Uint8Array.from(atob(data.base64), char => char.charCodeAt(0));
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([bytes], data.filename, { type: data.mimeType }));
+    node.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    node.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+  }, { base64, filename: file.name, mimeType: file.mimeType });
+}
+
+test('public drag-and-drop PDF imports locally and exports real extracted text', async ({ page }) => {
+  await page.goto('/pdf-to-txt/');
+  await dropSyntheticFile(page, '[data-testid="utility-dropzone"]', {
+    name: 'dragged.pdf', mimeType: 'application/pdf',
+    bytes: await fixture([333], 'LOCAL DRAG PDF'),
+  });
+  await expect(page.getByTestId('utility-file-summary')).toContainText('dragged.pdf');
+  const out = await downloaded(page, () => page.getByTestId('utility-run').click());
+  expect(out.bytes.toString('utf8')).toContain('LOCAL DRAG PDF');
+});
+
+test('public drag-and-drop text creates a valid PDF without an extra import step', async ({ page }) => {
+  await page.goto('/txt-to-pdf/');
+  await dropSyntheticFile(page, '[data-testid="utility-dropzone"]', {
+    name: 'dragged.txt', mimeType: 'text/plain',
+    bytes: Buffer.from('Drag and drop a local note to PDF.', 'utf8'),
+  });
+  await expect(page.getByTestId('text-file-summary')).toContainText('dragged.txt');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible({ timeout: 20000 });
+  const out = await downloaded(page, () => page.getByTestId('utility-pdf-download').click());
+  expect((await PDFDocument.load(out.bytes)).getPageCount()).toBe(1);
+});
+
+test('public long PDF final batch on a narrow Chinese mobile viewport exports last real JPGs', async ({ page }) => {
+  test.setTimeout(85000);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/pdf-to-images/');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'book-125.pdf', mimeType: 'application/pdf',
+    buffer: await fixture(Array.from({ length: 125 }, () => 320)),
+  });
+  const input = page.getByTestId('utility-page-ranges');
+  await expect(input).toHaveValue('1-60', { timeout: 20000 });
+  await page.getByTestId('utility-batch-next').click();
+  await expect(input).toHaveValue('61-120');
+  await page.getByTestId('utility-batch-next').click();
+  await expect(input).toHaveValue('121-125');
+  const out = await downloaded(page, () => page.getByTestId('utility-run').click());
+  expect(out.filename).toMatch(/pages-121-125\.zip$/i);
+  const zip = await JSZip.loadAsync(out.bytes);
+  expect(Object.keys(zip.files).sort()).toEqual([
+    'page-121.jpg', 'page-122.jpg', 'page-123.jpg', 'page-124.jpg', 'page-125.jpg',
+  ]);
+  const bytes = await zip.files['page-125.jpg'].async('uint8array');
+  expect(Array.from(bytes.slice(0, 3))).toEqual([255, 216, 255]);
+  const width = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    client: document.documentElement.clientWidth,
+  }));
+  expect(width.scroll).toBeLessThanOrEqual(width.client + 2);
+});

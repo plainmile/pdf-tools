@@ -107,7 +107,7 @@ jobs:
               # Validate the exact bounded public-deploy selection in CI too,
               # without using the public site or treating a flaky release as QA.
               echo "=== Bounded deploy gate regressions ==="
-              PDF_BASE_URL=http://127.0.0.1:18081 npx playwright test --config=playwright.deploy.config.mjs --retries=0
+              PDF_BASE_URL=http://127.0.0.1:18081 npx playwright test --config=playwright.deploy.config.mjs
             '
       - name: Cleanup
         if: always()

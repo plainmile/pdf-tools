@@ -117,7 +117,7 @@ test('production probes exact published SHA instead of copy that SEO updates can
   const deploy = readWorkflow('deploy.yml');
   const ci = readWorkflow('ci.yml');
   const publicProbe = deploy.split('- name: Verify public HTTPS, exact release SHA, SEO and worker')[1]
-    ?.split('- name: Public browser E2E and SEO against deployed site')[0];
+    ?.split('- name: Public browser release smoke and SEO against deployed site')[0];
 
   assert.ok(publicProbe, 'immutable SHA public deployment verification step required');
   assert.match(docker, /ARG SOURCE_SHA=development/);
@@ -140,20 +140,30 @@ test('production probes exact published SHA instead of copy that SEO updates can
   assert.doesNotMatch(publicProbe, /Your documents|Work with PDF pages|自由整理每一页|<h1>/);
 });
 
-test('public production QA retries transient browser failures at most once without weakening strict Docker CI', () => {
+test('bounded PUBLIC verification retains complete SEO, real file outputs, safe rollback and full no-retry Docker CI', () => {
   const deploy = readWorkflow('deploy.yml');
   const ci = readWorkflow('ci.yml');
-  // The same deployed-site E2E suite remains mandatory; a failed repeat
-  // still causes deployment failure and the existing safe rollback.
-  const publicStep = deploy.split('- name: Public browser E2E and SEO against deployed site')[1]
-    .split('- name: Restore last healthy image if release checks fail')[0];
-  assert.match(publicStep, /timeout-minutes: 15/);
+  const deployConfig = readFileSync(new URL('../../playwright.deploy.config.mjs', import.meta.url), 'utf8');
+  const smoke = readFileSync(new URL('../e2e/public-release-smoke.spec.mjs', import.meta.url), 'utf8');
+  const publicStep = deploy.split('- name: Public browser release smoke and SEO against deployed site')[1]
+    ?.split('- name: Restore last healthy image if release checks fail')[0];
+  assert.ok(publicStep, 'public deployment must run the bounded release tests');
+  assert.match(publicStep, /timeout-minutes: 10/);
   assert.match(publicStep, /PDF_BASE_URL=https:\/\/pdf\.plainmile\.com/);
-  assert.match(publicStep, /npx playwright test --reporter=list --retries=1/);
+  assert.match(publicStep, /npx playwright test --config=playwright\.deploy\.config\.mjs --reporter=list --retries=1/);
   assert.match(publicStep, /cp -r test-results \/artifacts\//);
-  // Do not allow a retry to bypass E2E at merge time.
+  assert.match(deployConfig, /public\.spec\.mjs/);
+  assert.match(deployConfig, /public-release-smoke\.spec\.mjs/);
+  assert.match(deployConfig, /retries: 0/);
+  assert.match(deployConfig, /globalTimeout: 8 \* 60 \* 1000/);
+  for (const coverage of ['public merge:', 'public Chinese split:', 'public image converter:',
+    'public mobile Chinese PDF-to-TXT', 'public drag-and-drop PDF',
+    'public drag-and-drop text', 'public long PDF final batch']) {
+    assert.ok(smoke.includes(coverage), 'missing real release coverage: ' + coverage);
+  }
   assert.match(ci, /npx playwright test --config=playwright\.cross-browser\.config\.mjs/);
   assert.match(ci, /npx playwright test\s*\n/);
+  assert.match(ci, /npx playwright test --config=playwright\.deploy\.config\.mjs/);
   assert.doesNotMatch(ci, /--retries=/);
 });
 
@@ -161,7 +171,7 @@ test('failed public E2E or unhealthy deploy rolls back only this service to a pr
   const yaml = readWorkflow('deploy.yml');
   const checkpoint = yaml.indexOf('id: checkpoint');
   const deploy = yaml.indexOf('id: deploy');
-  const publicE2E = yaml.indexOf('- name: Public browser E2E and SEO against deployed site');
+  const publicE2E = yaml.indexOf('- name: Public browser release smoke and SEO against deployed site');
   const rollback = yaml.indexOf('- name: Restore last healthy image if release checks fail');
   assert.ok(checkpoint > 0 && checkpoint < deploy && deploy < publicE2E && publicE2E < rollback);
   // Never trust a stale .env; only a healthy, correctly owned running image.

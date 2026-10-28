@@ -250,7 +250,7 @@ jobs:
               # Includes public.spec.mjs (36-route SEO audit and live PDF
               # export) plus representative real PDF/ZIP/image/text workflows.
               # Do NOT run the full fault-injection suite against public HTTPS.
-              npx playwright test --config=playwright.deploy.config.mjs --reporter=list || {
+              npx playwright test --config=playwright.deploy.config.mjs --reporter=list --retries=1 || {
                 cp -r test-results /artifacts/ || true
                 exit 1
               }
