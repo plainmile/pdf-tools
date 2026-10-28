@@ -130,3 +130,52 @@ test('375px bilingual demo stays usable and does not overflow or weaken split va
     expect(size.scroll, path).toBeLessThanOrEqual(size.viewport + 2);
   }
 });
+
+
+test('workspace: user file import overrides a delayed demo GET without appending demo pages', async ({ page }) => {
+  await page.goto('/workspace/');
+  let release, intercepted;
+  const requested = new Promise(resolve => { intercepted = resolve; });
+  await page.route('**/samples/plainmile-demo.pdf', async route => {
+    await new Promise(resolve => { release = resolve; intercepted(); });
+    await route.continue();
+  });
+  await page.getByTestId('workspace-load-demo').click();
+  await requested;
+  const custom = await PDFDocument.create();
+  custom.addPage([471, 470]);
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'my-private-input.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await custom.save()),
+  });
+  await expect(page.locator('.file-count')).toContainText('1 page');
+  const response = page.waitForResponse('**/samples/plainmile-demo.pdf');
+  release();
+  await response;
+  await expect(page.locator('.file-count')).toContainText('1 page');
+  await expect(page.locator('.file-count')).toContainText('1 file');
+  const out = await captureDownload(page, () => page.getByRole('button', { name: 'Export PDF' }).click());
+  expect(await pdfWidths(out.bytes)).toEqual([471]);
+});
+
+test('standalone converter: an explicit user PDF wins over delayed example loading', async ({ page }) => {
+  await page.goto('/pdf-to-txt/');
+  let release, intercepted;
+  const requested = new Promise(resolve => { intercepted = resolve; });
+  await page.route('**/samples/plainmile-demo.pdf', async route => {
+    await new Promise(resolve => { release = resolve; intercepted(); });
+    await route.continue();
+  });
+  await page.getByTestId('utility-load-demo').click();
+  await requested;
+  const custom = await PDFDocument.create();
+  custom.addPage([483, 470]);
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'real-user-file.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await custom.save()),
+  });
+  await expect(page.getByTestId('utility-file-summary')).toContainText('real-user-file.pdf');
+  const response = page.waitForResponse('**/samples/plainmile-demo.pdf');
+  release();
+  await response;
+  await expect(page.getByTestId('utility-file-summary')).toContainText('real-user-file.pdf');
+  await expect(page.getByTestId('utility-file-summary')).not.toContainText('plainmile-demo.pdf');
+});
