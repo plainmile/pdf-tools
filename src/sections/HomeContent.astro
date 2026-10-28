@@ -114,14 +114,30 @@ const desc = zh
       const categoryNav = document.querySelector('[data-category-jump]');
       const categoryLinks = new Map([...(categoryNav?.querySelectorAll('[data-category-link]') || [])]
         .map(link => [link.getAttribute('href')?.slice(1), link]));
-      const update = () => {
-        // Common arrows and Chinese conversion verbs describe the same
-        // direction as our real tool aliases; never reverse the conversion.
-        const query = search.value.normalize('NFKC').trim()
+      // Search is a task finder, not a keyword guessing contest. Remove only
+      // common question wrappers and promotional qualifiers, never the source
+      // or destination of a conversion ("PDF to JPG" != "JPG to PDF").
+      const normalizeQuery = (value) => {
+        const original = value.normalize('NFKC').trim().toLocaleLowerCase()
+          .replace(/[?？!！。．]+$/g, '').trim();
+        const query = original
           .replace(/(?:->|[→➡➜➔⇒])/g, ' to ')
           .replace(/(?:转换成|转换为|转成|转为)/g, '转')
           .replace(/\s+/g, ' ')
-          .replace(/\s*转\s*/g, '转').toLocaleLowerCase();
+          .replace(/\s*转\s*/g, '转')
+          .replace(/^(?:how\s+(?:to|can\s+i|do\s+i)|please)\s+/, '')
+          .replace(/^(?:convert|change|turn)\s+/, '')
+          .replace(/^(?:(?:如何|怎么|怎样)(?:把|将)?|(?:请)?(?:把|将))\s*/, '')
+          .replace(/\bpdfs\b/g, 'pdf')
+          .replace(/\b(?:into)\b/g, 'to')
+          .replace(/(?:\s+(?:online|for\s+free|free))+$/, '')
+          .replace(/\s+(?:converter|conversion)$/, '')
+          .trim();
+        // Searching only "free" or "online" must not silently display all tools.
+        return query || original;
+      };
+      const update = () => {
+        const query = normalizeQuery(search.value);
         let matches = 0;
         for (const card of cards) {
           const words = query.split(' ').filter(Boolean);
