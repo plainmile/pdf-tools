@@ -220,6 +220,24 @@ test('TXT import SEO never describes a local file picker as a server upload', as
   expect(html).toContain('hreflang="zh-CN"');
 });
 
+test('bilingual TXT and Markdown SEO accurately documents blank-line trimming', async ({ request }) => {
+  for (const [path, expected] of [
+    ['/txt-to-pdf/', 'Empty lines surrounding the content are skipped'],
+    ['/zh/txt-to-pdf/', '正文开头与末尾的纯空行会被跳过'],
+    ['/markdown-to-pdf/', 'spaces inside fenced code blocks are retained'],
+    ['/zh/markdown-to-pdf/', '代码围栏内部的空白内容会保留'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    expect(html, path).toContain(expected);
+    expect(html).toContain('rel="canonical"');
+    expect(html).toContain('hreflang="en"');
+    expect(html).toContain('hreflang="zh-CN"');
+    expect(html).not.toContain('"@type":"FAQPage"');
+  }
+});
+
 test('live sitemap, robots, routes, PDF worker, 404', async ({ request }) => {
  const robots = await request.get('/robots.txt');
  expect(robots.status()).toBe(200);
