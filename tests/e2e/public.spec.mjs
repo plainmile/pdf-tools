@@ -202,7 +202,22 @@ test('bilingual compression SEO explains real 120/600-page limits and links to s
     expect(html).toMatch(/600/);
     expect(html).toContain(`href="${splitRoute}"`);
     expect(html).toContain('data-testid="compression-split-guidance"');
+    if (route.startsWith('/zh/')) {
+      expect(html).toContain('逐份从设备中选择并压缩');
+      expect(html).not.toContain('重新上传压缩');
+    } else {
+      expect(html).toContain('choose each saved part in this Compress PDF tool');
+      expect(html).not.toContain('upload each part again here');
+    }
   }
+});
+
+test('TXT import SEO never describes a local file picker as a server upload', async ({ request }) => {
+  const html = await (await request.get('/txt-to-pdf/')).text();
+  expect(html).toContain('pasted or imported TXT');
+  expect(html).not.toContain('pasted or uploaded TXT');
+  expect(html).toContain('rel="canonical"');
+  expect(html).toContain('hreflang="zh-CN"');
 });
 
 test('live sitemap, robots, routes, PDF worker, 404', async ({ request }) => {

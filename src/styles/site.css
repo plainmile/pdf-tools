@@ -631,6 +631,9 @@ summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
  * preserve browser pinch zoom and desktop typography. Do not enlarge
  * checkboxes, radio inputs or the native file picker. */
 @media (max-width: 770px) {
+  /* Native theme selection is outside .pdf-workspace; keep it readable on
+     iOS Safari too, without changing desktop header typography. */
+  .theme-switch select { font-size: 16px; }
   .tool-search-row input,
   .pdf-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
   .pdf-workspace select,
