@@ -118,7 +118,8 @@ const desc = zh
       // common question wrappers and promotional qualifiers, never the source
       // or destination of a conversion ("PDF to JPG" != "JPG to PDF").
       const normalizeQuery = (value) => {
-        const original = value.normalize('NFKC').trim().toLocaleLowerCase();
+        const original = value.normalize('NFKC').trim().toLocaleLowerCase()
+          .replace(/[?？!！。．]+$/g, '').trim();
         const query = original
           .replace(/(?:->|[→➡➜➔⇒])/g, ' to ')
           .replace(/(?:转换成|转换为|转成|转为)/g, '转')
