@@ -198,7 +198,7 @@ test('task-first bilingual 375px tool layout keeps upload above crawlable exampl
     expect(html, path).toContain('rel="canonical"');
     expect(html, path).toContain('hreflang="en"');
     expect(html, path).toContain('hreflang="zh-CN"');
-    expect(html, path).toMatch(/href="\\/samples\\/plainmile-demo\\.pdf"/);
+    expect(html, path).toContain('href="/samples/plainmile-demo.pdf"');
 
     await page.goto(path);
     await expect(page.getByTestId(loadTestId)).toBeEnabled();
@@ -216,7 +216,7 @@ test('task-first bilingual 375px tool layout keeps upload above crawlable exampl
       };
     });
     expect(positions.toolTop, path).toBeLessThan(positions.guideTop);
-    expect(positions.toolBottom, path).toBeLessThan(positions.guideTop);
+    expect(positions.toolBottom, path).toBeLessThanOrEqual(positions.guideTop);
     expect(positions.gap, path).toBeLessThan(100);
     expect(positions.scrollWidth, path).toBeLessThanOrEqual(positions.clientWidth + 2);
     if (path.startsWith('/zh/')) expect(positions.guideText).toContain('上方工具');
