@@ -419,10 +419,15 @@ export async function addPageNumbers(pdf, opts = {}, reportProgress = () => {}) 
 export async function textToPdf(text, markdown = false, options = {}) {
   checkCancelled(options.signal);
   const blocks = parseTextBlocks(text, markdown);
-  // Trailing newlines are common in pasted TXT/Markdown. They must not create
-  // a final, entirely blank PDF page or exhaust long-document page limits.
-  // Keep interior blank lines: those can separate real paragraphs.
+  // Pasted TXT/Markdown may contain hundreds of empty lines at either
+  // document edge. Those should not consume whole PDF pages before/after the
+  // first/last real content. Keep interior gaps and whitespace INSIDE fenced
+  // Markdown code blocks; only block.kind === 'gap' is disposable.
   while (blocks.at(-1)?.kind === 'gap') blocks.pop();
+  const firstContent = blocks.findIndex(block => block.kind !== 'gap');
+  // One splice, not repeated shift(), so a 5 MiB input full of leading
+  // newlines remains linear instead of quadratic.
+  if (firstContent > 0) blocks.splice(0, firstContent);
   if (!blocks.some(b => b.text.trim())) throw new Error('Enter some text first.');
   // TXT/Markdown output is a new document, not a metadata scrubber.
   const doc = await abortableWait(PDFDocument.create({ updateMetadata: false }), options.signal);
