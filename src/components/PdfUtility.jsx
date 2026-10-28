@@ -3,6 +3,7 @@ import { loadPdf, readFileArrayBuffer, convertPdfToImages, compressPdfRaster, co
 import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, translateUtilityError, decodeImportedText, textFitsUtf8Budget, IMAGE_PRINT_SCALE, requestedPages, validateNumberingPlan } from '../lib/utilityCore.mjs';
 import { saveDownload } from '../lib/pdfEngine.mjs';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
+import { demoForTool, loadDemoPdfFiles } from '../lib/demoScenarios.mjs';
 
 const COPY = {
   en: {
@@ -198,6 +199,9 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const [fontSize, setFontSize] = useState('12');
   const [busy, setBusy] = useState(false);
   const [loadingFile, setLoadingFile] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const demoLoadRef = useRef(false);
+  const demoRequestIdRef = useRef(0);
   const [loadCancelling, setLoadCancelling] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -264,8 +268,15 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     if (hasUnsavedUtilityWork) { setClearConfirm(true); return; }
     clearSession();
   }
-  function requestFile(file) {
+  function requestFile(file, { fromDemo = false } = {}) {
     if (!file || operationRef.current || pendingReplacementRef.current) return;
+    // User's chosen PDF takes priority over a still-loading public sample.
+    // The old GET result must never replace a completed user import later.
+    if (!fromDemo && demoLoadRef.current) {
+      demoRequestIdRef.current += 1;
+      demoLoadRef.current = false;
+      setDemoLoading(false);
+    }
     // An obviously unsupported/empty/oversized input must be rejected right
     // away, WITHOUT asking the user to abandon a valuable unsaved result.
     // PDF content corruption is checked by the existing parser after consent.
@@ -362,6 +373,29 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     const file = event.target.files?.[0];
     event.target.value = '';
     requestFile(file);
+  }
+  async function importDemo() {
+    if (!demoForTool(mode) || pdf || operationRef.current || demoLoadRef.current || pendingReplacementRef.current) return;
+    const requestId = ++demoRequestIdRef.current;
+    demoLoadRef.current = true;
+    setDemoLoading(true);
+    setError('');
+    try {
+      const [file] = await loadDemoPdfFiles(mode);
+      if (requestId === demoRequestIdRef.current && !operationRef.current && !pendingReplacementRef.current) {
+        requestFile(file, { fromDemo: true });
+      }
+    } catch (_error) {
+      if (requestId !== demoRequestIdRef.current) return;
+      setError(locale === 'zh'
+        ? '示例 PDF 暂时无法载入。请使用上方下载链接后手动选择。'
+        : 'The example PDF could not be loaded. Download it above and select it manually.');
+    } finally {
+      if (requestId === demoRequestIdRef.current) {
+        demoLoadRef.current = false;
+        setDemoLoading(false);
+      }
+    }
   }
   function chooseBatch(index) {
     if (!pdf || operationRef.current || pendingReplacementRef.current) return;
@@ -612,6 +646,12 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           </label>
           <span className="utility-drop-hint">{t.dropHint}</span>
         </div>
+        {!pdf && demoForTool(mode) && <button type="button" className="button button-secondary button-small demo-load-action"
+          data-testid="utility-load-demo" disabled={inputLocked || demoLoading}
+          onClick={() => { void importDemo(); }}>
+          {demoLoading ? (locale === 'zh' ? '正在载入示例…' : 'Loading example…')
+            : (locale === 'zh' ? '载入示例 PDF 试用' : 'Load example PDF to try')}
+        </button>}
         {loadingFile && <div className="utility-load-controls" role="status">
           <span>{t.loadingFile}</span>
           <button type="button" className="button button-secondary button-small"

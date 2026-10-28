@@ -283,9 +283,9 @@ test('SEO and AI answer-readiness audit of 36 live URLs', async ({ page }) => {
       breadcrumbItems: schema.itemListElement?.map(entry => entry.item),
     })),
     localLinks: [...document.querySelectorAll('a[href]')]
-      .map(anchor => new URL(anchor.href))
-      .filter(link => link.origin === location.origin)
-      .map(link => link.pathname),
+      .map(anchor => ({ url: new URL(anchor.href), download: anchor.hasAttribute('download') }))
+      .filter(item => item.url.origin === location.origin)
+      .map(item => ({ path: item.url.pathname, download: item.download })),
     };
    });
    expect(meta.lang,path).toBe(locale==='en'?'en':'zh-CN');
@@ -302,8 +302,14 @@ test('SEO and AI answer-readiness audit of 36 live URLs', async ({ page }) => {
    expect(meta.officialSiteHref,path+' official project link').toBe(domain+'/');
    expect(meta.officialSiteText,path+' visible credit').toContain('pdf.plainmile.com');
    expect(meta.officialSiteRel,path+' template outbound link').toMatch(/\bnofollow\b/);
-   for (const localPath of meta.localLinks) {
-    expect(indexablePaths.has(localPath), path + ': broken internal link to ' + localPath).toBe(true);
+   for (const local of meta.localLinks) {
+    // Navigation must lead to one of the 36 real HTML routes.
+    // Explicit download links can target the three public noindex PDFs;
+    // their GET, MIME, response headers and PDF bytes are checked separately.
+    const allowed = local.download
+      ? /^\/samples\/plainmile-demo(?:-part-[ab])?\.pdf$/.test(local.path)
+      : indexablePaths.has(local.path);
+    expect(allowed, path + ': broken or unexpected internal link to ' + local.path).toBe(true);
    }
    expect(seenTitles.has(meta.title), 'Duplicate title: '+meta.title).toBe(false);
    expect(seenDescriptions.has(meta.description), 'Duplicate description: '+meta.description).toBe(false);

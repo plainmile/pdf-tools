@@ -148,6 +148,17 @@ main { flex: 1; }
 .tool-hero > p { max-width: 740px; margin: 0; line-height: 1.75; font-size: 14px; color: var(--muted); }
 .tool-hero > .tool-task-tip { margin-top: 12px; }
 .tool-task-tip a { color: var(--accent); text-underline-offset: 2px; }
+/* A useful, crawlable example, not another keyword landing page. */
+.sample-guide { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px 24px; padding: 16px 19px; margin-bottom: 18px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.sample-guide-copy { flex: 1 1 460px; min-width: 0; }
+.sample-guide h2 { font-size: 15px; letter-spacing: -.015em; margin: 0 0 7px; }
+.sample-guide p { max-width: 780px; font-size: 12px; line-height: 1.6; margin: 0 0 5px; }
+.sample-guide .sample-guide-privacy { color: var(--muted); margin-bottom: 0; }
+.sample-guide-links { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 7px 14px; }
+.sample-guide-links a { font-size: 12px; font-weight: 650; color: var(--accent); text-underline-offset: 3px; padding: 5px 0; }
+.sample-guide-links a:hover { color: var(--accent-hover); }
+.demo-load-action { min-height: 40px; }
+@media (max-width: 440px) { .sample-guide { padding: 13px; } .sample-guide-links { width: 100%; flex-direction: column; gap: 2px; } }
 .workspace-outer { padding-bottom: 65px; }
 .tool-js-required { margin: 0; padding: 16px 18px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); font-size: 14px; line-height: 1.65; }
 .tool-explanation { display: grid; grid-template-columns: 1fr .72fr; gap: 50px; padding: 45px 0 65px; border-top: 1px solid var(--border); }
