@@ -191,14 +191,24 @@ export function compressionStats(original, candidate) {
  * Returns a reason code instead of a translated string for bilingual UI.
  * Empty number fields are invalid (Number('') would otherwise become 0).
  */
+/** Input[type=number] accepts scientific notation (e.g. 2e0), but a PDF
+ * page field should represent a written decimal integer, not an expression.
+ * Return null for exponents, fractions, hex strings and unsafe integers.
+ * Keep this parser shared by preflight and generated-PDF preview controls.
+ */
+export function decimalPageInteger(value) {
+  const text = String(value ?? '').trim();
+  if (!/^[0-9]+$/.test(text)) return null;
+  const number = Number(text);
+  return Number.isSafeInteger(number) ? number : null;
+}
+
 export function validateNumberingPlan(startInput, firstPageInput, pageCount) {
-  const start = Number(startInput);
-  const firstPage = Number(firstPageInput);
-  if (!String(startInput ?? '').trim() || !Number.isSafeInteger(start) ||
-      start < 1 || start > 99999) return 'start';
+  const start = decimalPageInteger(startInput);
+  const firstPage = decimalPageInteger(firstPageInput);
+  if (start === null || start < 1 || start > 99999) return 'start';
   if (!Number.isSafeInteger(pageCount) || pageCount < 1 ||
-      !String(firstPageInput ?? '').trim() || !Number.isSafeInteger(firstPage) ||
-      firstPage < 1 || firstPage > pageCount) return 'first';
+      firstPage === null || firstPage < 1 || firstPage > pageCount) return 'first';
   if (start + pageCount - firstPage > 99999) return 'overflow';
   return null;
 }
