@@ -163,6 +163,10 @@ main { flex: 1; }
    public example stays accessible after the tool without a giant blank gap. */
 .workspace-outer { padding-bottom: 65px; }
 .workspace-outer.workspace-with-demo { padding-bottom: 18px; }
+/* React-only converters previously left an empty gap until JS loaded.
+   Reserve room for the main tool on slow devices, then replace automatically. */
+.tool-loading-placeholder { min-height: 320px; display: flex; justify-content: center; align-items: center; padding: 24px; text-align: center; background: var(--surface); color: var(--muted); border: 1px solid var(--border); border-radius: 10px; font-size: 13px; line-height: 1.7; }
+.tool-loading-placeholder > span { max-width: 100%; overflow-wrap: anywhere; }
 .tool-js-required { margin: 0; padding: 16px 18px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); font-size: 14px; line-height: 1.65; }
 .tool-explanation { display: grid; grid-template-columns: 1fr .72fr; gap: 50px; padding: 45px 0 65px; border-top: 1px solid var(--border); }
 .explanation-intro h2 { font-size: 29px; margin: 12px 0; }

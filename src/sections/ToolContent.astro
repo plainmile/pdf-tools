@@ -37,8 +37,16 @@ const href = (path) => langPath(path, locale);
   </section>
   <section class={'site-container workspace-outer' + (demo ? ' workspace-with-demo' : '')}>
     {utilitySlugs.includes(tool.slug)
-      ? <PdfUtility client:only="react" locale={locale} mode={tool.slug} />
-      : <PdfWorkspace client:only="react" locale={locale} mode={tool.slug} />}
+      ? <PdfUtility client:only="react" locale={locale} mode={tool.slug}>
+        <div slot="fallback" class="tool-loading-placeholder" role="status" data-testid="tool-loading-placeholder">
+          <span>{locale === 'zh' ? '正在加载浏览器本地 PDF 工具…' : 'Loading your browser PDF tool…'}</span>
+        </div>
+        </PdfUtility>
+      : <PdfWorkspace client:only="react" locale={locale} mode={tool.slug}>
+        <div slot="fallback" class="tool-loading-placeholder" role="status" data-testid="tool-loading-placeholder">
+          <span>{locale === 'zh' ? '正在加载浏览器本地 PDF 工具…' : 'Loading your browser PDF tool…'}</span>
+        </div>
+        </PdfWorkspace>}
     <noscript>
       <p class="tool-js-required" data-testid="tool-js-required">
         {locale === 'zh'

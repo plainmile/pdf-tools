@@ -468,12 +468,17 @@ test('JavaScript-disabled PDF tools give a useful bilingual fallback without hid
     expect(raw.status(), path).toBe(200);
     const html = await raw.text();
     expect(html, path + ' must include readable HTML without hydration').toContain('data-testid="tool-js-required"');
+    // The upload region no longer looks empty while the React island downloads.
+    expect(html, path + ' must show static loading content').toContain('data-testid="tool-loading-placeholder"');
+    expect(html, path).toContain(locale === 'zh'
+      ? '正在加载浏览器本地 PDF 工具' : 'Loading your browser PDF tool');
     expect(html, path + ' must keep prerendered canonical').toContain('rel="canonical"');
     expect(html, path + ' must keep language alternates').toContain('hreflang="zh-CN"');
     const response = await noJsPage.goto(path, { waitUntil: 'domcontentloaded' });
     expect(response?.status(), path).toBe(200);
     const message = noJsPage.getByTestId('tool-js-required');
     await expect(message).toBeVisible();
+    await expect(noJsPage.getByTestId('tool-loading-placeholder')).toBeVisible();
     await expect(message).toContainText(locale === 'zh'
       ? '请启用 JavaScript 后刷新页面'
       : 'Enable JavaScript and reload this page');
@@ -486,6 +491,27 @@ test('JavaScript-disabled PDF tools give a useful bilingual fallback without hid
    }
   }
  } finally { await context.close(); }
+});
+
+test('bilingual tool loading placeholder disappears when the real local tool is ready', async ({ request, page }) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  for (const [path, input] of [
+    ['/merge-pdf/', 'file-input'],
+    ['/zh/split-pdf/', 'file-input'],
+    ['/pdf-to-txt/', 'utility-file-input'],
+    ['/zh/pdf-to-images/', 'utility-file-input'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    expect(html, path).toContain('data-testid="tool-loading-placeholder"');
+    expect(html, path).toContain('rel="canonical"');
+    await page.goto(path);
+    await expect(page.getByTestId(input), path + ' input must eventually mount').toBeAttached();
+    await expect(page.getByTestId('tool-loading-placeholder')).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() =>
+      document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
 });
 
 test('public language/theme and mobile layout', async ({ page }) => {
