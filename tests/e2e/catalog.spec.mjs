@@ -178,7 +178,7 @@ test('tool finder announces localized match counts and no-match status to assist
   const status = page.locator('[data-tool-results]');
   await expect(status).toBeHidden();
   await page.getByRole('searchbox', { name: 'Find a PDF tool' }).fill('compress');
-  await expect(status).toHaveText('1 matching tools.');
+  await expect(status).toHaveText('1 matching tool.');
   await expect(status).toBeVisible();
   await page.getByRole('searchbox', { name: 'Find a PDF tool' }).fill('no-such-tool-match');
   await expect(status).toHaveText('0 matching tools.');
@@ -415,4 +415,58 @@ test('organize PDF page copy/blank help remains indexable in both languages with
   } finally {
     await context.close();
   }
+});
+
+
+test('compact Chinese/English tool queries find the correct real tool without conversion reversal', async ({ page }) => {
+  for (const [route, searchLabel, cases] of [
+    ['/', 'Find a PDF tool', [
+      ['MergePDF', '/merge-pdf/'],
+      ['RotatePDF', '/rotate-pdf/'],
+      ['JPGtoPDF', '/image-to-pdf/'],
+      ['PDFtoJPG', '/pdf-to-images/'],
+    ]],
+    ['/zh/', '搜索工具', [
+      ['旋转PDF', '/zh/rotate-pdf/'],
+      ['旋转ＰＤＦ', '/zh/rotate-pdf/'],
+      ['删除PDF页面', '/zh/delete-pages/'],
+      ['JPG转PDF', '/zh/image-to-pdf/'],
+      ['PDF转JPG', '/zh/pdf-to-images/'],
+    ]],
+  ]) {
+    await page.goto(route);
+    const search = page.getByRole('searchbox', { name: searchLabel });
+    for (const [query, href] of cases) {
+      await search.fill(query);
+      await expect(page.locator('[data-tool-card]:visible'), query).toHaveCount(1);
+      await expect(page.locator('a.tool-card[href="' + href + '"]')).toBeVisible();
+    }
+    await search.fill(route === '/' ? 'JPG to PDF' : 'PDF转Word');
+    if (route === '/zh/') await expect(page.locator('[data-tool-card]:visible')).toHaveCount(0);
+    else await expect(page.locator('a.tool-card[href="/image-to-pdf/"]')).toBeVisible();
+  }
+});
+
+test('mobile theme picker avoids iOS focus zoom without changing desktop sizing or SEO pages', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  for (const route of ['/', '/zh/', '/split-pdf/', '/zh/pdf-to-images/']) {
+    await page.goto(route);
+    const theme = page.locator('[data-theme-select]');
+    await expect(theme).toBeVisible();
+    const size = await theme.evaluate(el => Number.parseFloat(getComputedStyle(el).fontSize));
+    expect(size, route).toBeGreaterThanOrEqual(16);
+    await theme.selectOption('dark');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    const width = await page.evaluate(() => ({
+      content: document.documentElement.scrollWidth,
+      viewport: document.documentElement.clientWidth,
+    }));
+    expect(width.content, route).toBeLessThanOrEqual(width.viewport + 2);
+    await theme.selectOption('system');
+  }
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await page.goto('/');
+  const desktop = await page.locator('[data-theme-select]')
+    .evaluate(el => Number.parseFloat(getComputedStyle(el).fontSize));
+  expect(desktop).toBeLessThan(16);
 });
