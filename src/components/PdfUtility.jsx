@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { loadPdf, readFileArrayBuffer, convertPdfToImages, compressPdfRaster, compressPdfStructure, extractPdfText, textToPdf, addPageNumbers } from '../lib/pdfUtilities.mjs';
-import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, translateUtilityError, decodeImportedText, textFitsUtf8Budget, IMAGE_PRINT_SCALE, requestedPages, validateNumberingPlan } from '../lib/utilityCore.mjs';
+import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, translateUtilityError, decodeImportedText, textFitsUtf8Budget, IMAGE_PRINT_SCALE, requestedPages, validateNumberingPlan, decimalPageInteger } from '../lib/utilityCore.mjs';
 import { saveDownload } from '../lib/pdfEngine.mjs';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 import { demoForTool, loadDemoPdfFiles } from '../lib/demoScenarios.mjs';
@@ -228,9 +228,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   // entire PDF to reopen after the 300ms debounce (pages 5, 50, 500).
   useEffect(() => {
     if (numberPreviewPage !== 'custom' || !output?.pageCount) return undefined;
-    const page = Number(numberPreviewCustom);
-    if (!numberPreviewCustom.trim() || !Number.isSafeInteger(page) ||
-        page < 1 || page > output.pageCount) return undefined;
+    const page = decimalPageInteger(numberPreviewCustom);
+    if (page === null || page < 1 || page > output.pageCount) return undefined;
     const handle = setTimeout(() => setNumberPreviewSettled(numberPreviewCustom), 300);
     return () => clearTimeout(handle);
   }, [numberPreviewPage, numberPreviewCustom, output?.pageCount]);
@@ -600,9 +599,9 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   const limitHint = isTextInput ? t.limitText : isCompress
     ? (compressStrategy === 'raster' ? t.limitCompressionRaster : t.limitCompression)
     : isImages ? t.limitImages : t.limitGeneral;
-  const selectedPreviewNumber = Number(numberPreviewCustom);
+  const selectedPreviewNumber = decimalPageInteger(numberPreviewCustom);
   const numberPreviewValid = Boolean(output?.bytes && output.pageCount &&
-    numberPreviewCustom.trim() && Number.isSafeInteger(selectedPreviewNumber) &&
+    selectedPreviewNumber !== null &&
     selectedPreviewNumber >= 1 && selectedPreviewNumber <= output.pageCount);
   const numberPreviewReady = numberPreviewValid && numberPreviewSettled === numberPreviewCustom;
   const numberPreviewActualPage = numberPreviewPage === 'last' ? output?.pageCount

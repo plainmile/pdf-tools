@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline, wrapTextLines,
   textContentToLines, textContentToReadingOrderLines, linesToReadableText, hasMinimalSelectableText, hasSparseTextScanRisk, textLinesFromFormAnnotations, summarizeTextCoverage, textFitsUtf8Budget, sanitizeFilename, workspaceFilenameStem, bookmarkSplitPartFilenames,
-  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageFilename, imageExportFilenames, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError, validateNumberingPlan,
+  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageFilename, imageExportFilenames, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError, validateNumberingPlan, decimalPageInteger,
 } from '../../src/lib/utilityCore.mjs';
 
 
@@ -15,13 +15,19 @@ test('numbering plan preflight matches 1-99999 output bounds before any PDF pars
   assert.equal(validateNumberingPlan('99999', '5', 5), null); // only the last page numbered
   assert.equal(validateNumberingPlan('99999', '4', 5), 'overflow');
   assert.equal(validateNumberingPlan('99999', '1', 2), 'overflow');
-  for (const invalid of ['', '0', '-1', '1.5', '100000', 'abc']) {
+  for (const invalid of ['', '0', '-1', '1.5', '1.0', '2e0', '1e2', '0x10', '+2', '100000', 'abc']) {
     assert.equal(validateNumberingPlan(invalid, '1', 5), 'start', invalid);
   }
-  for (const invalid of ['', '0', '-1', '1.5', '6', '99999', 'abc']) {
+  for (const invalid of ['', '0', '-1', '1.5', '1.0', '2e0', '1e0', '0x1', '6', '99999', 'abc']) {
     assert.equal(validateNumberingPlan('1', invalid, 5), 'first', invalid);
   }
   assert.equal(validateNumberingPlan('1', '1', 0), 'first');
+  assert.equal(validateNumberingPlan('0002', '0001', 5), null);
+  assert.equal(decimalPageInteger('002'), 2);
+  assert.equal(decimalPageInteger('1e2'), null);
+  assert.equal(decimalPageInteger('2.0'), null);
+  assert.equal(decimalPageInteger('0x10'), null);
+
 });
 
 test('bookmark ZIP names are opt-in-safe, unique, Unicode-aware and never filesystem paths', () => {
