@@ -11,6 +11,8 @@ on:
 
 permissions:
   contents: read
+  # The GHCR container may be private; avoid unauthenticated VPS pulls.
+  packages: read
 
 concurrency:
   group: pdf-tools-production
@@ -56,6 +58,20 @@ jobs:
           fi
           printf '%s %s\n' "$host_pattern" "$DEPLOY_HOST_KEY" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
+
+      # A successful push does not prove the VPS can pull a private GHCR package.
+      # Fail before modifying the existing healthy release when read permission is missing.
+      - name: Verify published image is readable using the deployment token
+        env:
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          auth_dir=$(mktemp -d)
+          trap 'rm -rf "$auth_dir"' EXIT
+          printf '%s' "$GHCR_TOKEN" | docker --config "$auth_dir" login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null
+          DOCKER_CONFIG="$auth_dir" docker buildx imagetools inspect "ghcr.io/plainmile/pdf-tools:$IMAGE_TAG" >/dev/null
 
       - name: Copy isolated Compose configuration
         env:
@@ -130,20 +146,32 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
           IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+          # Short-lived Actions token: scoped to this repository, not a stored VPS PAT.
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
         run: |
           set -eu
           case "$IMAGE_TAG" in
             *[!0-9a-f]*|'') echo 'Invalid image SHA' >&2; exit 1 ;;
           esac
           test "${#IMAGE_TAG}" = 40
-          ssh -p "$DEPLOY_PORT" -o BatchMode=yes -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
-            "IMAGE_TAG=$IMAGE_TAG /bin/sh -s" <<'REMOTE'
+          # Send the token as the first SSH stdin line (never in argv, URL or
+          # a persistent file), followed by a fixed, quoted deployment script.
+          {
+            printf '%s\n' "$GHCR_TOKEN"
+            cat <<'REMOTE'
           set -eu
           cd /opt/compose/pdf-tools
           docker compose -f compose.prod.yaml config --quiet
           docker network inspect edge >/dev/null
+          # Store Docker credentials only in a private temporary directory,
+          # remove them even on failure, then keep the existing SHA/health gate.
           umask 077
+          auth_dir=$(mktemp -d)
+          trap 'rm -rf "$auth_dir"' EXIT
+          export DOCKER_CONFIG="$auth_dir"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null
+          unset GHCR_TOKEN
           printf 'IMAGE_TAG=%s\n' "$IMAGE_TAG" > .env
           docker compose -f compose.prod.yaml pull
           docker compose -f compose.prod.yaml up -d
@@ -168,6 +196,9 @@ jobs:
           docker logs --tail 60 plainmile-pdf-tools || true
           exit 1
           REMOTE
+          } | ssh -p "$DEPLOY_PORT" -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
+            "IMAGE_TAG=$IMAGE_TAG GHCR_USER=$GHCR_USER /bin/sh -c 'IFS= read -r GHCR_TOKEN; export GHCR_TOKEN; exec /bin/sh -s'"
 
       - name: Diagnose origin certificate and local proxy (public metadata only)
         env:
