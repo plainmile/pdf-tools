@@ -56,3 +56,26 @@ test('Chinese mobile: tap drop-area hint to import TXT and export a valid PDF', 
   }));
   expect(viewport.content).toBeLessThanOrEqual(viewport.client + 2);
 });
+
+test('PDF-to-image range help starts compact and expands on demand in both locales', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  for (const [path, quick, more, advanced] of [
+    ['/pdf-to-images/', 'Up to 60 images per batch', 'More page-range and ZIP details', 'Repeated or overlapping page numbers'],
+    ['/zh/pdf-to-images/', '每批最多导出 60 张图片', '查看更多页码与 ZIP 说明', '重复或重叠页码'],
+  ]) {
+    await page.goto(path);
+    await expect(page.getByTestId('image-range-quick-hint')).toContainText(quick);
+    const details = page.getByTestId('image-range-more');
+    await expect(details).not.toHaveAttribute('open');
+    await expect(details.locator('summary')).toContainText(more);
+    await details.locator('summary').click();
+    await expect(details).toHaveAttribute('open', '');
+    await expect(details.locator('.utility-helper')).toBeVisible();
+    await expect(details.locator('.utility-helper')).toContainText(advanced);
+    const widths = await page.evaluate(() => ({
+      content: document.documentElement.scrollWidth,
+      client: document.documentElement.clientWidth,
+    }));
+    expect(widths.content).toBeLessThanOrEqual(widths.client + 2);
+  }
+});
