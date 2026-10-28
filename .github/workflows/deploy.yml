@@ -222,14 +222,14 @@ jobs:
           done
           curl -fsS -o /dev/null https://pdf.plainmile.com/pdfjs/pdf.worker.min.mjs
 
-      # Reuse the SAME GitHub-hosted Runner after a successful netcup deployment,
-      # so a separate public E2E workflow does not consume another Runner job.
-      - name: Public browser E2E and SEO against deployed site
-        # Public HTTPS can have transient worker or navigation failures. Retry
-        # individual failed tests once in a fresh browser context, but retain
-        # the exact same full document/SEO regression suite and fail closed if
-        # the retry also fails. A normal full suite takes close to ten minutes.
-        timeout-minutes: 15
+      # Full Chromium/Firefox/WebKit regression is mandatory in PR/main CI.
+      # The PUBLIC release gate checks genuine documents and all indexable SEO
+      # pages only. Repeating >300 fault-injection tests over Cloudflare caused
+      # a 15-minute timeout and rolled back an otherwise healthy deployment.
+      - name: Public browser release smoke and SEO against deployed site
+        # Fail closed on repeatable public regressions; a single transient
+        # network hiccup may retry without compromising release verification.
+        timeout-minutes: 10
         run: |
           set -euo pipefail
           mkdir -p /tmp/plainmile-public-e2e
@@ -243,13 +243,14 @@ jobs:
               set -eu
               mkdir -p /tmp/live-tests/tests/e2e
               cp /work/tests/e2e/*.spec.mjs /tmp/live-tests/tests/e2e/
-              cp /work/playwright.config.mjs /tmp/live-tests/
+              cp /work/playwright.deploy.config.mjs /tmp/live-tests/
               cd /tmp/live-tests
               npm init -y >/dev/null
               npm install --no-audit --no-fund @playwright/test@1.55.0 pdf-lib@1.17.1 jszip@3.10.1
-              # One retry is PUBLIC-only: PR/main Docker CI still runs with zero
-              # retries. A repeatable product failure must still roll back.
-              npx playwright test --reporter=list --retries=1 || {
+              # Includes public.spec.mjs (36-route SEO audit and live PDF
+              # export) plus representative real PDF/ZIP/image/text workflows.
+              # Do NOT run the full fault-injection suite against public HTTPS.
+              npx playwright test --config=playwright.deploy.config.mjs --reporter=list --retries=1 || {
                 cp -r test-results /artifacts/ || true
                 exit 1
               }
