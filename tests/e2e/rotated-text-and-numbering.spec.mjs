@@ -41,8 +41,15 @@ test('PDF /Rotate 90 and 180 export visible row order instead of unrotated PDF Y
   const text = (await download(page, () => page.getByTestId('utility-run').click())).toString('utf8');
   expect(text).toContain('TOP_LEFT_90 TOP_RIGHT_90\nBOTTOM_LEFT_90 BOTTOM_RIGHT_90');
   expect(text).toContain('TOP_LEFT_180 TOP_RIGHT_180\nBOTTOM_LEFT_180 BOTTOM_RIGHT_180');
+  // The ordinary row-order path needs no extra options. For rotated
+  // two-column PDFs, explicitly expand the optional reading-order controls.
+  const orderOptions = page.getByTestId('text-reading-order-more');
+  await expect(orderOptions).not.toHaveAttribute('open');
+  await orderOptions.locator('summary').click();
+  const orderPicker = page.getByTestId('text-reading-order');
+  await expect(orderPicker).toBeVisible();
   // Column-first uses the same displayed viewport rather than PDF user X.
-  await page.getByTestId('text-reading-order').selectOption('left-first');
+  await orderPicker.selectOption('left-first');
   const columnText = (await download(page, () => page.getByTestId('utility-run').click())).toString('utf8');
   expect(columnText).toContain('TOP_LEFT_90\nBOTTOM_LEFT_90\nTOP_RIGHT_90\nBOTTOM_RIGHT_90');
 });
