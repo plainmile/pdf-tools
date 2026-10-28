@@ -18,7 +18,7 @@ const COPY = {
     noSavingEarly: 'Stopped early: JPEG data already exceeds the original size. Keep the original or lower the resolution.',
     compressionLowerBound: 'At least', previewAction: 'Generate PDF preview', previewTitle: 'Generated PDF preview', previewFirst: 'Previewing page 1 of {pages}', previewFailed: 'Preview unavailable; you can still download the PDF.', previewRetry: 'Retry preview', downloadPdf: 'Download PDF',
     textWarning: 'Extracts existing selectable PDF text and common filled text/dropdown form fields, not OCR. Columns, tables and complex forms may need review.',
-    textOrderLabel: 'Text reading order', textOrderRows: 'By rows (single-column documents and tables)', textOrderLeft: 'Two columns: left first', textOrderRight: 'Two columns: right first', textOrderHint: 'For newspapers and side-by-side articles. Full-width headings, tables and complex layouts can still need manual review.', textOrderStale: 'This download uses your previous reading order. Convert again to apply the new selection.',
+    textOrderMore: 'Reading order (optional)', textOrderLabel: 'Text reading order', textOrderRows: 'By rows (single-column documents and tables)', textOrderLeft: 'Two columns: left first', textOrderRight: 'Two columns: right first', textOrderHint: 'For newspapers and side-by-side articles. Full-width headings, tables and complex layouts can still need manual review.', textOrderStale: 'This download uses your previous reading order. Convert again to apply the new selection.',
     missingTextPages: 'Important: {missing} of {total} pages have no selectable text (pages {pages}). Those pages may be blank or scanned images. Their content was not extracted; OCR would be required for scanned text. Check your original PDF.',
     partialTextReady: 'Some PDF pages were not extracted. Review the warning before choosing to download this incomplete text file.', imageOnlyTextWarning: 'Review before downloading: {count} of {total} pages have images but very little selectable text (pages {pages}). Scanned text may be inside those images and was NOT extracted. These may also be ordinary illustrated pages. Compare with your original; this tool does not run OCR.', imageOnlyTextReady: 'Possible missing text inside images. Automatic download was paused; review the warning and download explicitly if the result is suitable.', formFieldWarning: 'This PDF contains interactive form fields. Visible filled text and dropdown values are included when exposed by PDF.js, but checkbox/radio states, signatures and unsupported or hidden form fields may be missing. Verify the original PDF before downloading.', formFieldReady: 'Interactive PDF form detected. Review extracted field values and any missing controls before downloading.',
     markdownWarning: 'Markdown conversion is approximate; headings are inferred from font size. Complex PDF layout cannot be faithfully recovered.',
@@ -45,7 +45,7 @@ const COPY = {
     noSavingEarly: '已提前停止：JPEG 数据已不小于原文件，继续转换也不能节省空间。请保留原文件或降低清晰度。',
     compressionLowerBound: '至少', previewAction: '生成 PDF 预览', previewTitle: '生成的 PDF 预览', previewFirst: '第 1 页预览（共 {pages} 页）', previewFailed: '无法生成预览，但仍可下载 PDF。', previewRetry: '重新尝试预览', downloadPdf: '下载 PDF',
     textWarning: '提取 PDF 中已有的可选择文字，以及常见的已填写文本框和下拉框内容，不具备 OCR。多栏、表格及复杂表单仍需核对。',
-    textOrderLabel: '文字阅读顺序', textOrderRows: '按行读取（单栏文档、表格）', textOrderLeft: '双栏：先左栏后右栏', textOrderRight: '双栏：先右栏后左栏', textOrderHint: '适用于报纸、双栏论文等。跨栏标题、表格和复杂版式仍需人工核对。', textOrderStale: '当前结果使用之前的阅读顺序。请重新转换以应用新设置。',
+    textOrderMore: '阅读顺序（可选）', textOrderLabel: '文字阅读顺序', textOrderRows: '按行读取（单栏文档、表格）', textOrderLeft: '双栏：先左栏后右栏', textOrderRight: '双栏：先右栏后左栏', textOrderHint: '适用于报纸、双栏论文等。跨栏标题、表格和复杂版式仍需人工核对。', textOrderStale: '当前结果使用之前的阅读顺序。请重新转换以应用新设置。',
     missingTextPages: '重要提示：共 {total} 页中有 {missing} 页未检测到可选择文字（第 {pages} 页）。这些页可能是空白页或扫描图片，其内容未被提取；扫描文字需要 OCR。请对照原始 PDF 核查。',
     partialTextReady: '有些 PDF 页面未能提取文字。请先查看缺页提示，再决定是否下载这份不完整的文字文件。', imageOnlyTextWarning: '下载前请核查：共 {total} 页中有 {count} 页包含图片，但只能提取到极少文字（第 {pages} 页）。扫描正文可能仍在图片里，未被提取；也可能是正常的图片页面。请对照原 PDF，本工具不提供 OCR。', imageOnlyTextReady: '部分页面的图片中可能藏有未提取的文字。已暂停自动下载，请核对后主动下载。', formFieldWarning: '检测到可交互 PDF 表单。已尝试提取可见的已填写文本框及下拉框内容，但复选框、单选框、签名、隐藏或特殊字段仍可能遗漏。请对照原文件核查后再下载。', formFieldReady: '检测到交互表单，请核对已提取字段及可能遗漏的选项后主动下载。',
     markdownWarning: 'Markdown 为近似转换：根据字号推测标题，复杂 PDF 的版式无法完整还原。',
@@ -727,16 +727,19 @@ export default function PdfUtility({ mode, locale = 'en' }) {
               data-testid="utility-batch-resume" onClick={resumeImageBatches} disabled={inputLocked}>{t.batchResume}</button>
           </div>}
         </div>}
-        {isTextOutput && <div className="utility-options">
-          <label><span>{t.textOrderLabel}</span><select data-testid="text-reading-order"
-            aria-label={t.textOrderLabel} value={readingOrder} disabled={inputLocked}
-            onChange={event => { setReadingOrder(event.target.value); setNotice(''); setError(''); }}>
-            <option value="rows">{t.textOrderRows}</option>
-            <option value="left-first">{t.textOrderLeft}</option>
-            <option value="right-first">{t.textOrderRight}</option>
-          </select></label>
-        </div>}
-        {isTextOutput && <p className="utility-note" data-testid="text-reading-order-hint">{t.textOrderHint}</p>}
+        {isTextOutput && <details className="utility-text-order-more" data-testid="text-reading-order-more">
+          <summary>{t.textOrderMore}</summary>
+          <div className="utility-options">
+            <label><span>{t.textOrderLabel}</span><select data-testid="text-reading-order"
+              aria-label={t.textOrderLabel} value={readingOrder} disabled={inputLocked}
+              onChange={event => { setReadingOrder(event.target.value); setNotice(''); setError(''); }}>
+              <option value="rows">{t.textOrderRows}</option>
+              <option value="left-first">{t.textOrderLeft}</option>
+              <option value="right-first">{t.textOrderRight}</option>
+            </select></label>
+          </div>
+          <p className="utility-note" data-testid="text-reading-order-hint">{t.textOrderHint}</p>
+        </details>}
         {isCompress && <div className="utility-options">
           <label><span>{t.compressionMethod}</span><select data-testid="compression-strategy"
             aria-label={t.compressionMethod} value={compressStrategy} disabled={inputLocked}

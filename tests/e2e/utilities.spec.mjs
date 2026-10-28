@@ -64,9 +64,16 @@ test('two-column PDF text extraction has explicit row, left and right orders and
   await page.goto('/pdf-to-txt/');
   await upload(page, bytes);
   const picker = page.getByTestId('text-reading-order');
+  const more = page.getByTestId('text-reading-order-more');
+  await expect(more).not.toHaveAttribute('open');
+  await expect(more.locator('summary')).toHaveText('Reading order (optional)');
+  await expect(picker).not.toBeVisible();
   await expect(picker).toHaveValue('rows');
+  // Ordinary PDFs convert without visiting advanced options.
   const rows = (await getDownload(page, () => page.getByTestId('utility-run').click(), 20000)).bytes.toString('utf8');
   expect(rows.indexOf('RIGHT1')).toBeLessThan(rows.indexOf('LEFT2'));
+  await more.locator('summary').click();
+  await expect(picker).toBeVisible();
   await picker.selectOption('left-first');
   await expect(page.getByTestId('text-reading-order-stale')).toBeVisible();
   const leftFirst = (await getDownload(page, () => page.getByTestId('utility-run').click(), 20000)).bytes.toString('utf8');
@@ -79,6 +86,11 @@ test('two-column PDF text extraction has explicit row, left and right orders and
   await page.setViewportSize({width:375,height:812});
   await upload(page,bytes);
   const zhPicker=page.getByTestId('text-reading-order');
+  const zhMore=page.getByTestId('text-reading-order-more');
+  await expect(zhMore).not.toHaveAttribute('open');
+  await expect(zhMore.locator('summary')).toHaveText('阅读顺序（可选）');
+  await zhMore.locator('summary').click();
+  await expect(zhPicker).toBeVisible();
   await expect(zhPicker.locator('option')).toHaveCount(3);
   await zhPicker.selectOption('left-first');
   const markdown = (await getDownload(page, () => page.getByTestId('utility-run').click(), 20000)).bytes.toString('utf8');
