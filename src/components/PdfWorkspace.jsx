@@ -230,7 +230,15 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   }, [pages, sources]);
   const fileBase = activeNames.length === 1 ? sanitizeFilename(activeNames[0]) :
     activeNames.length ? `plainmile-${activeNames.length}-files` : 'plainmile-pages';
-  const defaultFilename = `${fileBase}-${mode === 'image-to-pdf' ? 'images' : 'organized'}.pdf`;
+  // A task-specific suggested name tells users what they just downloaded.
+  // The editable filename override and PDF bytes remain unchanged.
+  const filenameSuffix = ({
+    'image-to-pdf': 'images',
+    'merge-pdf': 'merged',
+    'rotate-pdf': 'rotated',
+    'delete-pages': 'edited',
+  })[mode] || (mode === 'watermark-pdf' && watermarkPreview ? 'watermarked' : 'organized');
+  const defaultFilename = `${fileBase}-${filenameSuffix}.pdf`;
   // An optional name must never change the PDF bytes, page order, or privacy.
   const userDownloadStem = workspaceFilenameStem(downloadNameInput);
   const filename = userDownloadStem ? `${userDownloadStem}.pdf` : defaultFilename;
@@ -1664,7 +1672,15 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
               </section>
             ) : (
               <section className="split-panel" aria-label={t.splitTitle} role="tabpanel" id="workspace-panel-split" aria-labelledby="workspace-tab-split">
-                <div className="split-intro"><div className="split-graphic" aria-hidden="true">1–3 <span>→</span> 4–6</div><h3>{t.splitTitle}</h3><p>{t.splitHint}</p></div>
+                <div className="split-intro">
+                  <div className="split-graphic" aria-hidden="true">1–3 <span>→</span> 4–6</div>
+                  <h3>{t.splitTitle}</h3>
+                  <p data-testid="split-intro-quick">{t.splitSummary}</p>
+                  <details className="split-intro-more" data-testid="split-intro-more">
+                    <summary>{t.splitMore}</summary>
+                    <p>{t.splitHint}</p>
+                  </details>
+                </div>
                 <div className="split-fields">
                   <label className="option-radio"><input type="radio" name="split-method" checked={splitMode === 'ranges'} disabled={busy} onChange={() => { setSplitMode('ranges'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); }} />{t.byRanges}</label>
                   <label className="input-label" htmlFor="ranges-input">{t.pageRanges}</label>
