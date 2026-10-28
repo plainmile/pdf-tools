@@ -94,7 +94,7 @@ jobs:
               mkdir -p /tmp/pdf-e2e/tests/e2e /tmp/pdf-e2e/tests/cross-browser
               cp /work/tests/e2e/*.spec.mjs /tmp/pdf-e2e/tests/e2e/
               cp /work/tests/cross-browser/*.spec.mjs /tmp/pdf-e2e/tests/cross-browser/
-              cp /work/playwright.config.mjs /work/playwright.cross-browser.config.mjs /tmp/pdf-e2e/
+              cp /work/playwright.config.mjs /work/playwright.cross-browser.config.mjs /work/playwright.deploy.config.mjs /tmp/pdf-e2e/
               cd /tmp/pdf-e2e
               npm init -y >/dev/null
               npm install --no-audit --no-fund @playwright/test@1.55.0 pdf-lib@1.17.1 jszip@3.10.1
@@ -104,6 +104,10 @@ jobs:
               PDF_BASE_URL=http://127.0.0.1:18081 npx playwright test --config=playwright.cross-browser.config.mjs
               echo "=== Full Chromium E2E ==="
               PDF_BASE_URL=http://127.0.0.1:18081 npx playwright test
+              # Validate the exact bounded public-deploy selection in CI too,
+              # without using the public site or treating a flaky release as QA.
+              echo "=== Bounded deploy gate regressions ==="
+              PDF_BASE_URL=http://127.0.0.1:18081 npx playwright test --config=playwright.deploy.config.mjs --retries=0
             '
       - name: Cleanup
         if: always()
