@@ -159,7 +159,10 @@ main { flex: 1; }
 .sample-guide-links a:hover { color: var(--accent-hover); }
 .demo-load-action { min-height: 40px; }
 @media (max-width: 440px) { .sample-guide { padding: 13px; } .sample-guide-links { width: 100%; flex-direction: column; gap: 2px; } }
+/* Keep the editing surface immediately below the page heading; the optional
+   public example stays accessible after the tool without a giant blank gap. */
 .workspace-outer { padding-bottom: 65px; }
+.workspace-outer.workspace-with-demo { padding-bottom: 18px; }
 .tool-js-required { margin: 0; padding: 16px 18px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); font-size: 14px; line-height: 1.65; }
 .tool-explanation { display: grid; grid-template-columns: 1fr .72fr; gap: 50px; padding: 45px 0 65px; border-top: 1px solid var(--border); }
 .explanation-intro h2 { font-size: 29px; margin: 12px 0; }
