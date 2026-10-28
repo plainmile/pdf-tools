@@ -155,6 +155,22 @@ test('six bilingual PDF routes explain the real trailing-dash range semantics wi
   }
 });
 
+test('bilingual page-number SEO truthfully describes strict decimal input before JS', async ({ request }) => {
+  for (const [path, claim] of [
+    ['/add-page-numbers/', 'Scientific notation (2e0), fractions and hexadecimal strings are rejected'],
+    ['/zh/add-page-numbers/', '2e0、2.0 等写法会在生成 PDF 前被拒绝'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    expect(html, path).toContain(claim);
+    expect(html).toContain('rel="canonical"');
+    expect(html).toContain('hreflang="en"');
+    expect(html).toContain('hreflang="zh-CN"');
+    expect(html).not.toContain('"@type":"FAQPage"');
+  }
+});
+
 test('both numbering pages explain real output bounds in prerendered SEO content', async ({ request }) => {
   for (const [path, wording] of [
     ['/add-page-numbers/', 'final printed page number would exceed 99999'],
