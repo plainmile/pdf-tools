@@ -321,6 +321,22 @@ test('Markdown parser preserves generics, placeholders and comparisons without s
   assert.equal(blocks[2].text, 'Check: a<b && c>d');
 });
 
+test('Markdown inline-code markers remain bounded with saturated private-use Unicode', () => {
+  const privateUse = Array.from({ length: 0x1900 }, (_, index) =>
+    String.fromCharCode(0xe000 + index)).join('');
+  const large = 'A'.repeat(160_000) + privateUse + ' Use `<script>` literally.';
+  assert.equal(stripMarkdownInline(large), large.replace('`<script>`', '<script>'));
+
+  // All individual UTF-16 code units are present; a missing adjacent pair
+  // must be chosen without looping forever or losing a later inline example.
+  let allCodeUnits = '';
+  for (let code = 0; code < 65536; code += 128) {
+    allCodeUnits += String.fromCharCode(...Array.from({ length: 128 }, (_, offset) => code + offset)) + '\n';
+  }
+  const output = stripMarkdownInline(allCodeUnits + '\nExample: `<strong>`.');
+  assert.ok(output.endsWith('\nExample: <strong>.'));
+});
+
 test('inline Markdown code preserves literal HTML tags, URL text and arithmetic', () => {
   const input = 'Use `<strong>` and `<script>alert(1)</script>` literally; `[docs](https://example.com)` is code. Outside <strong>bold</strong>.';
   assert.equal(stripMarkdownInline(input),

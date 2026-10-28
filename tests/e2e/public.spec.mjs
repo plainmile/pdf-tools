@@ -23,6 +23,22 @@ test('split every N documents strict decimal input before JavaScript in both loc
   }
 });
 
+test('Markdown code-example limitations are crawlable bilingual help, not unsupported SEO schema', async ({ request }) => {
+  for (const [path, phrase] of [
+    ['/markdown-to-pdf/', 'Can I keep HTML-like snippets and links in code examples?'],
+    ['/zh/markdown-to-pdf/', '如何保留代码示例中的 HTML 标签和链接？'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    expect(html, path).toContain(phrase);
+    expect(html, path).toContain('rel="canonical"');
+    expect(html, path).toContain('hreflang="en"');
+    expect(html, path).toContain('hreflang="zh-CN"');
+    expect(html, path).not.toContain('"@type":"FAQPage"');
+  }
+});
+
 test('real task descriptions are the prerendered bilingual headings, not vague marketing copy', async ({ request }) => {
   for (const [path, heading] of [
     ['/', 'Merge, split and organize PDF pages'],

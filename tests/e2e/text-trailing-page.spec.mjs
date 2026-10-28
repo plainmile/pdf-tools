@@ -33,3 +33,27 @@ for (const mode of ['txt-to-pdf', 'markdown-to-pdf']) {
     expect(extracted).toContain('Last entry');
   });
 }
+
+
+test('Markdown technical inline code survives actual PDF export and text extraction', async ({ page }) => {
+  await page.goto('/markdown-to-pdf/');
+  await page.getByTestId('utility-text').fill('Use `<strong>` literally. See [guide](https://example.org/docs).');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible({ timeout: 20000 });
+  const pdfEvent = page.waitForEvent('download');
+  await page.getByTestId('utility-pdf-download').click();
+  const pdfBytes = await readFile(await (await pdfEvent).path());
+  const pdf = await PDFDocument.load(pdfBytes);
+  expect(pdf.getPageCount()).toBe(1);
+
+  await page.goto('/pdf-to-txt/');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: 'technical-code.pdf', mimeType: 'application/pdf', buffer: pdfBytes,
+  });
+  await expect(page.getByTestId('utility-file-summary')).toBeVisible();
+  const textEvent = page.waitForEvent('download');
+  await page.getByTestId('utility-run').click();
+  const extracted = (await readFile(await (await textEvent).path())).toString('utf8');
+  expect(extracted).toContain('Use <strong> literally.');
+  expect(extracted).toContain('guide (https://example.org/docs)');
+});
