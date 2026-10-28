@@ -739,7 +739,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
             </select></label>
           </div>
           <p className="utility-note" data-testid="text-reading-order-hint">{t.textOrderHint}</p>
-        </details>
+        </details>}
         {isCompress && <div className="utility-options">
           <label><span>{t.compressionMethod}</span><select data-testid="compression-strategy"
             aria-label={t.compressionMethod} value={compressStrategy} disabled={inputLocked}
