@@ -7,11 +7,13 @@ import { tools, getTool } from '../lib/tools.mjs';
 import { toolHelpFor } from '../lib/toolHelp.mjs';
 import { relatedToolSlugs } from '../lib/toolGroups.mjs';
 import { toolJsonLd } from '../lib/seo.mjs';
+import { demoForTool } from '../lib/demoScenarios.mjs';
 import { siteCopy, langPath } from '../lib/i18n.mjs';
 const { source, locale = 'en' } = Astro.props;
 const tool = getTool(source, locale);
 const page = siteCopy[locale].toolsPage;
 const help = toolHelpFor(tool.slug, locale);
+const demo = demoForTool(tool.slug, locale);
 const toolsBySlug = Object.fromEntries(tools.map(item => [item.slug, item]));
 const relatedTools = relatedToolSlugs(tool.slug);
 const href = (path) => langPath(path, locale);
@@ -33,6 +35,16 @@ const href = (path) => langPath(path, locale);
         : ' to create smaller parts, then compress each one (file-size limits still apply). For PDFs over 600 pages, use another local PDF application to divide the source first: our Split PDF tool also has a 600-page limit. Files are not transferred automatically between tools.'}
     </p>}
   </section>
+  {demo && <section class="site-container sample-guide" data-testid="demo-guidance" aria-label={demo.title}>
+    <div class="sample-guide-copy">
+      <h2>{demo.title}</h2>
+      <p data-testid="demo-expected">{demo.expected}</p>
+      <p class="sample-guide-privacy">{demo.privacy}</p>
+    </div>
+    <div class="sample-guide-links">
+      {demo.files.map(file => <a href={file.path} download={file.name}>{locale === 'zh' ? file.zh : file.en}</a>)}
+    </div>
+  </section>}
   <section class="site-container workspace-outer">
     {utilitySlugs.includes(tool.slug)
       ? <PdfUtility client:only="react" locale={locale} mode={tool.slug} />
