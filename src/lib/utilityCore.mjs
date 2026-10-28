@@ -578,19 +578,55 @@ function stripKnownMarkdownHtml(source) {
   return parts.join('');
 }
 
+/** Reserve a marker for protected Markdown inline code without repeatedly
+ * scanning the full input for each private-use character. The previous
+ * includes() loop was quadratic and could wrap at the end of UTF-16.
+ * The 5 MiB text limit guarantees an unused one- or two-code-unit marker.
+ */
+function unusedInlineCodeMarker(source) {
+  if (!source.includes('\uE000')) return '\uE000';
+  const used = new Uint8Array(65536);
+  for (let index = 0; index < source.length; index++) used[source.charCodeAt(index)] = 1;
+  for (let code = 0xe000; code <= 0xf8ff; code++) {
+    if (!used[code]) return String.fromCharCode(code);
+  }
+  for (let code = 0; code < 65536; code++) {
+    if (!used[code]) return String.fromCharCode(code);
+  }
+  const prefixCounts = new Uint32Array(65536);
+  for (let index = 0; index < source.length - 1; index++) prefixCounts[source.charCodeAt(index)]++;
+  let prefix = 0;
+  while (prefix < 65536 && prefixCounts[prefix] >= 65536) prefix++;
+  if (prefix === 65536) throw new Error('Markdown text exceeds the safe inline-code marker limit.');
+  const followers = new Uint8Array(65536);
+  for (let index = 0; index < source.length - 1; index++) {
+    if (source.charCodeAt(index) === prefix) followers[source.charCodeAt(index + 1)] = 1;
+  }
+  let suffix = 0;
+  while (suffix < 65536 && followers[suffix]) suffix++;
+  if (suffix === 65536) throw new Error('Markdown inline-code marker unavailable.');
+  return String.fromCharCode(prefix, suffix);
+}
+
 // Intentionally a minimal CommonMark subset: never execute HTML, remote images or scripts.
 export function stripMarkdownInline(source) {
-  // Shield single-backtick inline code before stripping links, HTML or emphasis.
-  // Those tokens are literal text (e.g. `<strong>`, not an HTML element).
+  // No inline-code pair: keep Markdown/HTML parsing, but skip marker allocation.
+  if (!/`[^`\n]+`/.test(source)) {
+    return stripPairedMarkdownMarkers(stripKnownMarkdownHtml(readableMarkdownReferences(source)));
+  }
+  // Shield inline code before stripping links, HTML or emphasis. Technical
+  // expressions such as `<strong>` should be literal, never HTML elements.
   const inlineCode = [];
-  let marker = '\uE000';
-  while (source.includes(marker)) marker = String.fromCharCode(marker.charCodeAt(0) + 1);
-  const outsideCode = source.replace(/`([^`\n]+)`/g, (_token, literal) => {
-    return `${marker}${inlineCode.push(literal) - 1}${marker}`;
+  const marker = unusedInlineCodeMarker(source);
+  const outsideCode = source.replace(/`([^`\n]+)`/g, (_token, code) => {
+    return `${marker}${inlineCode.push(code) - 1}${marker}`;
   });
   const plain = stripKnownMarkdownHtml(readableMarkdownReferences(outsideCode));
+  // An unused marker can contain regexp punctuation in pathological Unicode
+  // input, so escape it before restoring protected snippets.
+  const escapedMarker = marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return stripPairedMarkdownMarkers(plain)
-    .replace(new RegExp(`${marker}(\\d+)${marker}`, 'g'),
+    .replace(new RegExp(`${escapedMarker}(\\d+)${escapedMarker}`, 'g'),
       (_token, index) => inlineCode[Number(index)]);
 }
 export function textContentToLines(content) {
