@@ -176,6 +176,14 @@ test('failed Cloudflare gate logs path, 525/522 status and Ray ID before safe ro
   const probe = yaml.slice(diagnostic, rollback);
   assert.ok(publicGate.includes('id: public_gate'));
   assert.ok(publicGate.includes('curl --fail --silent --show-error --max-time 15'));
+  // 525 is not in curl's default --retry HTTP list: only two idempotent
+  // GET checkpoints (page HTML and PDF Worker) may use bounded all-error
+  // retries. Persistent 4xx/5xx still fail and roll the candidate back.
+  assert.equal((publicGate.match(/--retry 2 --retry-all-errors --retry-delay 2 --retry-max-time 40/g) || []).length, 2);
+  assert.equal((publicGate.match(/--connect-timeout 5 --max-time 10/g) || []).length, 2);
+  assert.ok(publicGate.includes('public_route_failed=$route cf_ray='));
+  assert.ok(publicGate.includes('public_route_failed=/pdfjs/pdf.worker.min.mjs cf_ray='));
+  assert.ok(!publicGate.includes('-X POST'));
   assert.ok(publicGate.includes('-D /tmp/pdf-public-headers'));
   assert.ok(publicGate.includes('public_route_failed=$route cf_ray='));
   assert.ok(publicGate.includes('public_route_failed=/pdfjs/pdf.worker.min.mjs cf_ray='));
