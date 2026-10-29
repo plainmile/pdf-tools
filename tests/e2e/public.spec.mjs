@@ -41,8 +41,8 @@ test('Markdown code-example limitations are crawlable bilingual help, not unsupp
 
 test('real task descriptions are the prerendered bilingual headings, not vague marketing copy', async ({ request }) => {
   for (const [path, heading] of [
-    ['/', 'Merge, split and organize PDF pages'],
-    ['/zh/', '合并、拆分与整理 PDF 页面'],
+    ['/', 'Merge, split, convert and organize PDFs'],
+    ['/zh/', '合并、拆分、转换与整理 PDF'],
     ['/workspace/', 'Reorder, rotate and organize PDF pages.'],
     ['/zh/workspace/', '拖动排序、旋转和整理 PDF 页面。'],
     ['/rotate-pdf/', 'Rotate PDF pages in 90° steps.'],

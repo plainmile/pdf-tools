@@ -30,8 +30,8 @@ const desc = zh
       <h1>{p.title}</h1>
       <p class="hero-lead">{p.lead}</p>
       <div class="hero-actions">
-        <a class="button button-primary" href={href('/workspace/')}>{p.start} <span aria-hidden="true">→</span></a>
-        <a class="button button-secondary" href="#all-tools">{p.explore}</a>
+        <a class="button button-primary" href="#all-tools">{p.explore} <span aria-hidden="true">→</span></a>
+        <a class="button button-secondary" href={href('/workspace/')}>{p.start}</a>
       </div>
       <ul class="home-assurances"><li>{p.local}</li><li>{p.noaccount}</li><li>{p.ordered}</li></ul>
     </div>
@@ -129,8 +129,11 @@ const desc = zh
           // Everyday questions need no special query syntax: "How do I
           // split a PDF?" should lead to the existing Split PDF tool.
           .replace(/^(?:how\s+(?:do|can)\s+i|could\s+you|can\s+you)\s+/, '')
+          // Everyday "Can I..." or "I want to..." searches should resolve
+          // to an existing task without inventing unsupported conversions.
+          .replace(/^(?:can\s+i|i\s+(?:want|need)\s+to|i(?:'d|\s+would)\s+like\s+to)\s+/, '')
           .replace(/^(?:convert|change|turn)\s+/, '')
-          .replace(/^(?:(?:如何|怎么|怎样)(?:把|将)?|(?:请)?(?:把|将))\s*/, '')
+          .replace(/^(?:(?:如何|怎么|怎样)(?:把|将)?|(?:请)?(?:把|将)|(?:我想|我需要|帮我)(?:把|将)?)\s*/, '')
           .replace(/\bpdfs\b/g, 'pdf')
           .replace(/\b(?:into)\b/g, 'to')
           .replace(/(?:\s+(?:online|for\s+free|free))+$/, '')
