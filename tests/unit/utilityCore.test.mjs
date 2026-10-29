@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline, wrapTextLines,
   textContentToLines, textContentToReadingOrderLines, linesToReadableText, hasMinimalSelectableText, hasSparseTextScanRisk, textLinesFromFormAnnotations, summarizeTextCoverage, textFitsUtf8Budget, sanitizeFilename, workspaceFilenameStem, bookmarkSplitPartFilenames,
-  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageFilename, imageExportFilenames, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError, validateNumberingPlan, numberingSettingsChanged, decimalPageInteger,
+  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageSelectionChanged, imageSettingsChanged, imagePageFilename, imageExportFilenames, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError, validateNumberingPlan, numberingSettingsChanged, decimalPageInteger,
 } from '../../src/lib/utilityCore.mjs';
 
 
@@ -110,6 +110,29 @@ test('compression reports actual savings; a larger result must not count as savi
   assert.throws(() => compressionStats(0, 100));
   assert.equal(formatBytes(1048576), '1.00 MB');
 });
+test('image export freshness uses ordered pages after strict localized range parsing', () => {
+  const saved = { format: 'png', scale: '1.5', pages: '２－３' };
+  for (const equivalent of ['2-3', '2, 3', '02-03', '２－３，３', ' 2-3 ']) {
+    assert.equal(imageSettingsChanged(saved, { ...saved, pages: equivalent }, 5), false, equivalent);
+  }
+  for (const change of [
+    { pages: '3,2' }, { pages: '2-4' }, { pages: '3-2' },
+    { pages: '9' }, { pages: 'two-three' }, { format: 'jpg' },
+    { scale: '2' },
+  ]) {
+    assert.equal(imageSettingsChanged(saved, { ...saved, ...change }, 5), true, JSON.stringify(change));
+  }
+  assert.equal(imageSettingsChanged(null, saved, 5), true);
+  assert.equal(imageSettingsChanged(saved, saved, 0), true);
+  assert.equal(imageSettingsChanged({ ...saved, pages: '' }, { ...saved, pages: '1-3' }, 3), false);
+  assert.equal(imageSettingsChanged(saved, { ...saved, pages: '' }, 65), true);
+  assert.equal(imagePageSelectionChanged('121-125', '１２１－１２５', 125), false);
+  assert.equal(imagePageSelectionChanged('121-125', '121,122,123,124,125', 125), false);
+  assert.equal(imagePageSelectionChanged('121-125', '122-125', 125), true);
+  assert.equal(imagePageSelectionChanged('121-125', 'invalid', 125), true);
+  assert.equal(imageSettingsChanged({ ...saved, pages: '1-60' }, { ...saved, pages: '1-61' }, 65), true);
+});
+
 test('image page selection handles ranges and no duplicate pages', () => {
   assert.deepEqual(requestedPages('', 4), [1, 2, 3, 4]);
   assert.deepEqual(requestedPages('2-3,1,2', 4), [2, 3, 1]);

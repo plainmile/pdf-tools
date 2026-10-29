@@ -229,6 +229,35 @@ export function requestedPages(input, count) {
   }
   return output;
 }
+/** Compare the *effective ordered* output selection, not range spelling.
+ * A Chinese fullwidth page range or a duplicate mention must not force a new
+ * image conversion or disable standard 60-page batch navigation. Ordering
+ * remains meaningful for the real output and ZIP entry names.
+ */
+export function imagePageSelectionChanged(previousPages, currentPages, pageCount) {
+  if (!Number.isSafeInteger(pageCount) || pageCount < 1 ||
+      pageCount > UTILITY_LIMITS.maxPages) return true;
+  try {
+    const before = requestedPages(previousPages, pageCount);
+    const after = requestedPages(currentPages, pageCount);
+    return !before.length || before.length > UTILITY_LIMITS.maxImagePagesPerRun ||
+      !after.length || after.length > UTILITY_LIMITS.maxImagePagesPerRun ||
+      before.length !== after.length || before.some((page, i) => page !== after[i]);
+  } catch {
+    // The user's invalid current input cannot describe a previous valid export.
+    return true;
+  }
+}
+
+/** Keep the previous JPG/PNG/ZIP available, marking it stale only when an
+ * actual page order, file format or render-resolution change affects output.
+ */
+export function imageSettingsChanged(previous, current, pageCount) {
+  if (!previous || !current ||
+      previous.format !== current.format || previous.scale !== current.scale) return true;
+  return imagePageSelectionChanged(previous.pages, current.pages, pageCount);
+}
+
 /** Stable natural/lexicographic page filenames for extracted images.
  * All filenames in one PDF use the SAME width, including page 1 when a
  * 1,000-page source crosses the three-digit boundary.
