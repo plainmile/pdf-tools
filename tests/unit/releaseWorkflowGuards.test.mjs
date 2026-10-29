@@ -140,6 +140,30 @@ test('production probes exact published SHA instead of copy that SEO updates can
   assert.doesNotMatch(publicProbe, /Your documents|Work with PDF pages|自由整理每一页|<h1>/);
 });
 
+test('deployment diagnostics distinguish external origin from Cloudflare without disabling public TLS checks', () => {
+  const yaml = readWorkflow('deploy.yml');
+  const local = yaml.indexOf('- name: Diagnose origin certificate and local proxy (public metadata only)');
+  const direct = yaml.indexOf('- name: Diagnose external origin TLS and release SHA (non-gating)');
+  const publicCheck = yaml.indexOf('- name: Verify public HTTPS, exact release SHA, SEO and worker');
+  const browser = yaml.indexOf('- name: Public browser release smoke and SEO against deployed site');
+  assert.ok(local > 0 && local < direct && direct < publicCheck && publicCheck < browser);
+
+  const diagnostics = yaml.slice(direct, publicCheck);
+  const publicProbe = yaml.slice(publicCheck, browser);
+  assert.match(diagnostics, /DEPLOY_HOST: \\$\\{\\{ secrets\\.DEPLOY_HOST \\}\\}/);
+  assert.match(diagnostics, /EXPECTED_SHA: \\$\\{\\{ github\\.event\\.workflow_run\\.head_sha \\}\\}/);
+  assert.match(diagnostics, /--connect-to "pdf\\.plainmile\\.com:443:\\$\\{origin_host\\}:443"/);
+  assert.match(diagnostics, /--insecure/);
+  assert.match(diagnostics, /--connect-timeout 5 --max-time 12/);
+  assert.match(diagnostics, /external_origin_https_status=/);
+  assert.match(diagnostics, /external_origin_release_sha=match/);
+  assert.match(diagnostics, /2>\\/dev\\/null \\|\\| true/);
+  assert.doesNotMatch(diagnostics, /echo "\\$DEPLOY_HOST"|echo "\\$origin_host"/);
+  assert.doesNotMatch(publicProbe, /--insecure|curl .* -k\\b/);
+  assert.match(publicProbe, /curl --fail --silent --show-error --max-time 15/);
+  assert.match(publicProbe, /if \\[ "\\$deployed_sha" != "\\$EXPECTED_SHA" \\]; then/);
+});
+
 test('bounded PUBLIC verification retains complete SEO, real file outputs, safe rollback and full no-retry Docker CI', () => {
   const deploy = readWorkflow('deploy.yml');
   const ci = readWorkflow('ci.yml');
