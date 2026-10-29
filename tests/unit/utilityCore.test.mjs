@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline, wrapTextLines,
   textContentToLines, textContentToReadingOrderLines, linesToReadableText, hasMinimalSelectableText, hasSparseTextScanRisk, textLinesFromFormAnnotations, summarizeTextCoverage, textFitsUtf8Budget, sanitizeFilename, workspaceFilenameStem, bookmarkSplitPartFilenames,
-  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imageSettingsChanged, imagePageFilename, imageExportFilenames, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError, validateNumberingPlan, numberingSettingsChanged, decimalPageInteger,
+  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageSelectionChanged, imageSettingsChanged, imagePageFilename, imageExportFilenames, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError, validateNumberingPlan, numberingSettingsChanged, decimalPageInteger,
 } from '../../src/lib/utilityCore.mjs';
 
 
@@ -126,6 +126,10 @@ test('image export freshness uses ordered pages after strict localized range par
   assert.equal(imageSettingsChanged(saved, saved, 0), true);
   assert.equal(imageSettingsChanged({ ...saved, pages: '' }, { ...saved, pages: '1-3' }, 3), false);
   assert.equal(imageSettingsChanged(saved, { ...saved, pages: '' }, 65), true);
+  assert.equal(imagePageSelectionChanged('121-125', '１２１－１２５', 125), false);
+  assert.equal(imagePageSelectionChanged('121-125', '121,122,123,124,125', 125), false);
+  assert.equal(imagePageSelectionChanged('121-125', '122-125', 125), true);
+  assert.equal(imagePageSelectionChanged('121-125', 'invalid', 125), true);
   assert.equal(imageSettingsChanged({ ...saved, pages: '1-60' }, { ...saved, pages: '1-61' }, 65), true);
 });
 
