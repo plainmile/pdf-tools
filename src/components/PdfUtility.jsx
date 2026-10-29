@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { protectLocalFileDropNavigation } from '../lib/fileDropSafety.mjs';
-import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, translateUtilityError, decodeImportedText, textFitsUtf8Budget, IMAGE_PRINT_SCALE, requestedPages, validateNumberingPlan, numberingSettingsChanged, decimalPageInteger } from '../lib/utilityCore.mjs';
+import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imageSettingsChanged, translateUtilityError, decodeImportedText, textFitsUtf8Budget, IMAGE_PRINT_SCALE, requestedPages, validateNumberingPlan, numberingSettingsChanged, decimalPageInteger } from '../lib/utilityCore.mjs';
 import { saveDownload } from '../lib/download.mjs';
 import { readFileArrayBuffer } from '../lib/fileIo.mjs';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
@@ -619,8 +619,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     ? imagePageBatch(pdf.count, batchIndex) : null;
   const customImageRange = Boolean(imageBatch && pages !== imageBatch.range);
   const imageResultStale = Boolean(isImages && output?.imageSettings &&
-    (output.imageSettings.format !== format || output.imageSettings.scale !== scale ||
-      output.imageSettings.pages !== pages));
+    imageSettingsChanged(output.imageSettings, { format, scale, pages }, pdf?.count));
   const limitHint = isTextInput ? t.limitText : isCompress
     ? (compressStrategy === 'raster' ? t.limitCompressionRaster : t.limitCompression)
     : isImages ? t.limitImages : t.limitGeneral;
