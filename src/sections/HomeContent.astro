@@ -30,8 +30,8 @@ const desc = zh
       <h1>{p.title}</h1>
       <p class="hero-lead">{p.lead}</p>
       <div class="hero-actions">
-        <a class="button button-primary" href={href('/workspace/')}>{p.start} <span aria-hidden="true">→</span></a>
-        <a class="button button-secondary" href="#all-tools">{p.explore}</a>
+        <a class="button button-primary" href="#all-tools">{p.explore} <span aria-hidden="true">→</span></a>
+        <a class="button button-secondary" href={href('/workspace/')}>{p.start}</a>
       </div>
       <ul class="home-assurances"><li>{p.local}</li><li>{p.noaccount}</li><li>{p.ordered}</li></ul>
     </div>
