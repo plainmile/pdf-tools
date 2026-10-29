@@ -148,8 +148,21 @@ const desc = zh
           .replace(/(?:文件|文档|工具)$/, '')
           .replace(/(?:免费|在线)+$/, '')
           .trim();
+        // In "add a watermark to PDF", "to" describes the document receiving
+        // the action, NOT an image/text conversion direction. Keep the existing
+        // ordered "PDF to JPG" / "JPG to PDF" matching unchanged.
+        // These are only aliases for real tools, never new SEO landing routes.
+        const taskQuery = query
+          .replace(/^(?:add|insert|put|place) (?:(?:text|custom) )?watermark (?:to|on|in) pdf$/, 'pdf watermark')
+          .replace(/^(?:add|insert|put) page numbers? (?:to|on|in) pdf$/, 'page numbers')
+          .replace(/^(remove|delete|extract|rotate|reorder|split) (?:(?:selected|specific|unwanted|some|individual) )?pages? (?:from|in|of) pdf$/,
+            (_match, action) => action + ' pdf pages')
+          .replace(/^(?:给|为)pdf(?:添加|加)(?:文字)?水印$/u, 'pdf加水印')
+          .replace(/^(?:给|为)pdf(?:添加|加)页码$/u, 'pdf加页码')
+          .replace(/^(?:从|在)pdf(?:中|里)?(删除|移除|提取)(?:某些|部分|指定)?(?:的)?页面$/u,
+            (_match, action) => action === '提取' ? 'pdf提取页面' : 'pdf删除页面');
         // Searching only "free" or "online" must not silently display all tools.
-        return query || original;
+        return taskQuery || original;
       };
       const update = () => {
         const query = normalizeQuery(search.value);
