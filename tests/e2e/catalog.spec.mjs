@@ -164,6 +164,8 @@ test('task-first homepage and everyday search terms remain accurate in both lang
     ['make pdf smaller', '/compress-pdf/'],
     ['save pdf as png', '/pdf-to-images/'],
     ['photos to pdf', '/image-to-pdf/'],
+    ['Can I convert PDF to PNG?', '/pdf-to-images/'],
+    ['I want to make a PDF smaller', '/compress-pdf/'],
   ]) {
     await en.fill(query);
     await expect(page.locator('a.tool-card[href="' + path + '"]')).toBeVisible();
@@ -176,10 +178,14 @@ test('task-first homepage and everyday search terms remain accurate in both lang
   for (const [query, path] of [
     ['pdf变小', '/zh/compress-pdf/'],
     ['提取部分页', '/zh/extract-pages/'],
+    ['我想把PDF转成JPG？', '/zh/pdf-to-images/'],
+    ['我需要把PDF压小', '/zh/compress-pdf/'],
   ]) {
     await zh.fill(query);
     await expect(page.locator('a.tool-card[href="' + path + '"]')).toBeVisible();
   }
+  await zh.fill('我想把PDF转成Word');
+  await expect(page.locator('[data-tool-card]:visible')).toHaveCount(0);
 });
 
 test('ordinary bilingual search questions resolve to existing tasks, never reverse conversions', async ({ page }) => {
