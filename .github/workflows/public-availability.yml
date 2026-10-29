@@ -1,0 +1,57 @@
+name: Monitor PDF Tools public HTTPS
+
+on:
+  # Small, read-only availability probes. This is NOT a second browser QA or a deploy.
+  schedule:
+    - cron: '19 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pdf-tools-public-availability
+  cancel-in-progress: true
+
+jobs:
+  availability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe CDN status for public pages, SEO endpoints and PDF worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed_routes=0
+          # Fixed public paths only: no user files, uploads, source IPs,
+          # private credentials or document data ever enter this workflow.
+          for route in / /zh/ /merge-pdf/ /zh/merge-pdf/ /robots.txt /sitemap-index.xml /pdfjs/pdf.worker.min.mjs; do
+            good=0
+            for attempt in 1 2; do
+              headers=$(mktemp)
+              result=$(curl --silent --location --connect-timeout 4 --max-time 9 \
+                -H 'Cache-Control: no-cache' \
+                -D "$headers" -o /dev/null \
+                -w '%{http_code}|%{time_total}' \
+                "https://pdf.plainmile.com${route}" 2>/dev/null || true)
+              IFS='|' read -r status seconds <<< "${result:-000|0}"
+              ray=$(grep -im1 '^cf-ray:' "$headers" | awk '{print $2}' | tr -cd '[:alnum:]-' || true)
+              rm -f "$headers"
+              echo "public_route=$route attempt=$attempt http_status=${status:-000} total_s=${seconds:-0} cf_ray=${ray:-absent}"
+              if [ "$status" = 200 ]; then
+                good=$((good + 1))
+              else
+                echo "::warning title=PDF Tools public HTTP probe::route=$route attempt=$attempt status=${status:-000} ray=${ray:-absent}"
+              fi
+              sleep 1
+            done
+            if [ "$good" -eq 0 ]; then
+              failed_routes=$((failed_routes + 1))
+              echo "::error title=PDF Tools public HTTPS unavailable::Both checks failed for route=$route"
+            fi
+          done
+          if [ "$failed_routes" -gt 0 ]; then
+            echo "Public HTTPS unavailable on $failed_routes route(s). Investigate Cloudflare 522/525 and issue #222." >&2
+            exit 1
+          fi
+          echo 'Public HTTPS checks passed; individual transient 5xx results remain visible as warnings.'
