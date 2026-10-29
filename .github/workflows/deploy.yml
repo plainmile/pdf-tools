@@ -295,7 +295,12 @@ jobs:
           for route in / /workspace/ /zh/workspace/; do
             # Keep the original failing response's Cloudflare Ray ID: later
             # diagnostic requests may hit a different edge and return 200.
-            if ! curl --fail --show-error --silent --location --retry 4 \
+            # Default curl --retry does not include Cloudflare 525. Only
+            # idempotent public GETs use bounded retries; repeatable failure
+            # still fails the release and triggers rollback.
+            if ! curl --fail --show-error --silent --location \
+              --retry 2 --retry-all-errors --retry-delay 2 --retry-max-time 40 \
+              --connect-timeout 5 --max-time 10 \
               -D /tmp/pdf-public-headers \
               -o /tmp/pdf-public-page.html "https://pdf.plainmile.com$route"; then
               ray=$(grep -i '^cf-ray:' /tmp/pdf-public-headers | tail -n 1 | awk '{print $2}' | tr -cd '[:alnum:]-' || true)
@@ -306,7 +311,10 @@ jobs:
             grep -q 'hreflang="en"' /tmp/pdf-public-page.html
             grep -q 'hreflang="zh-CN"' /tmp/pdf-public-page.html
           done
-          if ! curl -fsS -D /tmp/pdf-public-worker-headers -o /dev/null \
+          if ! curl --fail --silent --show-error \
+            --retry 2 --retry-all-errors --retry-delay 2 --retry-max-time 40 \
+            --connect-timeout 5 --max-time 10 \
+            -D /tmp/pdf-public-worker-headers -o /dev/null \
             https://pdf.plainmile.com/pdfjs/pdf.worker.min.mjs; then
             ray=$(grep -i '^cf-ray:' /tmp/pdf-public-worker-headers | tail -n 1 | awk '{print $2}' | tr -cd '[:alnum:]-' || true)
             echo "public_route_failed=/pdfjs/pdf.worker.min.mjs cf_ray=${ray:-absent}" >&2
