@@ -393,7 +393,7 @@ test('Chinese Every N split accepts fullwidth digits and exports exact PDF page 
   // intentionally not mounted. The localized page count is the right cue.
   await expect(page.locator('.file-count')).toContainText('7 页');
   await page.locator('input[name="split-method"]').nth(1).check();
-  const count = page.getByRole('spinbutton', { name: '每份 PDF 页数' });
+  const count = page.getByRole('spinbutton', { name: '每个 PDF 的页数' });
   await expect(count).toHaveAttribute('inputmode', 'numeric');
   // Text, not type=number: Chromium and Safari otherwise discard fullwidth
   // characters before the app gets a chance to normalize them.
