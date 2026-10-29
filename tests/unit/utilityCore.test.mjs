@@ -540,6 +540,11 @@ test('generated download filename removes unsafe path characters and Windows dev
   // ".PDF"-like fragments and duplicate extensions.
   assert.equal(sanitizeFilename('报告．ＰＤＦ'), '报告');
   assert.equal(sanitizeFilename('ＡＢＣ－２０２６.pdf'), 'ABC-2026');
+  // Fullwidth ASCII normalization must not replace distinct Unicode glyphs:
+  // COM¹ is a Windows-reserved device stem, but the superscript is retained.
+  assert.equal(sanitizeFilename('COM¹.pdf'), 'plainmile-COM¹');
+  assert.equal(sanitizeFilename('LPT².pdf'), 'plainmile-LPT²');
+  assert.equal(sanitizeFilename('Café².pdf'), 'Café²');
   assert.equal(sanitizeFilename('report' + '.'.repeat(20) + '.pdf'), 'report');
   assert.equal(sanitizeFilename('a'.repeat(69) + '.long.pdf'), 'a'.repeat(69));
   for (const reserved of ['CON.pdf', 'prn.md', 'AUX.txt', 'NUL', 'COM1.PDF', 'lpt9.pdf', 'CON..pdf',
