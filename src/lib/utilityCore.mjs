@@ -229,6 +229,28 @@ export function requestedPages(input, count) {
   }
   return output;
 }
+/** Image export freshness depends on the actual ordered pages, not on the
+ * spelling of a range. "２－３" and "2,3" export the same two pages.
+ * Unlike a set comparison, ordering matters for ZIP entry numbering.
+ *
+ * A malformed or oversized current selection must never claim to match the
+ * retained file; that previous file remains available for a safe retry.
+ */
+export function imageSettingsChanged(previous, current, pageCount) {
+  if (!previous || !current || !Number.isSafeInteger(pageCount) ||
+      pageCount < 1 || pageCount > UTILITY_LIMITS.maxPages) return true;
+  if (previous.format !== current.format || previous.scale !== current.scale) return true;
+  try {
+    const before = requestedPages(previous.pages, pageCount);
+    const after = requestedPages(current.pages, pageCount);
+    return !before.length || before.length > UTILITY_LIMITS.maxImagePagesPerRun ||
+      !after.length || after.length > UTILITY_LIMITS.maxImagePagesPerRun ||
+      before.length !== after.length || before.some((page, i) => page !== after[i]);
+  } catch {
+    // Invalid edited ranges are stale, never silently treated as the old PDF.
+    return true;
+  }
+}
 /** Stable natural/lexicographic page filenames for extracted images.
  * All filenames in one PDF use the SAME width, including page 1 when a
  * 1,000-page source crosses the three-digit boundary.
