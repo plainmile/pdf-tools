@@ -150,18 +150,19 @@ test('deployment diagnostics distinguish external origin from Cloudflare without
 
   const diagnostics = yaml.slice(direct, publicCheck);
   const publicProbe = yaml.slice(publicCheck, browser);
-  assert.match(diagnostics, /DEPLOY_HOST: \\$\\{\\{ secrets\\.DEPLOY_HOST \\}\\}/);
-  assert.match(diagnostics, /EXPECTED_SHA: \\$\\{\\{ github\\.event\\.workflow_run\\.head_sha \\}\\}/);
-  assert.match(diagnostics, /--connect-to "pdf\\.plainmile\\.com:443:\\$\\{origin_host\\}:443"/);
-  assert.match(diagnostics, /--insecure/);
-  assert.match(diagnostics, /--connect-timeout 5 --max-time 12/);
-  assert.match(diagnostics, /external_origin_https_status=/);
-  assert.match(diagnostics, /external_origin_release_sha=match/);
-  assert.match(diagnostics, /2>\\/dev\\/null \\|\\| true/);
-  assert.doesNotMatch(diagnostics, /echo "\\$DEPLOY_HOST"|echo "\\$origin_host"/);
-  assert.doesNotMatch(publicProbe, /--insecure|curl .* -k\\b/);
-  assert.match(publicProbe, /curl --fail --silent --show-error --max-time 15/);
-  assert.match(publicProbe, /if \\[ "\\$deployed_sha" != "\\$EXPECTED_SHA" \\]; then/);
+  assert.ok(diagnostics.includes('DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}'));
+  assert.ok(diagnostics.includes('EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}'));
+  assert.ok(diagnostics.includes('--connect-to "pdf.plainmile.com:443:${origin_host}:443"'));
+  assert.ok(diagnostics.includes('--insecure --silent --connect-timeout 5 --max-time 12'));
+  assert.ok(diagnostics.includes('external_origin_https_status='));
+  assert.ok(diagnostics.includes('external_origin_release_sha=match'));
+  assert.ok(diagnostics.includes('2>/dev/null || true'));
+  assert.ok(!diagnostics.includes('echo "$DEPLOY_HOST"'));
+  assert.ok(!diagnostics.includes('echo "$origin_host"'));
+  assert.ok(!publicProbe.includes('--insecure'));
+  assert.ok(!publicProbe.includes('curl -k'));
+  assert.ok(publicProbe.includes('curl --fail --silent --show-error --max-time 15'));
+  assert.ok(publicProbe.includes('if [ "$deployed_sha" != "$EXPECTED_SHA" ]; then'));
 });
 
 test('bounded PUBLIC verification retains complete SEO, real file outputs, safe rollback and full no-retry Docker CI', () => {
