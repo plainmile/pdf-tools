@@ -153,6 +153,10 @@ const desc = zh
       };
       const update = () => {
         const query = normalizeQuery(search.value);
+        // Descriptions of almost every Chinese tool say "免费". A search
+        // containing ONLY "免费"/"在线" describes no actual task and must
+        // not falsely return all tools. Keep all real task queries unchanged.
+        const modifierOnly = /^(?:免费|在线)+$/u.test(query);
         let matches = 0;
         for (const card of cards) {
           const words = query.split(' ').filter(Boolean);
@@ -167,8 +171,8 @@ const desc = zh
           const compactQuery = query.replace(/\s+/g, '');
           const phraseMatch = haystack.includes(query) ||
             card.dataset.searchCompact.includes(compactQuery);
-          const visible = directional ? phraseMatch :
-            words.every(word => haystack.includes(word)) || phraseMatch;
+          const visible = !modifierOnly && (directional ? phraseMatch :
+            words.every(word => haystack.includes(word)) || phraseMatch);
           card.hidden = !visible;
           if (visible) matches++;
         }
