@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { protectLocalFileDropNavigation } from '../lib/fileDropSafety.mjs';
 import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, translateUtilityError, decodeImportedText, textFitsUtf8Budget, IMAGE_PRINT_SCALE, requestedPages, validateNumberingPlan, decimalPageInteger } from '../lib/utilityCore.mjs';
 import { saveDownload } from '../lib/download.mjs';
 import { readFileArrayBuffer } from '../lib/fileIo.mjs';
@@ -179,6 +180,9 @@ function stepLocalizedPageInteger(event, value, update, maximum) {
 
 export default function PdfUtility({ mode, locale = 'en' }) {
   const t = COPY[locale] || COPY.en;
+  // Browser-local edits must survive an accidental file drop on the header
+  // or another area outside the designated upload surface.
+  useEffect(() => protectLocalFileDropNavigation(document), []);
   const isTextInput = TEXT_INPUT_MODES.has(mode);
   const isTextOutput = TEXT_OUTPUT_MODES.has(mode);
   const isCompress = mode === 'compress-pdf';
