@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatBytes, compressionStats, requestedPages, normalizeText, decodeImportedText, parseTextBlocks, stripMarkdownInline, wrapTextLines,
   textContentToLines, textContentToReadingOrderLines, linesToReadableText, hasMinimalSelectableText, hasSparseTextScanRisk, textLinesFromFormAnnotations, summarizeTextCoverage, textFitsUtf8Budget, sanitizeFilename, workspaceFilenameStem, bookmarkSplitPartFilenames,
-  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageFilename, imageExportFilenames, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError, validateNumberingPlan, decimalPageInteger,
+  UTILITY_LIMITS, IMAGE_PRINT_DPI, IMAGE_PRINT_SCALE, validatedImageScale, enforceRasterViewport, rasterCanvasSideLimit, enforceUtilityPdfLimits, enforceImageBatchLimit, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, imagePageFilename, imageExportFilenames, enforceImageBatchBytes, enforceCompressionImageBytes, checkCancelled, translateUtilityError, validateNumberingPlan, numberingSettingsChanged, decimalPageInteger,
 } from '../../src/lib/utilityCore.mjs';
 
 
@@ -33,6 +33,20 @@ test('numbering plan preflight matches 1-99999 output bounds before any PDF pars
   assert.equal(decimalPageInteger('2.0'), null);
   assert.equal(decimalPageInteger('0x10'), null);
 
+});
+
+test('equivalent localized digits do not make the generated numbered PDF stale', () => {
+  const generated = { start: '７', firstPage: '３', position: 'bottom-center', fontSize: '12', margin: '24' };
+  assert.equal(numberingSettingsChanged(generated, { ...generated }), false);
+  assert.equal(numberingSettingsChanged(generated, { ...generated, start: '7', firstPage: '003' }), false);
+  assert.equal(numberingSettingsChanged(generated, { ...generated, start: ' ００７ ', firstPage: '3' }), false);
+  for (const change of [
+    { start: '8' }, { firstPage: '2' }, { start: '７e0' }, { firstPage: '' },
+    { position: 'top-center' }, { fontSize: '14' }, { margin: '40' },
+  ]) {
+    assert.equal(numberingSettingsChanged(generated, { ...generated, ...change }), true, JSON.stringify(change));
+  }
+  assert.equal(numberingSettingsChanged(null, generated), true);
 });
 
 test('bookmark ZIP names are opt-in-safe, unique, Unicode-aware and never filesystem paths', () => {

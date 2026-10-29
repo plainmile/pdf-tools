@@ -765,6 +765,51 @@ test('new shorter PDF resets stale page-number start while valid settings surviv
   await expect(page.getByTestId('number-first-pdf-page')).toHaveValue('2');
 });
 
+test('reformatting fullwidth page numbers never falsely marks the generated PDF outdated', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/add-page-numbers/');
+  await upload(page, await fixturePdf('Same numbering values', 5));
+  const start = page.getByTestId('number-start');
+  const first = page.getByTestId('number-first-pdf-page');
+  const run = page.getByTestId('utility-run');
+  const stale = page.getByTestId('numbered-result-stale');
+
+  await start.fill('７');
+  await first.fill('３');
+  await run.click();
+  await expect(page.getByTestId('numbered-pdf-result')).toBeVisible();
+  await expect(stale).toHaveCount(0);
+
+  // The user changes numeral appearance only, not the effective output PDF.
+  await start.fill('007');
+  await first.fill('3');
+  await expect(stale).toHaveCount(0);
+  await start.fill(' ００７ ');
+  await first.fill('００３');
+  await expect(run).toBeEnabled();
+  await expect(stale).toHaveCount(0);
+
+  // A real change, or malformed text, still preserves the earlier PDF but
+  // warns it no longer matches the form until the original values return.
+  await first.fill('２');
+  await expect(stale).toBeVisible();
+  await first.fill('３');
+  await expect(stale).toHaveCount(0);
+  await start.fill('７e0');
+  await expect(run).toBeDisabled();
+  await expect(stale).toBeVisible();
+  await start.fill('7');
+  await expect(stale).toHaveCount(0);
+
+  const saved = await getDownload(page, () => page.getByTestId('numbered-pdf-download').click());
+  expect((await PDFDocument.load(saved.bytes)).getPageCount()).toBe(5);
+  const viewport = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    client: document.documentElement.clientWidth,
+  }));
+  expect(viewport.scroll).toBeLessThanOrEqual(viewport.client + 2);
+});
+
 test('English numbering preflight blocks invalid values but keeps the previously generated PDF', async ({ page }) => {
   await page.goto('/add-page-numbers/');
   await upload(page, await fixturePdf('Number plan test', 3));
