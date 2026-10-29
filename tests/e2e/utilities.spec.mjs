@@ -722,6 +722,16 @@ test('Chinese fullwidth page numbers survive a PDF replacement and render as rea
   const downloaded = await getDownload(page, async () => {
     await run.click();
     await expect(page.getByTestId('numbered-pdf-result')).toBeVisible();
+    // The first numbered page is PDF page 3 (not a Number('３') NaN).
+    await expect(page.getByTestId('utility-pdf-preview')).toHaveAttribute('data-rendered-page', '3');
+    await page.getByTestId('number-preview-page').selectOption('custom');
+    const preview = page.getByTestId('number-preview-custom');
+    await expect(preview).toHaveAttribute('inputmode', 'numeric');
+    await preview.fill('４e0');
+    await expect(page.getByTestId('number-preview-invalid')).toBeVisible();
+    await preview.fill('４');
+    await expect(preview).toHaveAttribute('aria-valuenow', '4');
+    await expect(page.getByTestId('utility-pdf-preview')).toHaveAttribute('data-rendered-page', '4');
     await page.getByTestId('numbered-pdf-download').click();
   }, 15000);
   expect((await PDFDocument.load(downloaded.bytes)).getPageCount()).toBe(5);
