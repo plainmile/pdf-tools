@@ -176,6 +176,12 @@ test('failed Cloudflare gate logs path, 525/522 status and Ray ID before safe ro
   const probe = yaml.slice(diagnostic, rollback);
   assert.ok(publicGate.includes('id: public_gate'));
   assert.ok(publicGate.includes('curl --fail --silent --show-error --max-time 15'));
+  assert.ok(publicGate.includes('-D /tmp/pdf-public-headers'));
+  assert.ok(publicGate.includes('public_route_failed=$route cf_ray='));
+  assert.ok(publicGate.includes('public_route_failed=/pdfjs/pdf.worker.min.mjs cf_ray='));
+  assert.ok(publicGate.includes("grep -i '^cf-ray:'"));
+  assert.ok(publicGate.includes('tr -cd \'[:alnum:]-\''));
+  assert.ok(publicGate.includes('exit 1'));
   assert.ok(publicGate.includes('if [ "$deployed_sha" != "$EXPECTED_SHA" ]; then'));
   assert.ok(publicGate.includes('grep -q \'hreflang="zh-CN"\''));
   assert.ok(!publicGate.includes('--insecure'));
