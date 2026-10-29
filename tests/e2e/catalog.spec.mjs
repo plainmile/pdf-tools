@@ -154,6 +154,34 @@ test('conversion search accepts arrows and Chinese verbs without reversing direc
   await expect(page.locator('a.tool-card[href="/zh/image-to-pdf/"]')).toBeVisible();
 });
 
+test('task-first homepage and everyday search terms remain accurate in both languages', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Merge, split, convert and organize PDFs');
+  await expect(page.locator('.hero-actions a').first()).toHaveAttribute('href', '#all-tools');
+  await expect(page.getByText('Check the result and download it', { exact: true })).toBeVisible();
+  const en = page.getByRole('searchbox', { name: 'Find a PDF tool' });
+  for (const [query, path] of [
+    ['make pdf smaller', '/compress-pdf/'],
+    ['save pdf as png', '/pdf-to-images/'],
+    ['photos to pdf', '/image-to-pdf/'],
+  ]) {
+    await en.fill(query);
+    await expect(page.locator('a.tool-card[href="' + path + '"]')).toBeVisible();
+  }
+  await page.goto('/zh/');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('合并、拆分、转换与整理 PDF');
+  await expect(page.locator('.hero-actions a').first()).toHaveAttribute('href', '#all-tools');
+  await expect(page.getByText('核对结果后下载到设备', { exact: true })).toBeVisible();
+  const zh = page.getByRole('searchbox', { name: '搜索工具' });
+  for (const [query, path] of [
+    ['pdf变小', '/zh/compress-pdf/'],
+    ['提取部分页', '/zh/extract-pages/'],
+  ]) {
+    await zh.fill(query);
+    await expect(page.locator('a.tool-card[href="' + path + '"]')).toBeVisible();
+  }
+});
+
 test('ordinary bilingual search questions resolve to existing tasks, never reverse conversions', async ({ page }) => {
   await page.goto('/');
   const en = page.getByRole('searchbox', { name: 'Find a PDF tool' });
