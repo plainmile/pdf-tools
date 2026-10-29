@@ -227,6 +227,65 @@ test('ordinary bilingual search questions resolve to existing tasks, never rever
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
+test('natural action prepositions find existing tools without inventing conversions or SEO pages', async ({ page }) => {
+  await page.goto('/');
+  const en = page.getByRole('searchbox', { name: 'Find a PDF tool' });
+  for (const [query, slug] of [
+    ['How do I add a watermark to a PDF?', 'watermark-pdf'],
+    ['How do I add page numbers to a PDF?', 'add-page-numbers'],
+    ['How do I remove pages from a PDF?', 'delete-pages'],
+    ['How do I extract selected pages from a PDF?', 'extract-pages'],
+    ['How do I rotate pages in a PDF?', 'rotate-pdf'],
+    ['How do I split pages from a PDF?', 'split-pdf'],
+  ]) {
+    await en.fill(query);
+    await expect(page.locator('a.tool-card[href="/' + slug + '/"]')).toBeVisible();
+    // Workspace is also a legitimate match for some page actions; the
+    // important promise is that the focused real tool is discoverable.
+    // More than one category may contain a legitimate matching task.
+  }
+  // The preposition "to" in a destination conversion must remain ordered:
+  // we cannot turn a real PDF to JPG request into the opposite converter.
+  for (const [query, present, absent] of [
+    ['PDF to JPG', 'pdf-to-images', 'image-to-pdf'],
+    ['JPG to PDF', 'image-to-pdf', 'pdf-to-images'],
+  ]) {
+    await en.fill(query);
+    await expect(page.locator('a.tool-card[href="/' + present + '/"]')).toBeVisible();
+    await expect(page.locator('a.tool-card[href="/' + absent + '/"]')).toBeHidden();
+  }
+  await en.fill('How do I convert PDF to Word?');
+  await expect(page.locator('[data-tool-card]:visible')).toHaveCount(0);
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/');
+  const zh = page.getByRole('searchbox', { name: '搜索工具' });
+  for (const [query, slug] of [
+    ['怎么给PDF加水印', 'watermark-pdf'],
+    ['如何给PDF添加文字水印', 'watermark-pdf'],
+    ['如何给PDF加页码', 'add-page-numbers'],
+    ['如何从PDF删除页面', 'delete-pages'],
+    ['怎么在PDF中移除部分页面', 'delete-pages'],
+    ['如何从PDF提取页面', 'extract-pages'],
+  ]) {
+    await zh.fill(query);
+    await expect(page.locator('a.tool-card[href="/zh/' + slug + '/"]')).toBeVisible();
+    // Workspace is also a legitimate match for some page actions; the
+    // important promise is that the focused real tool is discoverable.
+  }
+  await zh.fill('PDF转Word');
+  await expect(page.locator('[data-tool-card]:visible')).toHaveCount(0);
+  await zh.fill('免费');
+  await expect(page.locator('[data-tool-card]:visible')).toHaveCount(0);
+  await zh.fill('');
+  await expect(page.locator('[data-tool-card]:visible')).toHaveCount(16);
+  const widths = await page.evaluate(() => ({
+    page: document.documentElement.scrollWidth,
+    viewport: document.documentElement.clientWidth,
+  }));
+  expect(widths.page).toBeLessThanOrEqual(widths.viewport + 2);
+});
+
 test('everyday English and Chinese PDF questions find the existing tools', async ({ page }) => {
   await page.goto('/');
   const en = page.getByRole('searchbox', { name: 'Find a PDF tool' });
