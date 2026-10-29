@@ -19,6 +19,7 @@ export default function PageZoomDialog({
   const canvasRef = useRef(null);
   const [zoom, setZoom] = useState(1);
   const [status, setStatus] = useState('loading');
+  const [retryVersion, setRetryVersion] = useState(0);
   const [size, setSize] = useState(() => ({
     width: window.innerWidth, height: window.innerHeight,
   }));
@@ -76,7 +77,12 @@ export default function PageZoomDialog({
       await renderTask.promise;
       if (!cancelled) setStatus('ready');
     })().catch((error) => {
-      if (!cancelled && error?.name !== 'RenderingCancelledException') setStatus('error');
+      if (!cancelled && error?.name !== 'RenderingCancelledException') {
+        // A failed render may have allocated a large backing bitmap. Discard
+        // it before showing Retry; the PDF source and page edits stay intact.
+        if (canvas) { canvas.width = 0; canvas.height = 0; }
+        setStatus('error');
+      }
     }).finally(() => { pdfPage?.cleanup(); });
     return () => {
       cancelled = true;
@@ -88,7 +94,7 @@ export default function PageZoomDialog({
       }
     };
   }, [source, pageRef.pageIndex, pageRef.rotation, getPreviewDoc,
-    zoom, size.width, size.height]);
+    zoom, size.width, size.height, retryVersion]);
 
   const changeZoom = (direction) => {
     setZoom(previous => {
@@ -157,7 +163,17 @@ export default function PageZoomDialog({
               <span className="page-watermark-preview" aria-hidden="true">{watermarkPreview}</span>}
           </div>
           {status === 'loading' && <p className="page-zoom-message" role="status">{t.previewLoading}</p>}
-          {status === 'error' && <p className="page-zoom-message" role="alert">{t.previewFail}</p>}
+          {status === 'error' && <div className="page-zoom-message page-zoom-error" role="alert">
+            <p>{t.previewFail}</p>
+            <button type="button" className="button button-secondary button-small"
+              data-testid="page-zoom-retry" onClick={() => {
+                // The Retry button disappears while rendering. Keep keyboard
+                // focus inside the modal rather than dropping it to <body>.
+                closeRef.current?.focus();
+                setStatus('loading');
+                setRetryVersion(value => value + 1);
+              }}>{t.previewRetry}</button>
+          </div>}
         </div>
         <p id="page-zoom-hint" className="page-zoom-hint">{t.previewHint}</p>
       </section>

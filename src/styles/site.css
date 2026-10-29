@@ -361,6 +361,9 @@ main { flex: 1; }
 .page-zoom-sheet canvas { display: block; flex: none; max-width: none; background: #fff; box-shadow: 0 0 0 1px var(--border); }
 .page-zoom-sheet .page-watermark-preview { font-size: clamp(16px, 2.3vw, 40px); }
 .page-zoom-message { position: absolute; top: 35%; left: 50%; transform: translateX(-50%); margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 11px 16px; font-size: 13px; white-space: nowrap; }
+.page-zoom-error { text-align: center; }
+.page-zoom-error p { margin: 0 0 8px; }
+.page-zoom-error button { white-space: nowrap; }
 .page-zoom-hint { margin: 0; padding: 9px 14px; border-top: 1px solid var(--border); color: var(--muted); font-size: 11px; line-height: 1.5; }
 @media (max-width: 480px) { .page-zoom-backdrop { padding: 4px; } .page-zoom-dialog { height: calc(100dvh - 8px); } .page-zoom-header { padding: 10px; } .page-zoom-toolbar { gap: 5px; padding: 7px; } .page-zoom-toolbar button { padding: 7px; font-size: 11px; } .page-zoom-hint { padding: 7px; font-size: 10px; } }
 .preview-loading { background: var(--border); width: 56%; height: 75%; animation: pulse 1.4s infinite alternate; }
