@@ -667,6 +667,84 @@ test('numbered PDF skips cover and contents so page 3 starts at printed 1', asyn
   expect(parts).toEqual(['COVER WITHOUT NUMBER', 'CONTENTS WITHOUT NUMBER', '1', '2', '3']);
 });
 
+test('Chinese fullwidth page numbers survive a PDF replacement and render as real selectable text', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  const original = await PDFDocument.create();
+  const font = await original.embedFont(StandardFonts.Helvetica);
+  for (let index = 0; index < 5; index++) {
+    const sheet = original.addPage([595.28, 841.89]);
+    if (index === 0) sheet.drawText('COVER WITHOUT NUMBER', { x: 40, y: 700, font, size: 14 });
+    if (index === 1) sheet.drawText('CONTENTS WITHOUT NUMBER', { x: 40, y: 700, font, size: 14 });
+  }
+  const originalBytes = Buffer.from(await original.save());
+  await page.goto('/zh/add-page-numbers/');
+  await upload(page, originalBytes);
+
+  const start = page.getByTestId('number-start');
+  const first = page.getByTestId('number-first-pdf-page');
+  const run = page.getByTestId('utility-run');
+  await expect(start).toHaveAttribute('inputmode', 'numeric');
+  await expect(first).toHaveAttribute('inputmode', 'numeric');
+  await expect(start).toHaveAttribute('role', 'spinbutton');
+  await expect(first).toHaveAttribute('role', 'spinbutton');
+  await start.fill('７e0');
+  await expect(run).toBeDisabled();
+  await start.fill('７');
+  await first.fill('３e0');
+  await expect(run).toBeDisabled();
+  await first.fill('３');
+  await expect(start).toHaveAttribute('aria-valuenow', '7');
+  await expect(first).toHaveAttribute('aria-valuenow', '3');
+  await expect(run).toBeEnabled();
+
+  // Switching from native number fields must not remove arrow-key stepping.
+  await first.press('ArrowUp');
+  await expect(first).toHaveValue('4');
+  await first.press('ArrowDown');
+  await expect(first).toHaveValue('3');
+  await first.fill('３');
+
+  // Replacing the source with another 5-page PDF must not silently reset a
+  // valid localized first-page number to page 1.
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: '章节-2.pdf', mimeType: 'application/pdf', buffer: originalBytes,
+  });
+  await expect(page.getByTestId('utility-file-summary')).toContainText('章节-2.pdf');
+  await expect(start).toHaveValue('７');
+  await expect(first).toHaveValue('３');
+
+  const bounds = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    viewport: document.documentElement.clientWidth,
+  }));
+  expect(bounds.scroll).toBeLessThanOrEqual(bounds.viewport + 2);
+
+  const downloaded = await getDownload(page, async () => {
+    await run.click();
+    await expect(page.getByTestId('numbered-pdf-result')).toBeVisible();
+    // The first numbered page is PDF page 3 (not a Number('３') NaN).
+    await expect(page.getByTestId('utility-pdf-preview')).toHaveAttribute('data-rendered-page', '3');
+    await page.getByTestId('number-preview-page').selectOption('custom');
+    const preview = page.getByTestId('number-preview-custom');
+    await expect(preview).toHaveAttribute('inputmode', 'numeric');
+    await preview.fill('４e0');
+    await expect(page.getByTestId('number-preview-invalid')).toBeVisible();
+    await preview.fill('４');
+    await expect(preview).toHaveAttribute('aria-valuenow', '4');
+    await expect(page.getByTestId('utility-pdf-preview')).toHaveAttribute('data-rendered-page', '4');
+    await page.getByTestId('numbered-pdf-download').click();
+  }, 15000);
+  expect((await PDFDocument.load(downloaded.bytes)).getPageCount()).toBe(5);
+
+  // PDF.js text extraction verifies actual page numbers rather than only
+  // trusting a UI success message or re-parsing the generation settings.
+  await page.goto('/zh/pdf-to-txt/');
+  await upload(page, downloaded.bytes);
+  const extracted = await getDownload(page, () => page.getByTestId('utility-run').click(), 15000);
+  const pages = extracted.bytes.toString('utf8').trim().split(/\n\s*\n/).map(part => part.trim());
+  expect(pages).toEqual(['COVER WITHOUT NUMBER', 'CONTENTS WITHOUT NUMBER', '7', '8', '9']);
+});
+
 test('new shorter PDF resets stale page-number start while valid settings survive replacement', async ({ page }) => {
   await page.goto('/add-page-numbers/');
   await upload(page, await fixturePdf('Long file', 5));

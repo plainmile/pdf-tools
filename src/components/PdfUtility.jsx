@@ -163,6 +163,20 @@ function PdfFirstPagePreview({ bytes, pageCount, t, locale, pageNumber = 1, supp
 const TEXT_INPUT_MODES = new Set(['txt-to-pdf', 'markdown-to-pdf']);
 const TEXT_OUTPUT_MODES = new Set(['pdf-to-txt', 'pdf-to-markdown']);
 
+// Native type=number fields can discard fullwidth Chinese digits before the
+// strict page-count parser sees them. Keep the numeric keyboard and the old
+// arrow-key stepping behavior on a plain-text spinbutton instead.
+function stepLocalizedPageInteger(event, value, update, maximum) {
+  if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return false;
+  event.preventDefault();
+  const parsed = decimalPageInteger(value);
+  const step = event.key === 'ArrowUp' ? 1 : -1;
+  const base = parsed !== null && parsed >= 1 && parsed <= maximum
+    ? parsed : step > 0 ? 0 : 2;
+  update(String(Math.max(1, Math.min(maximum, base + step))));
+  return true;
+}
+
 export default function PdfUtility({ mode, locale = 'en' }) {
   const t = COPY[locale] || COPY.en;
   const isTextInput = TEXT_INPUT_MODES.has(mode);
@@ -347,7 +361,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
         clearOutput();
         setPdf(loaded);
         if (mode === 'add-page-numbers' &&
-            (!Number.isSafeInteger(Number(firstPage)) || Number(firstPage) < 1 || Number(firstPage) > loaded.count)) {
+            (decimalPageInteger(firstPage) === null || decimalPageInteger(firstPage) < 1 || decimalPageInteger(firstPage) > loaded.count)) {
           // The old file may have 100 pages and the new one only two. Do not
           // silently carry an impossible physical page number into Run.
           setFirstPage('1');
@@ -569,7 +583,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
               .replace('{searchable}', String(created.pageCount - created.rasterPages));
         setNotice(`${t.ready}: ${created.pageCount} ${t.pages} · ${formatBytes(created.bytes.length)} · ${searchNotice}`);
       } else if (mode === 'add-page-numbers') {
-        result = { bytes: await addPageNumbers(pdf, { start: Number(start), firstPage: Number(firstPage), position, margin: Number(margin), fontSize: Number(fontSize), signal: controller.signal }, report), name: `${pdfName}-numbered.pdf` };
+        result = { bytes: await addPageNumbers(pdf, { start: decimalPageInteger(start), firstPage: decimalPageInteger(firstPage), position, margin: Number(margin), fontSize: Number(fontSize), signal: controller.signal }, report), name: `${pdfName}-numbered.pdf` };
         ensureNotCancelled();
         setOutput({ ...result, pageCount: pdf.count, numberingSettings: { start, firstPage, position, fontSize, margin } });
         setNumberPreviewPage('first'); setNumberPreviewCustom(firstPage); setNumberPreviewSettled(firstPage);
@@ -614,8 +628,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     selectedPreviewNumber >= 1 && selectedPreviewNumber <= output.pageCount);
   const numberPreviewReady = numberPreviewValid && numberPreviewSettled === numberPreviewCustom;
   const numberPreviewActualPage = numberPreviewPage === 'last' ? output?.pageCount
-    : numberPreviewPage === 'custom' ? Number(numberPreviewSettled)
-      : Number(output?.numberingSettings?.firstPage ?? 1);
+    : numberPreviewPage === 'custom' ? (decimalPageInteger(numberPreviewSettled) ?? 1)
+      : (decimalPageInteger(output?.numberingSettings?.firstPage ?? '1') ?? 1);
   const numberPreviewSuppressed = numberPreviewPage === 'custom' && !numberPreviewReady;
   const description = isCompress ? (compressStrategy === 'structure' ? t.structureWarning : t.compressionWarning) : isTextOutput ? `${t.textWarning} ${mode === 'pdf-to-markdown' ? t.markdownWarning : ''}` : isTextInput ? mode === 'markdown-to-pdf' ? t.markdownInputHint : t.textInputHint : mode === 'add-page-numbers' ? t.numbersHint : t.privacy;
   return (
@@ -756,14 +770,20 @@ export default function PdfUtility({ mode, locale = 'en' }) {
             </select></label>}
         </div>}
         {mode === 'add-page-numbers' && <div className="utility-options">
-          <label><span>{t.pageStart}</span><input data-testid="number-start" type="number" min="1" max="99999" step="1" value={start}
+          <label><span>{t.pageStart}</span><input data-testid="number-start" type="text" inputMode="numeric" role="spinbutton" maxLength={8} value={start}
+            aria-valuemin={1} aria-valuemax={99999}
+            aria-valuenow={decimalPageInteger(start) >= 1 && decimalPageInteger(start) <= 99999 ? decimalPageInteger(start) : undefined}
             aria-invalid={numberingErrorType === 'start' || numberingErrorType === 'overflow'}
             aria-describedby={numberingErrorType === 'start' || numberingErrorType === 'overflow' ? 'numbering-plan-error' : undefined}
-            disabled={inputLocked} onChange={e => { setStart(e.target.value); setNotice(''); setError(''); }} /></label>
-          <label><span>{t.firstPage}</span><input data-testid="number-first-pdf-page" type="number" min="1" max={pdf?.count || UTILITY_LIMITS.maxPages} step="1" value={firstPage}
+            disabled={inputLocked} onChange={e => { setStart(e.target.value); setNotice(''); setError(''); }}
+            onKeyDown={e => { if (stepLocalizedPageInteger(e, start, setStart, 99999)) { setNotice(''); setError(''); } }} /></label>
+          <label><span>{t.firstPage}</span><input data-testid="number-first-pdf-page" type="text" inputMode="numeric" role="spinbutton" maxLength={8} value={firstPage}
+            aria-valuemin={1} aria-valuemax={pdf?.count || UTILITY_LIMITS.maxPages}
+            aria-valuenow={decimalPageInteger(firstPage) >= 1 && decimalPageInteger(firstPage) <= (pdf?.count || UTILITY_LIMITS.maxPages) ? decimalPageInteger(firstPage) : undefined}
             aria-invalid={numberingErrorType === 'first'}
             aria-describedby={numberingErrorType === 'first' ? 'numbering-plan-error' : undefined}
-            disabled={inputLocked} onChange={e => { setFirstPage(e.target.value); setNotice(''); setError(''); }} /></label>
+            disabled={inputLocked} onChange={e => { setFirstPage(e.target.value); setNotice(''); setError(''); }}
+            onKeyDown={e => { if (stepLocalizedPageInteger(e, firstPage, setFirstPage, pdf?.count || UTILITY_LIMITS.maxPages)) { setNotice(''); setError(''); } }} /></label>
           <label><span>{t.pagePosition}</span><select aria-label={t.pagePosition} value={position} disabled={inputLocked} onChange={e => { setPosition(e.target.value); setNotice(''); setError(''); }}><option value="bottom-left">{t.bottomLeft}</option><option value="bottom-center">{t.bottomCenter}</option><option value="bottom-right">{t.bottomRight}</option><option value="top-left">{t.topLeft}</option><option value="top-center">{t.topCenter}</option><option value="top-right">{t.topRight}</option></select></label>
           <label><span>{t.pageMargin}</span><select aria-label={t.pageMargin} data-testid="number-margin" value={margin} disabled={inputLocked} onChange={e => { setMargin(e.target.value); setNotice(''); setError(''); }}><option value="12">{t.marginNarrow}</option><option value="24">{t.marginNormal}</option><option value="40">{t.marginWide}</option></select></label>
           <label><span>{t.pageSize}</span><select aria-label={t.pageSize} value={fontSize} disabled={inputLocked} onChange={e => { setFontSize(e.target.value); setNotice(''); setError(''); }}><option value="10">10</option><option value="12">12</option><option value="16">16</option></select></label>
@@ -819,8 +839,12 @@ export default function PdfUtility({ mode, locale = 'en' }) {
               </select>
             </label>
             {numberPreviewPage === 'custom' && <label><span>{t.customPage}</span>
-              <input data-testid="number-preview-custom" type="number" min="1" max={output.pageCount} step="1"
-                value={numberPreviewCustom} onChange={event => setNumberPreviewCustom(event.target.value)} />
+              <input data-testid="number-preview-custom" type="text" inputMode="numeric" role="spinbutton" maxLength={8}
+                aria-valuemin={1} aria-valuemax={output.pageCount}
+                aria-valuenow={selectedPreviewNumber >= 1 && selectedPreviewNumber <= output.pageCount ? selectedPreviewNumber : undefined}
+                aria-invalid={!numberPreviewValid}
+                value={numberPreviewCustom} onChange={event => setNumberPreviewCustom(event.target.value)}
+                onKeyDown={event => { stepLocalizedPageInteger(event, numberPreviewCustom, setNumberPreviewCustom, output.pageCount); }} />
             </label>}
           </div>
           {numberPreviewPage === 'custom' && !numberPreviewValid &&

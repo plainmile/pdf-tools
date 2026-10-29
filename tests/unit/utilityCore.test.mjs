@@ -23,6 +23,11 @@ test('numbering plan preflight matches 1-99999 output bounds before any PDF pars
   }
   assert.equal(validateNumberingPlan('1', '1', 0), 'first');
   assert.equal(validateNumberingPlan('0002', '0001', 5), null);
+  // Fullwidth digits are legitimate Chinese input; exponents and out-of-range results are not.
+  assert.equal(validateNumberingPlan('７', '３', 5), null);
+  assert.equal(validateNumberingPlan('９９９９９', '１', 2), 'overflow');
+  assert.equal(validateNumberingPlan('７e0', '３', 5), 'start');
+  assert.equal(validateNumberingPlan('７', '３e0', 5), 'first');
   assert.equal(decimalPageInteger('002'), 2);
   assert.equal(decimalPageInteger('1e2'), null);
   assert.equal(decimalPageInteger('2.0'), null);
