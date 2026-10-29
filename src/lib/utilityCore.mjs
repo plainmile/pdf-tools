@@ -861,11 +861,16 @@ export function bookmarkSplitPartFilenames(parts, chapters) {
 }
 
 export function sanitizeFilename(filename) {
-  // Treat automatic download names just like the custom-name field: normalize
-  // fullwidth punctuation before removing the source extension. A leading
-  // period (e.g. ".scan.pdf") can create a hidden download on macOS/Linux;
-  // leading separators and a truncated trailing dot are not useful either.
-  const source = typeof filename === 'string' ? filename.normalize('NFKC').trim() : '';
+  // Normalize fullwidth ASCII (including dot, letters and digits) before
+  // stripping extensions, but do NOT apply full NFKC to an automatic name:
+  // NFKC would rewrite the user's COM¹.pdf into COM1.pdf, unexpectedly
+  // changing a valid Unicode name. Keep other meaningful Unicode intact.
+  // Strip leading separators so dot-prefixed uploads never become hidden
+  // downloads on macOS/Linux.
+  const source = typeof filename === 'string'
+    ? filename.replace(/[\uFF01-\uFF5E]/g, character =>
+      String.fromCharCode(character.charCodeAt(0) - 0xFEE0)).trim()
+    : '';
   const stem = source.replace(/\.[^.]+$/, '')
     .replace(/[^\p{L}\p{N}._-]+/gu, '-')
     .replace(/^[._-]+|[._-]+$/g, '')
