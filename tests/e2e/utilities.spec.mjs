@@ -1132,7 +1132,7 @@ test('Chinese custom fullwidth range resumes the containing batch on mobile', as
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/zh/pdf-to-images/');
   await upload(page, await fixturePdf('Chinese custom pages', 125));
-  await page.getByTestId('utility-page-ranges').fill('１２１－１２５');
+  await page.getByTestId('utility-page-ranges').fill('１２２－１２５');
   await expect(page.getByTestId('utility-batch-nav')).toContainText('自定义页码范围');
   await expect(page.getByTestId('utility-batch-next')).toBeDisabled();
   await page.getByTestId('utility-batch-resume').click();
@@ -1144,6 +1144,27 @@ test('Chinese custom fullwidth range resumes the containing batch on mobile', as
     viewport: document.documentElement.clientWidth,
   }));
   expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.viewport + 2);
+});
+
+test('fullwidth spelling of the current book batch keeps Previous and Next available', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/pdf-to-images/');
+  await upload(page, await fixturePdf('Equivalent book batch', 125));
+  const input = page.getByTestId('utility-page-ranges');
+  await page.getByTestId('utility-batch-next').click();
+  await page.getByTestId('utility-batch-next').click();
+  await expect(input).toHaveValue('121-125');
+  await input.fill('１２１－１２５');
+  await expect(page.getByTestId('utility-batch-nav')).toContainText('3 / 3');
+  await expect(page.getByTestId('utility-batch-custom')).toHaveCount(0);
+  await expect(page.getByTestId('utility-batch-prev')).toBeEnabled();
+  await page.getByTestId('utility-batch-prev').click();
+  await expect(input).toHaveValue('61-120');
+  const viewport = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    client: document.documentElement.clientWidth,
+  }));
+  expect(viewport.scroll).toBeLessThanOrEqual(viewport.client + 2);
 });
 
 test('Chinese converter on narrow mobile keeps native file chooser and page batches accessible', async ({ page }) => {
