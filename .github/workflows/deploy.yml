@@ -272,6 +272,7 @@ jobs:
           # authoritative release/rollback gate even if this probe succeeded.
 
       - name: Verify public HTTPS, exact release SHA, SEO and worker
+        id: public_gate
         env:
           EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
@@ -292,13 +293,25 @@ jobs:
             exit 1
           fi
           for route in / /workspace/ /zh/workspace/; do
-            curl --fail --show-error --silent --location --retry 4 \
-              -o /tmp/pdf-public-page.html "https://pdf.plainmile.com$route"
+            # Keep the original failing response's Cloudflare Ray ID: later
+            # diagnostic requests may hit a different edge and return 200.
+            if ! curl --fail --show-error --silent --location --retry 4 \
+              -D /tmp/pdf-public-headers \
+              -o /tmp/pdf-public-page.html "https://pdf.plainmile.com$route"; then
+              ray=$(grep -i '^cf-ray:' /tmp/pdf-public-headers | tail -n 1 | awk '{print $2}' | tr -cd '[:alnum:]-' || true)
+              echo "public_route_failed=$route cf_ray=${ray:-absent}" >&2
+              exit 1
+            fi
             grep -q 'rel="canonical"' /tmp/pdf-public-page.html
             grep -q 'hreflang="en"' /tmp/pdf-public-page.html
             grep -q 'hreflang="zh-CN"' /tmp/pdf-public-page.html
           done
-          curl -fsS -o /dev/null https://pdf.plainmile.com/pdfjs/pdf.worker.min.mjs
+          if ! curl -fsS -D /tmp/pdf-public-worker-headers -o /dev/null \
+            https://pdf.plainmile.com/pdfjs/pdf.worker.min.mjs; then
+            ray=$(grep -i '^cf-ray:' /tmp/pdf-public-worker-headers | tail -n 1 | awk '{print $2}' | tr -cd '[:alnum:]-' || true)
+            echo "public_route_failed=/pdfjs/pdf.worker.min.mjs cf_ray=${ray:-absent}" >&2
+            exit 1
+          fi
 
       # Full Chromium/Firefox/WebKit regression is mandatory in PR/main CI.
       # The PUBLIC release gate checks genuine documents and all indexable SEO
@@ -333,6 +346,36 @@ jobs:
                 exit 1
               }
             '
+
+      # On CDN failures, gather request-level evidence BEFORE rollback,
+      # while the candidate image is still running on the public origin.
+      # This is strictly read-only, best-effort, and cannot change the result
+      # of the public HTTPS or real-browser release gates.
+      - name: Diagnose failed Cloudflare public route (non-gating)
+        if: ${{ failure() && steps.public_gate.outcome == 'failure' }}
+        run: |
+          set -euo pipefail
+          for route in / /workspace/ /zh/workspace/ /pdfjs/pdf.worker.min.mjs; do
+            for attempt in 1 2; do
+              headers=$(mktemp)
+              # Keep public TLS verification strict; Cloudflare 522/525 are
+              # retained as status codes instead of being hidden by --fail.
+              # Do not print origin IPs, HTTP bodies, URLs with credentials,
+              # origin headers, or certificate private material.
+              result=$(curl --silent --connect-timeout 5 --max-time 12 \
+                -H 'Cache-Control: no-cache' \
+                -D "$headers" -o /dev/null \
+                -w '%{http_code}|%{time_connect}|%{time_appconnect}|%{time_total}' \
+                "https://pdf.plainmile.com${route}?release-diag=${{ github.event.workflow_run.head_sha }}" \
+                2>/dev/null || true)
+              IFS='|' read -r status tcp tls total <<< "${result:-000|0|0|0}"
+              ray=$(grep -im1 '^cf-ray:' "$headers" | awk '{print $2}' | tr -d '\r' || true)
+              rm -f "$headers"
+              echo "cloudflare_probe_route=$route attempt=$attempt http_status=${status:-000} tcp_s=${tcp:-0} tls_s=${tls:-0} total_s=${total:-0} ray=${ray:-absent}"
+              sleep 1
+            done
+          done
+          echo 'Cloudflare probe results are diagnostic only; release remains failed and rollback still runs.'
 
       - name: Restore last healthy image if release checks fail
         if: ${{ failure() && steps.checkpoint.outputs.previous_sha != '' && steps.deploy.outcome != 'skipped' }}
