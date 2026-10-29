@@ -13,6 +13,7 @@ for (const { path, workspace } of [
 ]) {
   test(`OS file dropped on non-upload header cannot navigate away from ${path}; real dropzone still imports`, async ({ page }) => {
     await page.goto(path);
+    await expect(page.getByTestId(workspace ? 'dropzone' : 'utility-dropzone')).toBeVisible();
     // A browser normally opens a file dropped on an unhandled header/footer,
     // potentially discarding the in-memory PDF and any Undo/download state.
     const safety = await page.evaluate(() => {
