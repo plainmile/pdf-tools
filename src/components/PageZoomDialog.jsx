@@ -167,6 +167,9 @@ export default function PageZoomDialog({
             <p>{t.previewFail}</p>
             <button type="button" className="button button-secondary button-small"
               data-testid="page-zoom-retry" onClick={() => {
+                // The Retry button disappears while rendering. Keep keyboard
+                // focus inside the modal rather than dropping it to <body>.
+                closeRef.current?.focus();
                 setStatus('loading');
                 setRetryVersion(value => value + 1);
               }}>{t.previewRetry}</button>
