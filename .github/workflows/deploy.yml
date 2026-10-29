@@ -351,31 +351,30 @@ jobs:
       # while the candidate image is still running on the public origin.
       # This is strictly read-only, best-effort, and cannot change the result
       # of the public HTTPS or real-browser release gates.
+      # Keep failure-only diagnostics strictly bounded, so an unreachable CDN
+      # cannot delay restoring the last healthy version by ~100 seconds.
+      # The original failed request already has its own CF-Ray, and one extra
+      # sample per route is enough to identify potentially intermittent edges.
       - name: Diagnose failed Cloudflare public route (non-gating)
         if: ${{ failure() && steps.public_gate.outcome == 'failure' }}
         run: |
           set -euo pipefail
           for route in / /workspace/ /zh/workspace/ /pdfjs/pdf.worker.min.mjs; do
-            for attempt in 1 2; do
-              headers=$(mktemp)
-              # Keep public TLS verification strict; Cloudflare 522/525 are
-              # retained as status codes instead of being hidden by --fail.
-              # Do not print origin IPs, HTTP bodies, URLs with credentials,
-              # origin headers, or certificate private material.
-              result=$(curl --silent --connect-timeout 5 --max-time 12 \
-                -H 'Cache-Control: no-cache' \
-                -D "$headers" -o /dev/null \
-                -w '%{http_code}|%{time_connect}|%{time_appconnect}|%{time_total}' \
-                "https://pdf.plainmile.com${route}?release-diag=${{ github.event.workflow_run.head_sha }}" \
-                2>/dev/null || true)
-              IFS='|' read -r status tcp tls total <<< "${result:-000|0|0|0}"
-              ray=$(grep -im1 '^cf-ray:' "$headers" | awk '{print $2}' | tr -d '\r' || true)
-              rm -f "$headers"
-              echo "cloudflare_probe_route=$route attempt=$attempt http_status=${status:-000} tcp_s=${tcp:-0} tls_s=${tls:-0} total_s=${total:-0} ray=${ray:-absent}"
-              sleep 1
-            done
+            headers=$(mktemp)
+            # Public TLS stays strict. Log only status, timings, sanitized Ray ID
+            # and this fixed public path; never expose origin IPs or response bodies.
+            result=$(curl --silent --connect-timeout 2 --max-time 5 \
+              -H 'Cache-Control: no-cache' \
+              -D "$headers" -o /dev/null \
+              -w '%{http_code}|%{time_connect}|%{time_appconnect}|%{time_total}' \
+              "https://pdf.plainmile.com${route}?release-diag=${{ github.event.workflow_run.head_sha }}" \
+              2>/dev/null || true)
+            IFS='|' read -r status tcp tls total <<< "${result:-000|0|0|0}"
+            ray=$(grep -im1 '^cf-ray:' "$headers" | awk '{print $2}' | tr -cd '[:alnum:]-' || true)
+            rm -f "$headers"
+            echo "cloudflare_probe_route=$route http_status=${status:-000} tcp_s=${tcp:-0} tls_s=${tls:-0} total_s=${total:-0} ray=${ray:-absent}"
           done
-          echo 'Cloudflare probe results are diagnostic only; release remains failed and rollback still runs.'
+          echo 'Failure probes are non-gating; restore the previous healthy image without delay.'
 
       - name: Restore last healthy image if release checks fail
         if: ${{ failure() && steps.checkpoint.outputs.previous_sha != '' && steps.deploy.outcome != 'skipped' }}
