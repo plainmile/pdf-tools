@@ -255,6 +255,54 @@ test('everyday English and Chinese PDF questions find the existing tools', async
   await expect(page.getByText('没有匹配的工具')).toBeVisible();
 });
 
+test('free and online task queries find real tools in both locales without reversing conversions', async ({ page }) => {
+  await page.goto('/');
+  const en = page.getByRole('searchbox', { name: 'Find a PDF tool' });
+  for (const [query, path] of [
+    ['Free Online PDF Merger', '/merge-pdf/'],
+    ['Free PDF to JPG', '/pdf-to-images/'],
+    ['Online JPG to PDF for free', '/image-to-pdf/'],
+    ['PDF splitter', '/split-pdf/'],
+    ['PDF compressor', '/compress-pdf/'],
+  ]) {
+    await en.fill(query);
+    await expect(page.locator('a.tool-card[href="' + path + '"]')).toBeVisible();
+    if (path === '/pdf-to-images/') await expect(page.locator('a.tool-card[href="/image-to-pdf/"]')).toBeHidden();
+    if (path === '/image-to-pdf/') await expect(page.locator('a.tool-card[href="/pdf-to-images/"]')).toBeHidden();
+  }
+  // Promotional words alone and unsupported conversion directions must not
+  // fabricate available functions, links or search landing pages.
+  for (const query of ['free', 'Free PDF to Word online']) {
+    await en.fill(query);
+    await expect(page.getByText('No tools match that search')).toBeVisible();
+    await expect(page.locator('[data-tool-card]:visible')).toHaveCount(0);
+  }
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/');
+  const zh = page.getByRole('searchbox', { name: '搜索工具' });
+  for (const [query, path] of [
+    ['免费在线合并PDF工具', '/zh/merge-pdf/'],
+    ['在线PDF转JPG', '/zh/pdf-to-images/'],
+    ['免费JPG转PDF', '/zh/image-to-pdf/'],
+    ['PDF压缩工具', '/zh/compress-pdf/'],
+  ]) {
+    await zh.fill(query);
+    await expect(page.locator('a.tool-card[href="' + path + '"]')).toBeVisible();
+    if (path === '/zh/pdf-to-images/') await expect(page.locator('a.tool-card[href="/zh/image-to-pdf/"]')).toBeHidden();
+    if (path === '/zh/image-to-pdf/') await expect(page.locator('a.tool-card[href="/zh/pdf-to-images/"]')).toBeHidden();
+  }
+  for (const query of ['免费', '免费PDF转Word工具']) {
+    await zh.fill(query);
+    await expect(page.getByText('没有匹配的工具')).toBeVisible();
+    await expect(page.locator('[data-tool-card]:visible')).toHaveCount(0);
+  }
+  const pageWidth = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    client: document.documentElement.clientWidth,
+  }));
+  expect(pageWidth.scroll).toBeLessThanOrEqual(pageWidth.client + 2);
+});
+
 test('reciprocal converter navigation is crawlable with localized breadcrumbs', async ({ browser }) => {
   const context = await browser.newContext({ javaScriptEnabled: false });
   const page = await context.newPage();
