@@ -224,6 +224,53 @@ jobs:
             https://pdf.plainmile.com/ || true
           REMOTE
 
+      # A VPS-local 200 does not prove Cloudflare can connect to the PUBLIC
+      # origin interface. Probe from the ephemeral GitHub Runner, with real
+      # public SNI/Host but the netcup SSH target as the TCP destination. This
+      # diagnostic is non-gating; the full Cloudflare public release gate below
+      # remains mandatory and keeps rollback enabled on any failure.
+      - name: Diagnose external origin TLS and release SHA (non-gating)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          # Cloudflare Origin CA is intentionally not trusted by public root CAs.
+          # --insecure is ONLY for this direct-origin diagnostic, never for
+          # the public HTTPS release tests or real user traffic.
+          case "$DEPLOY_HOST" in
+            *:*) origin_host="[$DEPLOY_HOST]" ;;
+            *) origin_host="$DEPLOY_HOST" ;;
+          esac
+          probe_body=$(mktemp)
+          trap 'rm -f "$probe_body"' EXIT
+          # Suppress curl's connection error text to avoid exposing secret
+          # origin address/hostname in public GitHub Actions logs. The output
+          # reports only status, TCP connect time, and TLS connect time.
+          probe=$(curl --insecure --silent --connect-timeout 5 --max-time 12 \
+            --connect-to "pdf.plainmile.com:443:${origin_host}:443" \
+            -H 'Cache-Control: no-cache' -o "$probe_body" \
+            -w '%{http_code}|%{time_connect}|%{time_appconnect}' \
+            "https://pdf.plainmile.com/.well-known/plainmile-release?origin-diagnostic=$EXPECTED_SHA" 2>/dev/null || true)
+          IFS='|' read -r status tcp_seconds tls_seconds <<EOF
+          ${probe:-000|0|0}
+          EOF
+          echo "external_origin_https_status=${status:-000}"
+          echo "external_origin_tcp_seconds=${tcp_seconds:-0}"
+          echo "external_origin_tls_seconds=${tls_seconds:-0}"
+          if [ "$status" = 200 ]; then
+            if [ "$(cat "$probe_body")" = "$EXPECTED_SHA" ]; then
+              echo 'external_origin_release_sha=match'
+            else
+              echo 'external_origin_release_sha=mismatch'
+            fi
+          else
+            echo 'external_origin_release_sha=unavailable'
+            echo 'If local origin is healthy but this external check fails, inspect netcup/provider firewall, public port 443 and origin DNS.'
+          fi
+          # Do not exit nonzero: the following Cloudflare public check is the
+          # authoritative release/rollback gate even if this probe succeeded.
+
       - name: Verify public HTTPS, exact release SHA, SEO and worker
         env:
           EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
