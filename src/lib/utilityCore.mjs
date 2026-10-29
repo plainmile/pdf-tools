@@ -825,7 +825,10 @@ export function workspaceFilenameStem(input, fallback = '') {
   if (typeof input !== 'string' || !input.trim()) return fallback;
   const withoutExtension = input.normalize('NFKC').trim().replace(/\.pdf$/i, '');
   const stem = withoutExtension.replace(/[^\p{L}\p{N}._-]+/gu, '-')
-    .replace(/^[._-]+|[._-]+$/g, '').slice(0, 70);
+    .replace(/^[._-]+|[._-]+$/g, '').slice(0, 70)
+    // A 70-character cut may land on a period/underscore/hyphen even
+    // though we trimmed those before slicing.
+    .replace(/[._-]+$/g, '');
   if (!stem) return fallback;
   // These names are reserved on Windows even when given a PDF extension.
   return WINDOWS_RESERVED_DEVICE_STEM.test(stem)
@@ -858,9 +861,15 @@ export function bookmarkSplitPartFilenames(parts, chapters) {
 }
 
 export function sanitizeFilename(filename) {
-  const stem = (filename || 'document').replace(/\.[^.]+$/, '')
-    .replace(/[^\p{L}\p{N}._-]+/gu, '-').slice(0, 70)
-    .replace(/\.+$/g, '') || 'document';
+  // Treat automatic download names just like the custom-name field: normalize
+  // fullwidth punctuation before removing the source extension. A leading
+  // period (e.g. ".scan.pdf") can create a hidden download on macOS/Linux;
+  // leading separators and a truncated trailing dot are not useful either.
+  const source = typeof filename === 'string' ? filename.normalize('NFKC').trim() : '';
+  const stem = source.replace(/\.[^.]+$/, '')
+    .replace(/[^\p{L}\p{N}._-]+/gu, '-')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .slice(0, 70).replace(/[._-]+$/g, '') || 'document';
   // Windows reserves device names even when followed by .pdf, .txt or .md.
   // The workspace custom-name field already guards these; utility-generated
   // converter filenames must follow the same rule.
