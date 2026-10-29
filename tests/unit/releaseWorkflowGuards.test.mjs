@@ -191,3 +191,15 @@ test('failed public E2E or unhealthy deploy rolls back only this service to a pr
   // Rollback must never restart the VPS edge, touch other Compose stacks or prune images.
   assert.doesNotMatch(yaml, /docker compose down|docker system prune|docker image prune/);
 });
+
+test('failed Docker browser regression retains its exact WebKit/Chromium trace without weakening no-retry gate', () => {
+  const ci = readWorkflow('ci.yml');
+  assert.match(ci, /mkdir -p "\$RUNNER_TEMP\/pdf-browser-failure"/);
+  assert.match(ci, /-v "\$RUNNER_TEMP\/pdf-browser-failure:\/artifacts"/);
+  assert.match(ci, /trap "if \[ -d test-results \]; then cp -r test-results \/artifacts\/; fi" EXIT/);
+  assert.match(ci, /- name: Upload failing browser traces\s*\n\s*if: failure\(\)/);
+  assert.match(ci, /uses: actions\/upload-artifact@v4/);
+  assert.match(ci, /path: \$\{\{ runner\.temp \}\}\/pdf-browser-failure\/test-results\//);
+  assert.match(ci, /retention-days: 5/);
+  assert.doesNotMatch(ci, /--retries=/);
+});

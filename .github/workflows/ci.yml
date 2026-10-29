@@ -87,7 +87,11 @@ jobs:
           test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18081/unknown-route)" = "404"
       - name: Browser E2E against production image (Playwright in Docker)
         run: |
+          # Keep synthetic test traces outside the disposable test container.
+          # No customer PDFs ever enter this CI: only generated fixtures are used.
+          mkdir -p "$RUNNER_TEMP/pdf-browser-failure"
           docker run --rm --network host -v "$PWD:/work:ro" \
+            -v "$RUNNER_TEMP/pdf-browser-failure:/artifacts" \
             mcr.microsoft.com/playwright:v1.55.0-noble \
             bash -lc '
               set -eu
@@ -98,6 +102,9 @@ jobs:
               cd /tmp/pdf-e2e
               npm init -y >/dev/null
               npm install --no-audit --no-fund @playwright/test@1.55.0 pdf-lib@1.17.1 jszip@3.10.1
+              # When an engine fails, retain its screenshot, error context and
+              # Playwright trace before docker --rm deletes the test container.
+              trap "if [ -d test-results ]; then cp -r test-results /artifacts/; fi" EXIT
               # Fail fast on Safari/Firefox incompatibility before running the
               # longer full Chromium suite; both remain mandatory for merge.
               echo "=== Firefox and WebKit PDF workflow regression ==="
@@ -109,6 +116,14 @@ jobs:
               echo "=== Bounded deploy gate regressions ==="
               PDF_BASE_URL=http://127.0.0.1:18081 npx playwright test --config=playwright.deploy.config.mjs
             '
+      - name: Upload failing browser traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-browser-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pdf-browser-failure/test-results/
+          if-no-files-found: ignore
+          retention-days: 5
       - name: Cleanup
         if: always()
         run: docker rm -f plainmile-pdf-tools-e2e >/dev/null 2>&1 || true
