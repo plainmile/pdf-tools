@@ -405,7 +405,7 @@ test('Chinese Every N split accepts fullwidth digits and exports exact PDF page 
   const started = page.waitForEvent('download');
   await page.locator('.split-download').click();
   const download = await started;
-  expect(download.suggestedFilename()).toMatch(/-split\\.zip$/);
+  expect(download.suggestedFilename()).toMatch(/-split\.zip$/);
   const archive = await JSZip.loadAsync(await readFile(await download.path()));
   const names = Object.keys(archive.files).filter(name => name.endsWith('.pdf')).sort();
   expect(names).toEqual([
