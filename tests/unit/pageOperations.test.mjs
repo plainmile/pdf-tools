@@ -137,10 +137,19 @@ test('split into fixed-size chunks', () => {
   assert.deepEqual(chunkPageRanges(7, 3), [{start:1,end:3},{start:4,end:6},{start:7,end:7}]);
 });
 
-test('every-N split rejects exponent, fractional and hex page counts before export', () => {
+test('every-N split accepts fullwidth decimal digits, but rejects other numeric-looking input', () => {
   assert.equal(decimalPageInteger('002'), 2);
-  assert.deepEqual(chunkPageRanges(7, '03'), [{ start: 1, end: 3 }, { start: 4, end: 6 }, { start: 7, end: 7 }]);
-  for (const invalid of ['2e0', '2.0', '0x2', '2.5', '1e309', '+2', '-2', '0', '', ' ', '8', null, true]) {
+  assert.equal(decimalPageInteger('００３'), 3);
+  assert.equal(decimalPageInteger('  ３  '), 3);
+  assert.equal(decimalPageInteger('2３'), 23);
+  for (const size of ['03', '３', '００３']) {
+    assert.deepEqual(chunkPageRanges(7, size),
+      [{ start: 1, end: 3 }, { start: 4, end: 6 }, { start: 7, end: 7 }]);
+  }
+  // NFKC would convert circled and superscript numbers too; only ordinary
+  // ASCII/fullwidth digits are deliberate supported input.
+  for (const invalid of ['2e0', '2.0', '0x2', '2.5', '1e309', '+2', '-2', '0', '', ' ', '8', null, true,
+    '②', '²', '三', '３e0', '３.０', '３．０', '＋３', '３ ２']) {
     assert.throws(() => chunkPageRanges(7, invalid), /valid pages-per-file/, String(invalid));
   }
 });

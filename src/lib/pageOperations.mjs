@@ -2,11 +2,14 @@
 export const MAX_SPLIT_ZIP_BYTES = 128 * 1024 * 1024;
 
 /** Strict decimal whole-number input shared by page numbering and Split every N.
- * HTML number inputs also accept exponent notation (e.g. 2e0), which looks
- * like a count but is not a plain page number. Fail closed before export.
+ * Accept fullwidth ０-９ digits used by Chinese keyboards, just as the page
+ * range and page-jump fields do. Do NOT use NFKC here: that would also accept
+ * superscript digits, circled numbers and other unintended notations.
+ * Exponents (2e0), decimals, signs and hexadecimal remain invalid.
  */
 export function decimalPageInteger(value) {
-  const text = String(value ?? '').trim();
+  const text = String(value ?? '').trim()
+    .replace(/[\uFF10-\uFF19]/g, digit => String.fromCharCode(digit.charCodeAt(0) - 0xFEE0));
   if (!/^[0-9]+$/.test(text)) return null;
   const number = Number(text);
   return Number.isSafeInteger(number) ? number : null;
