@@ -532,7 +532,16 @@ test('scan risk considers short headers and longer page-labelled footers without
 });
 
 test('generated download filename removes unsafe path characters and Windows device names', () => {
-  assert.equal(sanitizeFilename('../secret\n local.pdf'), '..-secret-local');
+  assert.equal(sanitizeFilename('../secret\n local.pdf'), 'secret-local');
+  // Dotfiles must not silently become hidden downloads on Unix systems.
+  assert.equal(sanitizeFilename('.private.pdf'), 'private');
+  assert.equal(sanitizeFilename('...scan.PDF'), 'scan');
+  // NFKC keeps Chinese/fullwidth names legible rather than producing
+  // ".PDF"-like fragments and duplicate extensions.
+  assert.equal(sanitizeFilename('报告．ＰＤＦ'), '报告');
+  assert.equal(sanitizeFilename('ＡＢＣ－２０２６.pdf'), 'ABC-2026');
+  assert.equal(sanitizeFilename('report' + '.'.repeat(20) + '.pdf'), 'report');
+  assert.equal(sanitizeFilename('a'.repeat(69) + '.long.pdf'), 'a'.repeat(69));
   for (const reserved of ['CON.pdf', 'prn.md', 'AUX.txt', 'NUL', 'COM1.PDF', 'lpt9.pdf', 'CON..pdf',
     'NUL.tar.gz', 'CON.report.pdf', 'COM¹.pdf', 'COM².doc', 'COM³.pdf', 'LPT¹.txt', 'LPT².md', 'LPT³.archive.pdf']) {
     assert.match(sanitizeFilename(reserved), /^plainmile-/i, reserved);
@@ -746,4 +755,6 @@ test('custom PDF download stems are Unicode-safe, path-safe and optional', () =>
   assert.equal(workspaceFilenameStem('??...///', 'unchanged'), 'unchanged');
   assert.equal(workspaceFilenameStem('CON.pdf'), 'plainmile-CON');
   assert.ok(workspaceFilenameStem('A'.repeat(200)).length <= 70);
+  assert.equal(workspaceFilenameStem('A'.repeat(69) + '.part'), 'A'.repeat(69));
+  assert.equal(workspaceFilenameStem('报告．ＰＤＦ'), '报告');
 });
