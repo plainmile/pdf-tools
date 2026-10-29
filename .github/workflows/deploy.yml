@@ -293,13 +293,25 @@ jobs:
             exit 1
           fi
           for route in / /workspace/ /zh/workspace/; do
-            curl --fail --show-error --silent --location --retry 4 \
-              -o /tmp/pdf-public-page.html "https://pdf.plainmile.com$route"
+            # Keep the original failing response's Cloudflare Ray ID: later
+            # diagnostic requests may hit a different edge and return 200.
+            if ! curl --fail --show-error --silent --location --retry 4 \
+              -D /tmp/pdf-public-headers \
+              -o /tmp/pdf-public-page.html "https://pdf.plainmile.com$route"; then
+              ray=$(grep -i '^cf-ray:' /tmp/pdf-public-headers | tail -n 1 | awk '{print $2}' | tr -cd '[:alnum:]-' || true)
+              echo "public_route_failed=$route cf_ray=${ray:-absent}" >&2
+              exit 1
+            fi
             grep -q 'rel="canonical"' /tmp/pdf-public-page.html
             grep -q 'hreflang="en"' /tmp/pdf-public-page.html
             grep -q 'hreflang="zh-CN"' /tmp/pdf-public-page.html
           done
-          curl -fsS -o /dev/null https://pdf.plainmile.com/pdfjs/pdf.worker.min.mjs
+          if ! curl -fsS -D /tmp/pdf-public-worker-headers -o /dev/null \
+            https://pdf.plainmile.com/pdfjs/pdf.worker.min.mjs; then
+            ray=$(grep -i '^cf-ray:' /tmp/pdf-public-worker-headers | tail -n 1 | awk '{print $2}' | tr -cd '[:alnum:]-' || true)
+            echo "public_route_failed=/pdfjs/pdf.worker.min.mjs cf_ray=${ray:-absent}" >&2
+            exit 1
+          fi
 
       # Full Chromium/Firefox/WebKit regression is mandatory in PR/main CI.
       # The PUBLIC release gate checks genuine documents and all indexable SEO
