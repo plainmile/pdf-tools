@@ -383,6 +383,47 @@ test('select pages by output ranges then extract real nonconsecutive pages', asy
   expect(output.getPages().map(p => p.getWidth())).toEqual([302, 303, 305]);
 });
 
+test('Chinese Every N split accepts fullwidth digits and exports exact PDF page groups on a phone', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/split-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: '章节.pdf', mimeType: 'application/pdf', buffer: await makePdf([301, 302, 303, 304, 305, 306, 307]),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(7);
+  await page.locator('input[name="split-method"]').nth(1).check();
+  const count = page.locator('#chunk-input');
+  await expect(count).toHaveAttribute('inputmode', 'numeric');
+  // Text, not type=number: Chromium and Safari otherwise discard fullwidth
+  // characters before the app gets a chance to normalize them.
+  await count.fill('３e0');
+  await expect(page.getByTestId('split-chunk-invalid')).toBeVisible();
+  await expect(page.locator('.split-download')).toBeDisabled();
+  await count.fill('３');
+  await expect(count).toHaveValue('３');
+  await expect(page.getByTestId('split-chunk-invalid')).toHaveCount(0);
+  await expect(page.locator('.split-download')).toBeEnabled();
+  const started = page.waitForEvent('download');
+  await page.locator('.split-download').click();
+  const download = await started;
+  expect(download.suggestedFilename()).toMatch(/-split\\.zip$/);
+  const archive = await JSZip.loadAsync(await readFile(await download.path()));
+  const names = Object.keys(archive.files).filter(name => name.endsWith('.pdf')).sort();
+  expect(names).toEqual([
+    'part-01-pages-1-3.pdf', 'part-02-pages-4-6.pdf', 'part-03-pages-7-7.pdf',
+  ]);
+  const groups = [];
+  for (const name of names) {
+    const pdf = await PDFDocument.load(await archive.file(name).async('uint8array'));
+    groups.push(pdf.getPages().map(page => page.getWidth()));
+  }
+  expect(groups).toEqual([[301, 302, 303], [304, 305, 306], [307]]);
+  const width = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    viewport: document.documentElement.clientWidth,
+  }));
+  expect(width.scroll).toBeLessThanOrEqual(width.viewport + 2);
+});
+
 test('Chinese touch-width range selection uses export order and rejects reversed ranges atomically', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/zh/delete-pages/');
