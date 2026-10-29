@@ -8,6 +8,36 @@ async function pdf(widths) {
   return Buffer.from(await doc.save());
 }
 
+test('Unix-style dotfile PDF imports export a visible default filename and preserve the actual page', async ({ page }) => {
+  await page.goto('/merge-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: '.private.pdf', mimeType: 'application/pdf', buffer: await pdf([317]),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  await expect(page.getByTestId('workspace-export-filename')).toContainText('private-merged.pdf');
+  const started = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export PDF', exact: true }).click();
+  const download = await started;
+  expect(download.suggestedFilename()).toBe('private-merged.pdf');
+  const saved = await PDFDocument.load(await readFile(await download.path()));
+  expect(saved.getPages().map(p => p.getWidth())).toEqual([317]);
+});
+
+test('fullwidth PDF filename produces one clean Chinese image name without changing image bytes', async ({ page }) => {
+  await page.goto('/zh/pdf-to-images/');
+  await page.getByTestId('utility-file-input').setInputFiles({
+    name: '报告．ＰＤＦ', mimeType: 'application/pdf', buffer: await pdf([310]),
+  });
+  await expect(page.getByTestId('utility-file-summary')).toContainText('报告．ＰＤＦ');
+  await page.getByRole('combobox', { name: '图片格式' }).selectOption('png');
+  const started = page.waitForEvent('download');
+  await page.getByTestId('utility-run').click();
+  const download = await started;
+  expect(download.suggestedFilename()).toBe('报告-page-001.png');
+  const image = await readFile(await download.path());
+  expect([...image.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+});
+
 test('merge tool suggests merged.pdf, preserves a custom name, and exports correct pages', async ({ page }) => {
   await page.goto('/merge-pdf/');
   await page.getByTestId('file-input').setInputFiles([
