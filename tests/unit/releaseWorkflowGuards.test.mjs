@@ -165,6 +165,36 @@ test('deployment diagnostics distinguish external origin from Cloudflare without
   assert.ok(publicProbe.includes('if [ "$deployed_sha" != "$EXPECTED_SHA" ]; then'));
 });
 
+test('failed Cloudflare gate logs path, 525/522 status and Ray ID before safe rollback without bypass', () => {
+  const yaml = readWorkflow('deploy.yml');
+  const gate = yaml.indexOf('- name: Verify public HTTPS, exact release SHA, SEO and worker');
+  const realBrowser = yaml.indexOf('- name: Public browser release smoke and SEO against deployed site');
+  const diagnostic = yaml.indexOf('- name: Diagnose failed Cloudflare public route (non-gating)');
+  const rollback = yaml.indexOf('- name: Restore last healthy image if release checks fail');
+  assert.ok(gate > 0 && gate < realBrowser && realBrowser < diagnostic && diagnostic < rollback);
+  const publicGate = yaml.slice(gate, realBrowser);
+  const probe = yaml.slice(diagnostic, rollback);
+  assert.ok(publicGate.includes('id: public_gate'));
+  assert.ok(publicGate.includes('curl --fail --silent --show-error --max-time 15'));
+  assert.ok(publicGate.includes('if [ "$deployed_sha" != "$EXPECTED_SHA" ]; then'));
+  assert.ok(publicGate.includes('grep -q \'hreflang="zh-CN"\''));
+  assert.ok(!publicGate.includes('--insecure'));
+  assert.ok(probe.includes("if: ${{ failure() && steps.public_gate.outcome == 'failure' }}"));
+  assert.ok(probe.includes('cloudflare_probe_route='));
+  assert.ok(probe.includes('http_status='));
+  assert.ok(probe.includes('ray='));
+  assert.ok(probe.includes("grep -im1 '^cf-ray:'"));
+  assert.ok(probe.includes('for route in / /workspace/ /zh/workspace/ /pdfjs/pdf.worker.min.mjs; do'));
+  assert.ok(probe.includes('for attempt in 1 2; do'));
+  assert.ok(probe.includes('--connect-timeout 5 --max-time 12'));
+  assert.ok(probe.includes('2>/dev/null || true'));
+  assert.ok(!probe.includes('--insecure'));
+  assert.ok(!probe.includes('curl -k'));
+  assert.ok(!probe.includes('DEPLOY_HOST'));
+  assert.ok(!probe.includes('docker compose'));
+  assert.ok(!probe.includes('exit 0'));
+});
+
 test('bounded PUBLIC verification retains complete SEO, real file outputs, safe rollback and full no-retry Docker CI', () => {
   const deploy = readWorkflow('deploy.yml');
   const ci = readWorkflow('ci.yml');
