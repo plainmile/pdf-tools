@@ -79,6 +79,40 @@ test('Chinese mobile interface safely imports BMP and still AVIF', async ({ page
   expect(imageSize(pdf, 1)).toEqual(expect.arrayContaining([{ width: 9, height: 7 }]));
 });
 
+test('iPhone-size canvas preflight rejects a tall BMP without decoding or losing earlier pages', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+    });
+    const nativeDecoder = window.createImageBitmap.bind(window);
+    window.__bmpDecodeCalls = 0;
+    window.createImageBitmap = (blob, ...args) => {
+      if (blob instanceof Blob && blob.type === 'image/bmp') window.__bmpDecodeCalls++;
+      return nativeDecoder(blob, ...args);
+    };
+  });
+  await page.goto('/zh/image-to-pdf/');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'safe.bmp', mimeType: 'image/bmp', buffer: makeBmp(),
+  });
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  await page.evaluate(() => { window.__bmpDecodeCalls = 0; });
+  // Only change the dimensions in the header. The image body is tiny; the
+  // browser must reject BEFORE requesting expensive ImageBitmap decoding.
+  const tooTall = Buffer.from(makeBmp());
+  tooTall.writeInt32LE(4097, 22);
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'long.bmp', mimeType: 'image/bmp', buffer: tooTall,
+  });
+  await expect(page.getByRole('alert')).toContainText('画布限制');
+  expect(await page.evaluate(() => window.__bmpDecodeCalls)).toBe(0);
+  await expect(page.getByTestId('page-tile')).toHaveCount(1);
+  const pdf = await downloadPdf(page, '导出 PDF');
+  expect(pdf.getPageCount()).toBe(1);
+  expect(imageSize(pdf, 0)).toContainEqual({ width: 4, height: 3 });
+});
+
 test('unsupported AVIF decoder errors preserve loaded pages and allow a real retry in both languages', async ({ page }) => {
   await page.addInitScript(() => {
     const nativeDecoder = window.createImageBitmap.bind(window);
