@@ -1699,7 +1699,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   {splitMode === 'ranges' && <p className="input-note" id="split-range-combine-hint">{t.splitCombineHint}</p>}
                   <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); }} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
-                  <input id="chunk-input" type="number" min="1" max={pages.length} step="1" value={chunkSize} placeholder="5"
+                  <input id="chunk-input" type="text" inputMode="numeric" maxLength={8} value={chunkSize} placeholder="5"
+                    // Native number inputs discard fullwidth ３ before React
+                    // can validate it. Keep the mobile numeric keyboard, and
+                    // let the strict page-count parser handle all bounds.
                     onChange={(event) => { setChunkSize(event.target.value); setSplitBatchIndex(0); }}
                     disabled={splitMode !== 'chunks' || busy}
                     aria-invalid={invalidChunkSize ? 'true' : undefined}
