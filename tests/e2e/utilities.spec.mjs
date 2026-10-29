@@ -161,6 +161,54 @@ test('PDF-to-images overlapping ranges produce unique images and truthful ZIP na
   ]);
 });
 
+test('Chinese mobile image export remains current across equivalent page range spelling', async ({ page }) => {
+  test.setTimeout(70000);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/zh/pdf-to-images/');
+  await upload(page, await fixturePdf('Equivalent image page ranges', 5));
+  const format = page.getByRole('combobox', { name: '图片格式' });
+  const range = page.getByTestId('utility-page-ranges');
+  const stale = page.getByTestId('image-result-stale');
+  await format.selectOption('png');
+  await range.fill('２－３');
+  const original = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+  const expected = ['page-002.png', 'page-003.png'];
+  expect(Object.keys((await JSZip.loadAsync(original.bytes)).files).sort()).toEqual(expected);
+  await expect(page.getByTestId('image-result')).toBeVisible();
+  await expect(stale).toHaveCount(0);
+
+  // These spellings export the same ordered images: no unnecessary re-run.
+  for (const spelling of ['2-3', '2, 3', '02-03', '２－３，３']) {
+    await range.fill(spelling);
+    await expect(stale).toHaveCount(0);
+  }
+
+  // A different order, malformed input or format really does invalidate it.
+  await range.fill('3,2');
+  await expect(stale).toBeVisible();
+  const previous = await getDownload(page, () => page.getByTestId('image-download-again').click());
+  expect(Buffer.compare(previous.bytes, original.bytes)).toBe(0);
+  await range.fill('3-2');
+  await expect(page.getByTestId('utility-run')).toBeDisabled();
+  await expect(stale).toBeVisible();
+  await range.fill('2,3');
+  await expect(stale).toHaveCount(0);
+  await format.selectOption('jpg');
+  await expect(stale).toBeVisible();
+
+  const oldPng = await getDownload(page, () => page.getByTestId('image-download-again').click());
+  expect(Buffer.compare(oldPng.bytes, original.bytes)).toBe(0);
+  const updated = await getDownload(page, () => page.getByTestId('utility-run').click(), 30000);
+  expect(Object.keys((await JSZip.loadAsync(updated.bytes)).files).sort())
+    .toEqual(['page-002.jpg', 'page-003.jpg']);
+  await expect(stale).toHaveCount(0);
+  const width = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    viewport: document.documentElement.clientWidth,
+  }));
+  expect(width.scroll).toBeLessThanOrEqual(width.viewport + 2);
+});
+
 test('Chinese book-length PDF image selection blocks >60 pages and blank all-pages export', async ({ page }) => {
   await page.goto('/zh/pdf-to-images/');
   await upload(page, await fixturePdf('65 pages', 65));
