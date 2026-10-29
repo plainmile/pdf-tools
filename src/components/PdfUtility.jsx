@@ -861,7 +861,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           {textResultStale && <p className="utility-note" role="status" data-testid="text-result-stale">{t.textResultStale}</p>}
           <PdfFirstPagePreview bytes={output.bytes} pageCount={output.pageCount} locale={locale} t={t} />
           <button type="button" className="button button-primary" data-testid="utility-pdf-download"
-            onClick={() => save(output)}>{t.downloadPdf} ↓</button>
+            onClick={() => save(output)}>{textResultStale ? t.numberedPreviousDownload : t.downloadPdf} ↓</button>
         </div>}
         {error && <div className="notice notice-error" role="alert">{error}</div>}
         {notice && <div className="notice notice-success" role="status">{notice}</div>}
