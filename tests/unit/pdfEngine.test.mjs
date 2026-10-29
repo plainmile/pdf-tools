@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { imageTypeFor, isSupportedFile, compressedImageDimensions, composePdf, pristinePdfBytes, temporaryWorkspaceId, createBlankPageSource, hasInteractivePdfForm, hasPdfBookmarks, LIMITS, retainedSourceBytes, retainedSourcesBytes, reflowImageSources } from '../../src/lib/pdfEngine.mjs';
+import { imageTypeFor, isSupportedFile, compressedImageDimensions, enforceImageDecodeCanvasSide, composePdf, pristinePdfBytes, temporaryWorkspaceId, createBlankPageSource, hasInteractivePdfForm, hasPdfBookmarks, LIMITS, retainedSourceBytes, retainedSourcesBytes, reflowImageSources } from '../../src/lib/pdfEngine.mjs';
 import { PDFDocument, PDFName, PDFHexString, degrees } from 'pdf-lib';
 
 test('recognize JPEG/PNG/WebP images even with missing or generic MIME types', () => {
@@ -329,6 +329,24 @@ test('recognize BMP and still AVIF with MIME aliases and missing MIME types', ()
   assert.equal(imageTypeFor({ name: 'old.bmp', type: 'image/x-bmp' }), 'image/bmp');
   assert.equal(isSupportedFile({ name: 'unsupported.heic', type: '' }), false);
   assert.equal(isSupportedFile({ name: 'vector.svg', type: 'image/svg+xml' }), false);
+});
+
+test('canvas-backed image imports enforce mobile axis limits without reducing the JPG/PNG or 36 MP budgets', () => {
+  const iphone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)';
+  const desktopIpad = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)';
+  assert.equal(enforceImageDecodeCanvasSide({ width: 4096, height: 1000 }, iphone), true);
+  assert.throws(() => enforceImageDecodeCanvasSide({ width: 4097, height: 1000 }, iphone),
+    /browser canvas side limit of 4096 pixels/);
+  assert.throws(() => enforceImageDecodeCanvasSide({ width: 1000, height: 4097 }, desktopIpad, 5),
+    /browser canvas side limit of 4096 pixels/);
+  assert.equal(enforceImageDecodeCanvasSide({ width: 4097, height: 1000 }, desktopIpad, 0), true);
+  assert.equal(enforceImageDecodeCanvasSide({ width: 8000, height: 3000 }, '', 0), true);
+  assert.throws(() => enforceImageDecodeCanvasSide({ width: 16385, height: 100 }, '', 0),
+    /browser canvas side limit of 16384 pixels/);
+  assert.throws(() => enforceImageDecodeCanvasSide({ width: 8000, height: 5000 }, '', 0),
+    /Image dimensions are too large/);
+  assert.throws(() => enforceImageDecodeCanvasSide({ width: 0, height: 100 }, '', 0),
+    /Image dimensions are too large/);
 });
 
 test('validate authentic static AVIF headers and reject animation, spoofing or excessive dimensions', () => {

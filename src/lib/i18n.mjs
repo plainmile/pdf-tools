@@ -222,6 +222,7 @@ export function translateProcessingError(message, locale = 'en') {
   if (/password.protected|encrypted/i.test(error)) return '暂不支持带密码保护的 PDF，请先使用已授权方式解锁。';
   if (/could not be opened|as a PDF|corrupt/i.test(error)) return '文件无法作为 PDF 打开，请检查文件是否损坏。';
   if (/100 MB|between 1 byte/i.test(error)) return '单个文件大小必须在 1 字节至 100 MB 之间。';
+  if (/Image exceeds this browser canvas side limit/i.test(error)) return '图片宽或高超过当前设备的画布限制。请缩小图片尺寸，或先转换成 JPG/PNG 后再导入。';
   if (/image dimensions|too large/i.test(error)) return '图片尺寸过大，请缩小后重试。';
 
   // Errors already authored in Chinese (including exact limits such as 20 files,

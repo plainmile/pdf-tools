@@ -6,7 +6,7 @@ import { renderWatermarkPng, watermarkTextFromOptions, watermarkPagePlacement, W
 import { jpegExifOrientation, orientedJpegSize, jpegPdfPlacement, stripJpegPrivateMetadata } from './jpegExif.mjs';
 import { imagePdfPageLayout, IMAGE_PDF_LAYOUT_DEFAULT, shouldReflowImageSource } from './imagePdfLayout.mjs';
 import { readFileArrayBuffer, abortableWait } from './fileIo.mjs';
-import { checkCancelled } from './utilityCore.mjs';
+import { checkCancelled, rasterCanvasSideLimit } from './utilityCore.mjs';
 
 /**
  * Generate temporary IDs without depending on crypto.randomUUID(), which is
@@ -35,6 +35,25 @@ export const LIMITS = Object.freeze({
 });
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/avif']);
+
+/**
+ * BMP, WebP and AVIF require a browser canvas before being embedded in PDF.
+ * A narrow 4,097px-wide image can be far below the 36 MP image budget, but
+ * still fail on iPhones/iPads where a canvas side may stop at 4,096px.
+ * Use the existing browser-specific axis limits before decoding/allocating;
+ * JPEG and PNG embed directly without this extra canvas restriction.
+ */
+export function enforceImageDecodeCanvasSide({ width, height }, userAgent = '', maxTouchPoints = 0) {
+  if (![width, height].every(value => Number.isSafeInteger(value) && value > 0) ||
+      width * height > LIMITS.maxImagePixels) {
+    throw new Error('Image dimensions are too large.');
+  }
+  const maxSide = rasterCanvasSideLimit(userAgent, maxTouchPoints);
+  if (width > maxSide || height > maxSide) {
+    throw new Error(`Image exceeds this browser canvas side limit of ${maxSide} pixels. Resize it or convert it to JPG/PNG first.`);
+  }
+  return true;
+}
 
 /**
  * Count document buffers actually retained by the workspace, not only the
@@ -414,6 +433,11 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}, sig
       doc.embedJpg(stripJpegPrivateMetadata(originalBytes)), signal);
     else if (imageType === 'image/png') embedded = await abortableWait(doc.embedPng(originalBytes), signal);
     else {
+      // Reject narrow/long files that exceed this browser's canvas axis
+      // before allocating a decoded ImageBitmap, not after a failed toBlob.
+      const userAgent = globalThis.navigator?.userAgent ?? '';
+      const maxTouchPoints = globalThis.navigator?.maxTouchPoints ?? 0;
+      enforceImageDecodeCanvasSide(header, userAgent, maxTouchPoints);
       // Browser decoders can remain pending even after the file has loaded.
       // Race decoding against Cancel, but also close a *late* ImageBitmap:
       // abortableWait alone would drop the decoded bitmap and leak its pixels.
@@ -430,7 +454,8 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}, sig
       });
       await abortableWait(decoded, signal);
       checkCancelled(signal);
-      if (bitmap.width * bitmap.height > LIMITS.maxImagePixels) throw new Error('Image dimensions are too large.');
+      // Recheck actual decoded dimensions: untrusted headers may disagree.
+      enforceImageDecodeCanvasSide(bitmap, userAgent, maxTouchPoints);
       const canvas = document.createElement('canvas');
       conversionCanvas = canvas;
       canvas.width = bitmap.width;
@@ -495,7 +520,8 @@ async function imageToPdfBytes(file, originalBytes, imageType, options = {}, sig
     if (error?.message === 'Image dimensions are too large.' ||
         error?.message === 'JPEG metadata could not be safely removed.' ||
         /^Animated (AVIF|WebP|PNG) is not supported\.$/.test(error?.message) ||
-        /^This AVIF could not be decoded/.test(error?.message)) throw error;
+        /^This AVIF could not be decoded/.test(error?.message) ||
+        /^Image exceeds this browser canvas side limit/.test(error?.message)) throw error;
     throw new Error(`${file.name}: image could not be converted to PDF.`);
   } finally {
     // The expensive decoded bitmap AND backing canvas must be released on
