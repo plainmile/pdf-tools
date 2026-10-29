@@ -1699,10 +1699,23 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                   {splitMode === 'ranges' && <p className="input-note" id="split-range-combine-hint">{t.splitCombineHint}</p>}
                   <label className="option-radio option-divider"><input type="radio" name="split-method" checked={splitMode === 'chunks'} disabled={busy} onChange={() => { setSplitMode('chunks'); setPendingVisualCut(null); setBookmarkReplaceConfirm(false); setAppliedBookmarkPlan(null); setBookmarkUseTitles(false); }} />{t.every}</label>
                   <label className="input-label" htmlFor="chunk-input">{t.perFile}</label>
-                  {/* Native number fields reject fullwidth ３. Keep the mobile
-                      numeric keyboard while validating the full text strictly. */}
-                  <input id="chunk-input" type="text" inputMode="numeric" maxLength={8} value={chunkSize} placeholder="5"
+                  {/* Native number fields discard fullwidth ３. This accessible
+                      spinbutton retains arrow-key stepping and numeric mobile
+                      keyboards while preserving exact text for strict validation. */}
+                  <input id="chunk-input" type="text" inputMode="numeric" role="spinbutton" maxLength={8}
+                    aria-valuemin={1} aria-valuemax={pages.length}
+                    aria-valuenow={chunkSizeNumber !== null && chunkSizeNumber >= 1 && chunkSizeNumber <= pages.length ? chunkSizeNumber : undefined}
+                    value={chunkSize} placeholder="5"
                     onChange={(event) => { setChunkSize(event.target.value); setSplitBatchIndex(0); }}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+                      event.preventDefault();
+                      const current = decimalPageInteger(chunkSize);
+                      const base = current !== null && current >= 1 && current <= pages.length
+                        ? current : event.key === 'ArrowUp' ? 0 : 2;
+                      setChunkSize(String(Math.min(pages.length, Math.max(1, base + (event.key === 'ArrowUp' ? 1 : -1)))));
+                      setSplitBatchIndex(0);
+                    }}
                     disabled={splitMode !== 'chunks' || busy}
                     aria-invalid={invalidChunkSize ? 'true' : undefined}
                     aria-describedby={invalidChunkSize ? 'split-chunk-invalid split-estimate' : 'split-estimate'} />
