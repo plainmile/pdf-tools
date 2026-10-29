@@ -44,6 +44,7 @@ test('failed full-page preview offers bilingual mobile retry without changing ex
 
     await retry.click();
     await expect(retry).toHaveCount(0);
+    await expect(page.getByTestId('page-zoom-close')).toBeFocused();
     await expect(page.getByTestId('page-zoom-canvas'))
       .toHaveCSS('visibility', 'visible', { timeout: 30000 });
     // Retry did not reload the source or rewrite page order. Navigation still
