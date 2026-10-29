@@ -80,8 +80,7 @@ export default function PageZoomDialog({
       if (!cancelled && error?.name !== 'RenderingCancelledException') {
         // A failed render may have allocated a large backing bitmap. Discard
         // it before showing Retry; the PDF source and page edits stay intact.
-        canvas.width = 0;
-        canvas.height = 0;
+        if (canvas) { canvas.width = 0; canvas.height = 0; }
         setStatus('error');
       }
     }).finally(() => { pdfPage?.cleanup(); });
