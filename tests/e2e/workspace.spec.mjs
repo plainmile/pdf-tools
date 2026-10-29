@@ -389,9 +389,11 @@ test('Chinese Every N split accepts fullwidth digits and exports exact PDF page 
   await page.getByTestId('file-input').setInputFiles({
     name: '章节.pdf', mimeType: 'application/pdf', buffer: await makePdf([301, 302, 303, 304, 305, 306, 307]),
   });
-  await expect(page.getByTestId('page-tile')).toHaveCount(7);
+  // Split PDF opens on its Split tab, so the Organize-only page tiles are
+  // intentionally not mounted. The localized page count is the right cue.
+  await expect(page.locator('.file-count')).toContainText('7 页');
   await page.locator('input[name="split-method"]').nth(1).check();
-  const count = page.locator('#chunk-input');
+  const count = page.getByRole('spinbutton', { name: '每份 PDF 页数' });
   await expect(count).toHaveAttribute('inputmode', 'numeric');
   // Text, not type=number: Chromium and Safari otherwise discard fullwidth
   // characters before the app gets a chance to normalize them.
@@ -400,6 +402,13 @@ test('Chinese Every N split accepts fullwidth digits and exports exact PDF page 
   await expect(page.locator('.split-download')).toBeDisabled();
   await count.fill('３');
   await expect(count).toHaveValue('３');
+  await expect(count).toHaveAttribute('aria-valuenow', '3');
+  // Preserve the original spinbutton interaction for keyboard users.
+  await count.press('ArrowUp');
+  await expect(count).toHaveValue('4');
+  await count.press('ArrowDown');
+  await expect(count).toHaveValue('3');
+  await count.fill('３');
   await expect(page.getByTestId('split-chunk-invalid')).toHaveCount(0);
   await expect(page.locator('.split-download')).toBeEnabled();
   const started = page.waitForEvent('download');
