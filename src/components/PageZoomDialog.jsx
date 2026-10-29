@@ -163,7 +163,7 @@ export default function PageZoomDialog({
               <span className="page-watermark-preview" aria-hidden="true">{watermarkPreview}</span>}
           </div>
           {status === 'loading' && <p className="page-zoom-message" role="status">{t.previewLoading}</p>}
-          {status === 'error' && <div className="page-zoom-message" role="alert">
+          {status === 'error' && <div className="page-zoom-message page-zoom-error" role="alert">
             <p>{t.previewFail}</p>
             <button type="button" className="button button-secondary button-small"
               data-testid="page-zoom-retry" onClick={() => {
