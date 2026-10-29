@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { protectLocalFileDropNavigation } from '../lib/fileDropSafety.mjs';
 import { abortableWait } from '../lib/fileIo.mjs';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
 import PageZoomDialog from './PageZoomDialog.jsx';
@@ -100,6 +101,9 @@ function PageThumbnail({ source, pageRef, getPreviewDoc, locale, t, watermarkPre
 
 export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const t = workspaceCopy[locale] ?? workspaceCopy.en;
+  // Browser-local edits must survive an accidental file drop on the header
+  // or another area outside the designated upload surface.
+  useEffect(() => protectLocalFileDropNavigation(document), []);
   const inputRef = useRef(null);
   const lastSelectedIndex = useRef(null);
   const lastGroupedSelection = useRef(null);
