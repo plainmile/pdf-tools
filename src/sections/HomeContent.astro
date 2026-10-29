@@ -140,8 +140,13 @@ const desc = zh
           .replace(/\s+(?:converter|conversion)$/, '')
           .replace(/^(?:a|an|the)\s+/, '')
           .replace(/\s+(?:a|an|the)\s+/g, ' ')
+          // 'Free online PDF merger' and '免费在线合并PDF工具' are
+          // requests for an existing task, not separate SEO landing pages.
+          // Keep bare modifier queries ('free', '免费') as no-match queries.
+          .replace(/^(?:(?:free|online|private|browser-based)\s+|(?:免费|在线)\s*)+/u, '')
           .replace(/\s+(?:file|files|document|documents)$/, '')
-          .replace(/(?:文件|文档)$/, '')
+          .replace(/(?:文件|文档|工具)$/, '')
+          .replace(/(?:免费|在线)+$/, '')
           .trim();
         // Searching only "free" or "online" must not silently display all tools.
         return query || original;
