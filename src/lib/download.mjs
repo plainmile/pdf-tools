@@ -11,9 +11,12 @@ export function saveDownload(bytesOrBlob, filename, mime = 'application/pdf') {
     document.body.appendChild(anchor);
     anchor.click();
   } finally {
-    // A restrictive browser may throw during the synthetic click. Even on
-    // failure, remove the hidden anchor and release the temporary Blob URL.
-    anchor?.remove();
+    // Some WebKit versions finish resolving a Blob download AFTER click()
+    // returns. Removing the anchor synchronously can race that navigation.
+    // Keep it attached, but hidden, for a short grace period. If click()
+    // throws, the same cleanup still runs; the Blob URL remains valid long
+    // enough for slower mobile downloads before it is revoked.
+    setTimeout(() => anchor?.remove(), 1_000);
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 }
