@@ -1648,6 +1648,7 @@ test('text conversion retains old PDF for download after edits and only replaces
   await page.getByTestId('utility-text').fill('Second version with new edits');
   await expect(page.getByTestId('text-pdf-result')).toBeVisible();
   await expect(page.getByTestId('text-result-stale')).toContainText('previous text');
+  await expect(page.getByTestId('utility-pdf-download')).toContainText('Download previous PDF');
   const previous = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
   expect((await PDFDocument.load(previous.bytes)).getPageCount()).toBe(1);
   // The old download does not save the newly edited draft. Native navigation
@@ -1661,6 +1662,7 @@ test('text conversion retains old PDF for download after edits and only replaces
 
   await page.getByTestId('utility-run').click();
   await expect(page.getByTestId('text-result-stale')).toHaveCount(0);
+  await expect(page.getByTestId('utility-pdf-download')).toContainText('Download PDF');
   const updated = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
   await expect.poll(nativeGuard).toBe(false);
   expect(updated.name).toBe('plainmile-text-plain.pdf');
@@ -1698,11 +1700,13 @@ test('Markdown edits keep the previous PDF, and regenerated PDF contains only th
   await expect(page.getByTestId('utility-pdf-download')).toBeVisible();
   await page.getByTestId('utility-text').fill('# Changed document');
   await expect(page.getByTestId('text-result-stale')).toContainText('previous text');
+  await expect(page.getByTestId('utility-pdf-download')).toContainText('Download previous PDF');
   const old = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
   expect((await PDFDocument.load(old.bytes)).getPageCount()).toBe(1);
 
   await page.getByTestId('utility-run').click();
   await expect(page.getByTestId('text-result-stale')).toHaveCount(0);
+  await expect(page.getByTestId('utility-pdf-download')).toContainText('Download PDF');
   const result = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
   await page.goto('/pdf-to-txt/');
   await upload(page, result.bytes);
@@ -1719,6 +1723,7 @@ test('Chinese mobile text editing warns about stale generated PDF without losing
   await expect(page.getByTestId('text-pdf-result')).toBeVisible();
   await page.getByTestId('utility-text').fill('Chinese-route newer draft');
   await expect(page.getByTestId('text-result-stale')).toContainText('修改前的文字');
+  await expect(page.getByTestId('utility-pdf-download')).toContainText('下载之前生成的 PDF');
   const old = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
   expect((await PDFDocument.load(old.bytes)).getPageCount()).toBe(1);
   const size = await page.evaluate(() => ({
@@ -1728,6 +1733,7 @@ test('Chinese mobile text editing warns about stale generated PDF without losing
   expect(size.scroll).toBeLessThanOrEqual(size.client + 2);
   await page.getByTestId('utility-run').click();
   await expect(page.getByTestId('text-result-stale')).toHaveCount(0);
+  await expect(page.getByTestId('utility-pdf-download')).toContainText('下载 PDF');
   const newer = await getDownload(page, () => page.getByTestId('utility-pdf-download').click());
   expect((await PDFDocument.load(newer.bytes)).getPageCount()).toBe(1);
   expect(Buffer.compare(old.bytes, newer.bytes)).not.toBe(0);
