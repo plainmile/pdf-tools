@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { protectLocalFileDropNavigation } from '../lib/fileDropSafety.mjs';
-import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, translateUtilityError, decodeImportedText, textFitsUtf8Budget, IMAGE_PRINT_SCALE, requestedPages, validateNumberingPlan, decimalPageInteger } from '../lib/utilityCore.mjs';
+import { UTILITY_LIMITS, formatBytes, sanitizeFilename, imagePageBatch, batchIndexFromCustomPages, imagePageSelectionLabel, translateUtilityError, decodeImportedText, textFitsUtf8Budget, IMAGE_PRINT_SCALE, requestedPages, validateNumberingPlan, numberingSettingsChanged, decimalPageInteger } from '../lib/utilityCore.mjs';
 import { saveDownload } from '../lib/download.mjs';
 import { readFileArrayBuffer } from '../lib/fileIo.mjs';
 import UnsavedNavigationGuard from './UnsavedNavigationGuard.jsx';
@@ -253,9 +253,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
   }, [numberPreviewPage, numberPreviewCustom, output?.pageCount]);
   const textResultStale = Boolean(isTextInput && output?.bytes && output.textRevision !== textRevision);
   const numberedResultStale = Boolean(mode === 'add-page-numbers' && output?.bytes && output.numberingSettings &&
-    (output.numberingSettings.start !== start || output.numberingSettings.firstPage !== firstPage ||
-     output.numberingSettings.position !== position || output.numberingSettings.fontSize !== fontSize ||
-     output.numberingSettings.margin !== margin));
+    numberingSettingsChanged(output.numberingSettings, { start, firstPage, position, fontSize, margin }));
 
 
   function clearOutput() {
