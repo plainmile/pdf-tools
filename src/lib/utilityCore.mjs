@@ -202,6 +202,20 @@ export function validateNumberingPlan(startInput, firstPageInput, pageCount) {
   return null;
 }
 
+/** Compare the EFFECTIVE numbering plan, not how a user typed its digits.
+ * A generated PDF with first number '７' and starting PDF page '３' still
+ * matches input '7' and '3'. Invalid changes must remain stale, and position,
+ * size and margin changes must continue to invalidate the previous preview.
+ */
+export function numberingSettingsChanged(previous, current) {
+  if (!previous || !current) return true;
+  return decimalPageInteger(previous.start) !== decimalPageInteger(current.start) ||
+    decimalPageInteger(previous.firstPage) !== decimalPageInteger(current.firstPage) ||
+    previous.position !== current.position ||
+    previous.fontSize !== current.fontSize ||
+    previous.margin !== current.margin;
+}
+
 export function requestedPages(input, count) {
   if (!input || !input.trim()) return Array.from({ length: count }, (_, i) => i + 1);
   const output = [];
