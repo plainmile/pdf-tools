@@ -628,7 +628,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     selectedPreviewNumber >= 1 && selectedPreviewNumber <= output.pageCount);
   const numberPreviewReady = numberPreviewValid && numberPreviewSettled === numberPreviewCustom;
   const numberPreviewActualPage = numberPreviewPage === 'last' ? output?.pageCount
-    : numberPreviewPage === 'custom' ? Number(numberPreviewSettled)
+    : numberPreviewPage === 'custom' ? (decimalPageInteger(numberPreviewSettled) ?? 1)
       : (decimalPageInteger(output?.numberingSettings?.firstPage ?? '1') ?? 1);
   const numberPreviewSuppressed = numberPreviewPage === 'custom' && !numberPreviewReady;
   const description = isCompress ? (compressStrategy === 'structure' ? t.structureWarning : t.compressionWarning) : isTextOutput ? `${t.textWarning} ${mode === 'pdf-to-markdown' ? t.markdownWarning : ''}` : isTextInput ? mode === 'markdown-to-pdf' ? t.markdownInputHint : t.textInputHint : mode === 'add-page-numbers' ? t.numbersHint : t.privacy;
@@ -839,8 +839,12 @@ export default function PdfUtility({ mode, locale = 'en' }) {
               </select>
             </label>
             {numberPreviewPage === 'custom' && <label><span>{t.customPage}</span>
-              <input data-testid="number-preview-custom" type="number" min="1" max={output.pageCount} step="1"
-                value={numberPreviewCustom} onChange={event => setNumberPreviewCustom(event.target.value)} />
+              <input data-testid="number-preview-custom" type="text" inputMode="numeric" role="spinbutton" maxLength={8}
+                aria-valuemin={1} aria-valuemax={output.pageCount}
+                aria-valuenow={selectedPreviewNumber >= 1 && selectedPreviewNumber <= output.pageCount ? selectedPreviewNumber : undefined}
+                aria-invalid={!numberPreviewValid}
+                value={numberPreviewCustom} onChange={event => setNumberPreviewCustom(event.target.value)}
+                onKeyDown={event => { stepLocalizedPageInteger(event, numberPreviewCustom, setNumberPreviewCustom, output.pageCount); }} />
             </label>}
           </div>
           {numberPreviewPage === 'custom' && !numberPreviewValid &&
