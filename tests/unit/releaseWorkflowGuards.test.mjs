@@ -191,8 +191,11 @@ test('failed Cloudflare gate logs path, 525/522 status and Ray ID before safe ro
   assert.ok(probe.includes('ray='));
   assert.ok(probe.includes("grep -im1 '^cf-ray:'"));
   assert.ok(probe.includes('for route in / /workspace/ /zh/workspace/ /pdfjs/pdf.worker.min.mjs; do'));
-  assert.ok(probe.includes('for attempt in 1 2; do'));
-  assert.ok(probe.includes('--connect-timeout 5 --max-time 12'));
+  assert.ok(!probe.includes('for attempt in 1 2; do'));
+  assert.ok(probe.includes('--connect-timeout 2 --max-time 5'));
+  assert.ok(probe.includes('for route in / /workspace/ /zh/workspace/ /pdfjs/pdf.worker.min.mjs; do'));
+  assert.ok(!probe.includes('sleep 1'));
+  assert.ok(probe.includes('Failure probes are non-gating; restore the previous healthy image without delay.'));
   assert.ok(probe.includes('2>/dev/null || true'));
   assert.ok(!probe.includes('--insecure'));
   assert.ok(!probe.includes('curl -k'));
