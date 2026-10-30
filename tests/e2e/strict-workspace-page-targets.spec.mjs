@@ -36,7 +36,8 @@ test('Chinese page jump rejects compatibility numerals, but retains fullwidth di
     await expect(page.locator('.notice-error')).toContainText('1 到 6');
     await expect(page.locator('.notice-success')).toHaveCount(0);
   }
-  await field.fill('６');
+  // Ordinary zero-padded fullwidth decimals remain valid (② must not).
+  await field.fill('００６');
   await page.getByTestId('page-jump-submit').click();
   await expect(page.locator('.notice-success')).toContainText('第 6 页');
   await expect(page.locator('[data-testid="page-grid"] [data-export-position="6"]')).toBeInViewport();
@@ -65,7 +66,8 @@ test('Chinese mobile exact move rejects circled target without changing pages or
   const unchanged = await PDFDocument.load(await savedBytes(page, () =>
     page.getByRole('button', { name: '导出 PDF' }).click()));
   expect(unchanged.getPages().map(p => p.getWidth())).toEqual([301, 302, 303, 304, 305, 306]);
-  await field.fill('６');
+  // Moving to a zero-padded fullwidth page is intentional and unambiguous.
+  await field.fill('００６');
   await page.getByTestId('move-position-side').selectOption('after');
   await page.getByTestId('move-position-submit').click();
   const moved = await PDFDocument.load(await savedBytes(page, () =>
@@ -90,7 +92,7 @@ test('visual split page jump uses strict digits without modifying cuts or ZIP PD
     await expect(page.locator('.notice-error')).toContainText('1 到 6');
     await expect(page.getByTestId('split-coverage-complete')).toBeVisible();
   }
-  await field.fill('４');
+  await field.fill('００４');
   await page.getByTestId('split-visual-jump-submit').click();
   await expect(page.locator('.notice-success')).toContainText('第 4 页');
   await expect(page.locator('[data-testid="visual-split-page"][data-export-position="4"]')).toBeFocused();
