@@ -25,7 +25,7 @@ test('organize page selection preflights malformed, reversed, oversized and open
   const apply = page.getByTestId('selection-range-apply');
   const warning = page.getByTestId('selection-range-invalid');
 
-  for (const bad of ['6-3', '7-', '1,,2', Array.from({ length: 51 }, () => '1').join(',')]) {
+  for (const bad of ['6-3', '7-', '1,,2', '②', '²', Array.from({ length: 51 }, () => '1').join(',')]) {
     await input.fill(bad);
     await expect(input).toHaveAttribute('aria-invalid', 'true');
     await expect(input).toHaveAttribute('aria-describedby', /selection-range-invalid/);
