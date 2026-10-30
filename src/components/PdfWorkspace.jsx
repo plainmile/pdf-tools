@@ -477,9 +477,11 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const jumpToPage = (event) => {
     event.preventDefault();
     if (busy || !pages.length) return;
-    const value = jumpInput.trim().normalize('NFKC');
-    const number = Number(value);
-    if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(number) || number > pages.length) {
+    // Use the same strict decimal parser as page numbering and Every-N.
+    // NFKC would silently treat circled list markers (②) as page positions.
+    // Zero-padded fullwidth input such as ００２ remains an ordinary page 2.
+    const number = decimalPageInteger(jumpInput);
+    if (number === null || number < 1 || number > pages.length) {
       setError(interpolate(t.jumpInvalid, { pages: pages.length }));
       setNotice('');
       return;
@@ -493,9 +495,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const jumpToVisualSplitPage = (event) => {
     event.preventDefault();
     if (busy || !visualSplitOpen || !pages.length) return;
-    const value = splitVisualJumpInput.trim().normalize('NFKC');
-    const number = Number(value);
-    if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(number) || number > pages.length) {
+    // Keep visual split navigation consistent with the workspace jump and
+    // with actual export-range validation; never reinterpret Unicode markers.
+    const number = decimalPageInteger(splitVisualJumpInput);
+    if (number === null || number < 1 || number > pages.length) {
       setError(interpolate(t.jumpInvalid, { pages: pages.length }));
       setNotice('');
       return;
