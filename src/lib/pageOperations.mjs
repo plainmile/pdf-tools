@@ -221,6 +221,14 @@ export function parsePageRanges(input, pageCount, maxRanges = 50) {
   // Browser users often paste ranges with fullwidth Chinese punctuation,
   // Unicode dashes or digits. Normalize separators without relaxing bounds,
   // inverted-range checks or the 50-range safety limit.
+  // NFKC also maps circled/superscript numerals (①, ²) into valid digits.
+  // Those are often list markers, not page positions; silently accepting
+  // them can export the wrong PDF pages. Permit only ASCII/fullwidth digits,
+  // consistent with the Every-N and page-numbering numeric fields.
+  const otherNumbers = input.replace(/[0-9\uFF10-\uFF19]/g, '');
+  if (/\p{Number}/u.test(otherNumbers)) {
+    throw new Error('Invalid page range: use ordinary decimal page numbers.');
+  }
   const normalized = input.normalize('NFKC')
     .replace(/[\uFF0C\u3001\uFF1B;]/g, ',')
     .replace(/[\u2010-\u2015\u2212]/g, '-');
