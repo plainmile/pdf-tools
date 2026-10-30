@@ -331,7 +331,7 @@ test('free and online task queries find real tools in both locales without rever
   }
   // Promotional words alone and unsupported conversion directions must not
   // fabricate available functions, links or search landing pages.
-  for (const query of ['free', 'Free PDF to Word online']) {
+  for (const query of ['free', 'online', 'private', 'browser-based', 'free online', 'Free PDF to Word online']) {
     await en.fill(query);
     await expect(page.getByText('No tools match that search')).toBeVisible();
     await expect(page.locator('[data-tool-card]:visible')).toHaveCount(0);
