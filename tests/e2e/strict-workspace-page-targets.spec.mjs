@@ -50,15 +50,16 @@ test('Chinese page jump rejects compatibility numerals, but retains fullwidth di
 test('Chinese mobile exact move rejects circled target without changing pages or Undo, then accepts fullwidth target', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await openBook(page, '/zh/workspace/');
-  await page.getByRole('checkbox', { name: '选择页面 2 页' }).check();
+  await page.getByTestId('page-grid').getByTestId('page-tile').nth(1).locator('input[type="checkbox"]').check();
   await page.getByTestId('move-position-panel').locator('summary').click();
   const field = page.getByTestId('move-target-input');
+  const undoWasDisabled = await page.getByRole('button', { name: '撤销' }).isDisabled();
   for (const invalid of ['③', '²', 'Ⅲ']) {
     await field.fill(invalid);
     await page.getByTestId('move-position-submit').click();
     await expect(page.locator('.notice-error')).toContainText('1 到 6');
     await expect(page.locator('.selection-info strong')).toContainText('1 页已选中');
-    await expect(page.getByRole('button', { name: '撤销' })).toBeDisabled();
+    expect(await page.getByRole('button', { name: '撤销' }).isDisabled()).toBe(undoWasDisabled);
   }
   // An invalid pasted page marker never creates a history entry or reorders the PDF.
   const unchanged = await PDFDocument.load(await savedBytes(page, () =>
