@@ -57,3 +57,32 @@ test('Markdown technical inline code survives actual PDF export and text extract
   expect(extracted).toContain('Use <strong> literally.');
   expect(extracted).toContain('guide (https://example.org/docs)');
 });
+
+test('bilingual Markdown to PDF preserves escaped symbols in the actual downloaded PDF', async ({ page }) => {
+  const tick = String.fromCharCode(96);
+  const input = 'Stars: \\*literal\\*. Link: \\[docs](https://example.org).\n' +
+    'Inline code: ' + tick + '\\*raw\\*' + tick + '.';
+  for (const localePrefix of ['', '/zh']) {
+    await page.goto(localePrefix + '/markdown-to-pdf/');
+    await page.getByTestId('utility-text').fill(input);
+    await page.getByTestId('utility-run').click();
+    await expect(page.getByTestId('text-pdf-result')).toBeVisible({ timeout: 20000 });
+    const pdfEvent = page.waitForEvent('download');
+    await page.getByTestId('utility-pdf-download').click();
+    const bytes = await readFile(await (await pdfEvent).path());
+    const pdf = await PDFDocument.load(bytes);
+    expect(pdf.getPageCount()).toBe(1);
+
+    await page.goto(localePrefix + '/pdf-to-txt/');
+    await page.getByTestId('utility-file-input').setInputFiles({
+      name: 'escaped-markdown.pdf', mimeType: 'application/pdf', buffer: bytes,
+    });
+    await expect(page.getByTestId('utility-file-summary')).toBeVisible({ timeout: 20000 });
+    const txtEvent = page.waitForEvent('download');
+    await page.getByTestId('utility-run').click();
+    const actual = (await readFile(await (await txtEvent).path())).toString('utf8');
+    expect(actual).toContain('Stars: *literal*.');
+    expect(actual).toContain('Link: [docs](https://example.org).');
+    expect(actual).toContain('Inline code: \\*raw\\*.');
+  }
+});
