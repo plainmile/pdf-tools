@@ -79,6 +79,7 @@ export const toolHelp = {
       ['Which text-file encodings are supported?', 'Import UTF-8 or BOM-marked UTF-16 LE/BE. Invalid encoding is rejected rather than silently corrupting the generated PDF.'],
       ['Will blank lines at the start of pasted Markdown create empty PDF pages?', 'No. Empty lines before the first content and after the last content are skipped. Blank lines between paragraphs and spaces inside fenced code blocks are retained.'],
       ['Can I keep HTML-like snippets and links in code examples?', 'Yes. Put technical snippets such as `<strong>` in single backticks or use fenced code blocks. They remain literal text in the exported PDF. HTML is not executed, remote images are not fetched, and Markdown link addresses are shown as text rather than clickable PDF links.'],
+      ['How do I keep literal Markdown stars, underscores or brackets?', 'Put a backslash before the symbol, for example \\*literal\\* or \\[label]. These print as normal characters instead of formatting or links. Inside inline code and fenced code blocks, backslashes are kept literally. This is basic Markdown text conversion, not a full typesetting engine.'],
       ['Is this a full Word-style layout engine?', 'No. It is a lightweight browser-only converter. Review the downloaded layout, especially for long documents and Chinese text.'],
     ],
     'add-page-numbers': [
@@ -174,6 +175,7 @@ export const toolHelp = {
       ['导入文本文件支持哪些编码？', '支持 UTF-8 或带 BOM 的 UTF-16 LE/BE。无法正确识别编码时将拒绝导入，避免生成乱码 PDF。'],
       ['Markdown 开头有空行，会生成空白 PDF 页吗？', '不会。正文首尾的纯空行会被跳过，段落之间的空行以及代码围栏内部的空白内容会保留。'],
       ['如何保留代码示例中的 HTML 标签和链接？', '可以把 `<strong>` 等技术片段放在单反引号内，或使用围栏代码块。导出后这些字符会作为普通文字保留。不会执行 HTML、加载远程图片，也不会把 Markdown 链接变成可点击的 PDF 链接。'],
+      ['如何在 PDF 里保留 Markdown 星号、下划线和方括号？', '在符号前面加反斜杠，例如 \\*原样\\* 或 \\[标题]，导出后会保留这些符号，而不是错误地解析为强调或链接。在行内代码或代码围栏内，反斜杠会按原文字保留；仍不支持复杂 Markdown 排版。'],
       ['可以完全替代 Word 排版吗？', '不能。这是轻量级本地转换工具，较长内容或中文文档导出后应检查分页与排版。'],
     ],
     'add-page-numbers': [
