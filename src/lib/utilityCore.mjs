@@ -653,24 +653,45 @@ function unusedInlineCodeMarker(source) {
 
 // Intentionally a minimal CommonMark subset: never execute HTML, remote images or scripts.
 export function stripMarkdownInline(source) {
-  // No inline-code pair: keep Markdown/HTML parsing, but skip marker allocation.
-  if (!/`[^`\n]+`/.test(source)) {
+  // Backslash-escaped ASCII punctuation is literal Markdown text. Protect it
+  // before parsing HTML, links or emphasis: without protection, \*important\*
+  // loses its stars and an escaped link label can become an unwanted link.
+  // Match inline code in the SAME left-to-right pass, so escapes INSIDE code
+  // spans remain unchanged (CommonMark does not interpret them there).
+  const hasEscapedPunctuation = /\\[!-/:-@\[-\x60{-~]/.test(source);
+  const hasInlineCode = /\x60[^\x60\n]+\x60/.test(source);
+  if (!hasEscapedPunctuation && !hasInlineCode) {
     return stripPairedMarkdownMarkers(stripKnownMarkdownHtml(readableMarkdownReferences(source)));
   }
-  // Shield inline code before stripping links, HTML or emphasis. Technical
-  // expressions such as `<strong>` should be literal, never HTML elements.
-  const inlineCode = [];
   const marker = unusedInlineCodeMarker(source);
-  const outsideCode = source.replace(/`([^`\n]+)`/g, (_token, code) => {
-    return `${marker}${inlineCode.push(code) - 1}${marker}`;
-  });
-  const plain = stripKnownMarkdownHtml(readableMarkdownReferences(outsideCode));
-  // An unused marker can contain regexp punctuation in pathological Unicode
-  // input, so escape it before restoring protected snippets.
-  const escapedMarker = marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return stripPairedMarkdownMarkers(plain)
-    .replace(new RegExp(`${escapedMarker}(\\d+)${escapedMarker}`, 'g'),
-      (_token, index) => inlineCode[Number(index)]);
+  const escapedPunctuation = [];
+  const inlineCode = [];
+  const protectedSource = source.replace(
+    /\\([!-/:-@\[-\x60{-~])|\x60([^\x60\n]+)\x60/g,
+    (_token, escaped, code) => {
+      if (escaped !== undefined) {
+        const index = escapedPunctuation.push(escaped) - 1;
+        return marker + 'e' + index + marker;
+      }
+      const index = inlineCode.push(code) - 1;
+      return marker + 'c' + index + marker;
+    },
+  );
+  const plain = stripPairedMarkdownMarkers(
+    stripKnownMarkdownHtml(readableMarkdownReferences(protectedSource)),
+  );
+  // A marker can be one or two UTF-16 code units. Encode both as RegExp
+  // Unicode escapes; this also handles punctuation and surrogate code units.
+  const escapedMarker = marker.split('')
+    .map(char => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0'))
+    .join('');
+  // Inline code may contain literal backslashes: restore entire code spans
+  // first, then only the escaped punctuation outside them.
+  return plain
+    .replace(new RegExp(escapedMarker + 'c(\\d+)' + escapedMarker, 'g'),
+      (_token, index) => inlineCode[Number(index)])
+    .replace(new RegExp(escapedMarker + 'e(\\d+)' + escapedMarker, 'g'),
+      (_token, index) => escapedPunctuation[Number(index)]);
 }
 export function textContentToLines(content) {
   // PDF is positioned text, not a logical document. Sort approximately by baseline and X.
