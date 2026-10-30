@@ -35,3 +35,14 @@ test('scheduled probes retain real HTTPS TLS and identify intermittent versus pe
   assert.ok(!workflow.includes('-X POST'));
   assert.ok(!workflow.includes('npm install'));
 });
+
+test('HTTP 200 only counts when curl completes the entire transfer successfully', () => {
+  // curl can report http_code=200 and still exit 18 (truncated response) or
+  // 28 (timeout after headers). Do not suppress that exit and mark the
+  // sampled public route healthy just because response headers arrived.
+  assert.ok(workflow.includes('curl_exit=0'));
+  assert.ok(workflow.includes(') || curl_exit=$?'));
+  assert.ok(workflow.includes('if [ "$status" = 200 ] && [ "$curl_exit" -eq 0 ]; then'));
+  assert.ok(workflow.includes('curl_exit=$curl_exit'));
+  assert.ok(!workflow.includes('"https://pdf.plainmile.com${route}" 2>/dev/null || true)'));
+});
