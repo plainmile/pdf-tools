@@ -1355,6 +1355,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
           </div>}
         </section>
       )}
+      {/* aria-controls must point to an existing element while options are closed. */}
+      {pages.length > 0 && !exportSettingsOpen && <div id="export-options-panel" hidden />}
       {pages.length > 0 && exportSettingsOpen && (
         <section id="export-options-panel" className="export-options-panel" aria-label={t.exportOptions}>
           <div className="export-options-header"><strong>{t.exportOptions}</strong><span>{t.exportOptionsHint}</span></div>
@@ -1395,6 +1397,13 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
         </button>
       </div>}
       <div className="workspace-content" onDragOver={(event) => { if (Array.from(event.dataTransfer.types ?? []).includes('Files')) event.preventDefault(); }} onDrop={(event) => { if (event.dataTransfer.files?.length) { event.preventDefault(); void addFiles(event.dataTransfer.files); } }}>
+        {/* Keep the inactive tab's ARIA target present without rendering its
+            potentially expensive thumbnail/editor tree. Only the active
+            tabpanel contains work controls. */}
+        <div id={`workspace-panel-${tab === 'organize' ? 'split' : 'organize'}`}
+          role="tabpanel"
+          aria-labelledby={`workspace-tab-${tab === 'organize' ? 'split' : 'organize'}`}
+          hidden />
         {error && <div className="notice notice-error" role="alert">{error}<button type="button" aria-label={t.dismiss} onClick={() => setError('')}>×</button></div>}
         {notice && <div className="notice notice-success" role="status">{notice}<button type="button" aria-label={t.dismiss} onClick={() => setNotice('')}>×</button></div>}
         {pristineOutput && <p className="utility-note" data-testid="workspace-original-preserved">{locale === 'zh' ? '当前页面未修改，直接导出会保留原始 PDF 字节，包括书签、交互表单及签名。' : 'This PDF is unchanged. Export all preserves the original bytes, including bookmarks, form fields and signatures.'}</p>}
@@ -1624,8 +1633,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
                                 lastGroupedSelection.current = null;
                               }}>{t.groupClearSelection}</button>}
                           </div>
-                          {!collapsed && <div className="page-grid" id={`source-pages-${group.sourceId}`}
-                            data-testid="source-group-pages">{groupedTiles(group)}</div>}
+                          {collapsed
+                            ? <div id={`source-pages-${group.sourceId}`} hidden />
+                            : <div className="page-grid" id={`source-pages-${group.sourceId}`}
+                              data-testid="source-group-pages">{groupedTiles(group)}</div>}
                         </section>
                       );
                     })}
