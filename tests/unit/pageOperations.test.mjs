@@ -353,6 +353,11 @@ test('localized page range punctuation is normalized but still validates bounds'
   assert.throws(() => parsePageRanges('３－１，２', 10), /reversed/);
   assert.throws(() => parsePageRanges('１，１１', 10), /outside/);
   assert.throws(() => parsePageRanges('１，，２', 10));
+  // NFKC must not silently turn copied circled list markers or superscript
+  // numerals into page numbers; fullwidth decimal input above stays valid.
+  for (const invalid of ['①', '²', '⑩', '❶', 'Ⅳ', '2-③', '1,²']) {
+    assert.throws(() => parsePageRanges(invalid, 10), /Invalid page range/, invalid);
+  }
 });
 
 test('visual split positions create full, ordered PDF ranges from CURRENT page positions', () => {
