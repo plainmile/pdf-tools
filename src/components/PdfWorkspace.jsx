@@ -1090,10 +1090,11 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const moveSelectedToPage = (event) => {
     event.preventDefault();
     if (busy || !pages.length || !selectedCount) return;
-    const normalized = moveTargetInput.trim().normalize('NFKC');
-    const target = Number(normalized);
-    if (!/^\d+$/.test(normalized) || !Number.isSafeInteger(target) ||
-        target < 1 || target > pages.length) {
+    // Moving pages changes the exported PDF: do not interpret NFKC
+    // compatibility numerals (②, ²) as a destination. Accept ordinary
+    // zero-padded ASCII and fullwidth decimal digits like other PDF inputs.
+    const target = decimalPageInteger(moveTargetInput);
+    if (target === null || target < 1 || target > pages.length) {
       setError(interpolate(t.moveInvalid, { pages: pages.length }));
       setNotice('');
       return;
