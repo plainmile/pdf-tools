@@ -477,9 +477,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const jumpToPage = (event) => {
     event.preventDefault();
     if (busy || !pages.length) return;
-    const value = jumpInput.trim().normalize('NFKC');
-    const number = Number(value);
-    if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(number) || number > pages.length) {
+    // Match the strict decimal parser used by split ranges and page numbering.
+    // Fullwidth decimal digits are valid, but circled/superscript numbers are not.
+    const number = decimalPageInteger(jumpInput);
+    if (number === null || number < 1 || number > pages.length) {
       setError(interpolate(t.jumpInvalid, { pages: pages.length }));
       setNotice('');
       return;
@@ -493,9 +494,8 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const jumpToVisualSplitPage = (event) => {
     event.preventDefault();
     if (busy || !visualSplitOpen || !pages.length) return;
-    const value = splitVisualJumpInput.trim().normalize('NFKC');
-    const number = Number(value);
-    if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(number) || number > pages.length) {
+    const number = decimalPageInteger(splitVisualJumpInput);
+    if (number === null || number < 1 || number > pages.length) {
       setError(interpolate(t.jumpInvalid, { pages: pages.length }));
       setNotice('');
       return;
@@ -1087,10 +1087,10 @@ export default function PdfWorkspace({ mode = 'workspace', locale = 'en' }) {
   const moveSelectedToPage = (event) => {
     event.preventDefault();
     if (busy || !pages.length || !selectedCount) return;
-    const normalized = moveTargetInput.trim().normalize('NFKC');
-    const target = Number(normalized);
-    if (!/^\d+$/.test(normalized) || !Number.isSafeInteger(target) ||
-        target < 1 || target > pages.length) {
+    // NFKC would silently turn copied list markers like ③ or superscript ²
+    // into destination pages and unexpectedly reorder the user's PDF.
+    const target = decimalPageInteger(moveTargetInput);
+    if (target === null || target < 1 || target > pages.length) {
       setError(interpolate(t.moveInvalid, { pages: pages.length }));
       setNotice('');
       return;
