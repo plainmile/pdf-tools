@@ -341,6 +341,32 @@ test('Markdown inline formatting preserves identifiers, arithmetic and unmatched
   assert.equal(headings[1].text, 'Result: a*b + x**2 and c_d');
 });
 
+test('Markdown backslash-escaped punctuation stays literal without corrupting formatting or code', () => {
+  const tick = String.fromCharCode(96);
+  assert.equal(stripMarkdownInline('Literal \\*important\\* and \\_identifier\\_ with **bold**'),
+    'Literal *important* and _identifier_ with bold');
+  assert.equal(stripMarkdownInline('Reference \\[docs](https://example.org) plus \\<strong\\>'),
+    'Reference [docs](https://example.org) plus <strong>');
+  assert.equal(stripMarkdownInline('Print \\' + tick + 'not-code\\' + tick + ' and *italic*'),
+    'Print ' + tick + 'not-code' + tick + ' and italic');
+  assert.equal(stripMarkdownInline('Inline ' + tick + '\\*raw\\*' + tick + ' then \\*literal\\*'),
+    'Inline \\*raw\\* then *literal*');
+  assert.equal(stripMarkdownInline('Two backslashes: \\\\ plus ' + tick + 'code' + tick),
+    'Two backslashes: \\ plus code');
+  assert.equal(stripMarkdownInline('Unescaped <strong>markup</strong> and \\<b\\>'),
+    'Unescaped markup and <b>');
+  const blocks = parseTextBlocks('# A \\# heading with \\*literal\\*', true);
+  assert.equal(blocks[0].text, 'A # heading with *literal*');
+});
+
+test('large sequences of escaped Markdown symbols convert in bounded time', () => {
+  const source = '\\*'.repeat(30_000) + ' then **bold**';
+  const started = performance.now();
+  const output = stripMarkdownInline(source);
+  assert.equal(output, '*'.repeat(30_000) + ' then bold');
+  assert.ok(performance.now() - started < 1800, 'Escaped punctuation stalled the parser');
+});
+
 test('adjacent exponent operators never become an accidental Markdown emphasis pair', () => {
   const literal = 'Powers: x**2 and y**3; fields: a__2 and b__5; multiply: 2*3*4';
   assert.equal(stripMarkdownInline(literal), literal);
