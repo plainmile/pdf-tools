@@ -825,6 +825,8 @@ export default function PdfUtility({ mode, locale = 'en' }) {
             onClick={() => setShowCompressionPreview(value => !value)}>
             {showCompressionPreview ? t.hidePreview : t.previewCompressed}
           </button>}
+          {/* Keep the disclosure target stable without allocating a PDF.js preview while closed. */}
+          {!showCompressionPreview && output.bytes && <div id="compression-preview-content" hidden />}
           {showCompressionPreview && output.bytes && <div id="compression-preview-content" data-testid="compression-preview">
             <PdfFirstPagePreview bytes={output.bytes} pageCount={pdf.count} t={t} locale={locale} />
           </div>}
