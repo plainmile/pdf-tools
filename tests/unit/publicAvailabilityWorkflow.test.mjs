@@ -25,7 +25,7 @@ test('scheduled probes retain real HTTPS TLS and identify intermittent versus pe
   assert.ok(workflow.includes('for attempt in 1 2; do'));
   assert.ok(workflow.includes('https://pdf.plainmile.com'));
   assert.ok(workflow.includes('--connect-timeout 4 --max-time 9'));
-  assert.ok(workflow.includes("if [ \"$status\" = 200 ]; then"));
+  assert.ok(workflow.includes('if [ "$status" = 200 ] && [ "$curl_exit" -eq 0 ]; then'));
   assert.ok(workflow.includes('if [ "$good" -eq 0 ]; then'));
   assert.ok(workflow.includes('if [ "$failed_routes" -gt 0 ]; then'));
   assert.ok(workflow.includes('cf_ray='));
