@@ -29,19 +29,22 @@ jobs:
             good=0
             for attempt in 1 2; do
               headers=$(mktemp)
+              # A 200 header is not a complete response: curl can exit 18 on
+              # truncated bodies or 28 on a timeout after receiving HTTP 200.
+              curl_exit=0
               result=$(curl --silent --location --connect-timeout 4 --max-time 9 \
                 -H 'Cache-Control: no-cache' \
                 -D "$headers" -o /dev/null \
                 -w '%{http_code}|%{time_total}' \
-                "https://pdf.plainmile.com${route}" 2>/dev/null || true)
+                "https://pdf.plainmile.com${route}" 2>/dev/null) || curl_exit=$?
               IFS='|' read -r status seconds <<< "${result:-000|0}"
               ray=$(grep -im1 '^cf-ray:' "$headers" | awk '{print $2}' | tr -cd '[:alnum:]-' || true)
               rm -f "$headers"
-              echo "public_route=$route attempt=$attempt http_status=${status:-000} total_s=${seconds:-0} cf_ray=${ray:-absent}"
-              if [ "$status" = 200 ]; then
+              echo "public_route=$route attempt=$attempt http_status=${status:-000} curl_exit=$curl_exit total_s=${seconds:-0} cf_ray=${ray:-absent}"
+              if [ "$status" = 200 ] && [ "$curl_exit" -eq 0 ]; then
                 good=$((good + 1))
               else
-                echo "::warning title=PDF Tools public HTTP probe::route=$route attempt=$attempt status=${status:-000} ray=${ray:-absent}"
+                echo "::warning title=PDF Tools public HTTP probe::route=$route attempt=$attempt status=${status:-000} curl_exit=$curl_exit ray=${ray:-absent}"
               fi
               sleep 1
             done
