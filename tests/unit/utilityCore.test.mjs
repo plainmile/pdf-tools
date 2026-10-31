@@ -404,6 +404,21 @@ test('Markdown HTML break markers remain real text separators, including bilingu
   assert.equal(code[0].text, '<br>');
 });
 
+test('Markdown emphasis across HTML breaks does not leak formatting stars into PDF text', () => {
+  assert.equal(stripMarkdownInline('**First<br>Second**'), 'First\nSecond');
+  assert.equal(stripMarkdownInline('*First<BR />Second*'), 'First\nSecond');
+  assert.equal(stripMarkdownInline('**第一行<br/>第二行**'), '第一行\n第二行');
+  assert.equal(stripMarkdownInline('~~Old<br>New~~'), 'Old\nNew');
+  assert.equal(stripMarkdownInline('**First<br><br>Second**'), 'First\n\nSecond');
+  assert.equal(stripMarkdownInline('**First<br>Second** then \\*literal\\*'), 'First\nSecond then *literal*');
+  const tick = String.fromCharCode(96);
+  assert.equal(stripMarkdownInline('**First<br>Second** and ' + tick + '<br>' + tick),
+    'First\nSecond and <br>');
+  const blocks = parseTextBlocks('## **Title<br>subtitle**', true);
+  assert.equal(blocks[0].text, 'Title\nsubtitle');
+  assert.equal(blocks[0].kind, 'heading');
+});
+
 test('Markdown inline-code markers remain bounded with saturated private-use Unicode', () => {
   const privateUse = Array.from({ length: 0x1900 }, (_, index) =>
     String.fromCharCode(0xe000 + index)).join('');
