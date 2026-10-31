@@ -583,7 +583,7 @@ function stripPairedMarkdownMarkers(source) {
 // contain comment-like text. Sticky matching never scans past this position.
 const MARKDOWN_HTML_TAG_AT = /<\/?([A-Za-z][\w:-]*)(?:\s+[A-Za-z_:][\w:.-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*\s*\/?>/y;
 
-function stripKnownMarkdownHtml(source) {
+function stripKnownMarkdownHtml(source, breakSeparator = '\n') {
   const parts = [];
   let cursor = 0;
   let searchFrom = 0;
@@ -612,7 +612,7 @@ function stripKnownMarkdownHtml(source) {
         // Removing it outright joins unrelated words ("First<br>Second"
         // became "FirstSecond") and corrupts a Markdown-to-PDF export.
         // Preserve only this simple break, not arbitrary HTML rendering.
-        if (match[1].toLowerCase() === 'br') parts.push('\n');
+        if (match[1].toLowerCase() === 'br') parts.push(breakSeparator);
         cursor = MARKDOWN_HTML_TAG_AT.lastIndex;
       }
       // Unknown HTML-like tags are literal technical text. Skip the whole
@@ -665,7 +665,11 @@ export function stripMarkdownInline(source) {
   // spans remain unchanged (CommonMark does not interpret them there).
   const hasEscapedPunctuation = /\\[!-/:-@\[-\x60{-~]/.test(source);
   const hasInlineCode = /\x60[^\x60\n]+\x60/.test(source);
-  if (!hasEscapedPunctuation && !hasInlineCode) {
+  // Keep HTML line breaks virtual until emphasis parsing finishes. A real
+  // newline here splits the parser into two unrelated lines and makes
+  // **first<br>second** leak its literal asterisks into the exported PDF.
+  const hasInlineBreak = /<br\b/i.test(source);
+  if (!hasEscapedPunctuation && !hasInlineCode && !hasInlineBreak) {
     return stripPairedMarkdownMarkers(stripKnownMarkdownHtml(readableMarkdownReferences(source)));
   }
   const marker = unusedInlineCodeMarker(source);
@@ -683,20 +687,21 @@ export function stripMarkdownInline(source) {
     },
   );
   const plain = stripPairedMarkdownMarkers(
-    stripKnownMarkdownHtml(readableMarkdownReferences(protectedSource)),
+    stripKnownMarkdownHtml(readableMarkdownReferences(protectedSource), marker + 'b' + marker),
   );
   // A marker can be one or two UTF-16 code units. Encode both as RegExp
   // Unicode escapes; this also handles punctuation and surrogate code units.
   const escapedMarker = marker.split('')
     .map(char => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0'))
     .join('');
-  // Inline code may contain literal backslashes: restore entire code spans
-  // first, then only the escaped punctuation outside them.
+  // Restore protected spans and breaks only AFTER emphasis and HTML cleanup.
+  // Inline code keeps its literal backslashes and <br> text.
   return plain
     .replace(new RegExp(escapedMarker + 'c(\\d+)' + escapedMarker, 'g'),
       (_token, index) => inlineCode[Number(index)])
     .replace(new RegExp(escapedMarker + 'e(\\d+)' + escapedMarker, 'g'),
-      (_token, index) => escapedPunctuation[Number(index)]);
+      (_token, index) => escapedPunctuation[Number(index)])
+    .replace(new RegExp(escapedMarker + 'b' + escapedMarker, 'g'), '\n');
 }
 export function textContentToLines(content) {
   // PDF is positioned text, not a logical document. Sort approximately by baseline and X.
