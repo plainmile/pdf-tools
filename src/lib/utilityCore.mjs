@@ -608,6 +608,11 @@ function stripKnownMarkdownHtml(source) {
     if (match) {
       if (PLAIN_MARKDOWN_HTML_TAGS.has(match[1].toLowerCase())) {
         parts.push(source.slice(cursor, start));
+        // An inline HTML <br> is a semantic separator, not merely a tag.
+        // Removing it outright joins unrelated words ("First<br>Second"
+        // became "FirstSecond") and corrupts a Markdown-to-PDF export.
+        // Preserve only this simple break, not arbitrary HTML rendering.
+        if (match[1].toLowerCase() === 'br') parts.push('\n');
         cursor = MARKDOWN_HTML_TAG_AT.lastIndex;
       }
       // Unknown HTML-like tags are literal technical text. Skip the whole

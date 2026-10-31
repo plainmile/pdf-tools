@@ -86,3 +86,31 @@ test('bilingual Markdown to PDF preserves escaped symbols in the actual download
     expect(actual).toContain('Inline code: \\*raw\\*.');
   }
 });
+
+test('HTML break markers in pasted Markdown never join words in real bilingual PDF output', async ({ page }) => {
+  const tick = String.fromCharCode(96);
+  const input = 'Line A<br>Line B\nCode: ' + tick + 'A<br>B' + tick;
+  for (const prefix of ['', '/zh']) {
+    await page.goto(prefix + '/markdown-to-pdf/');
+    await page.getByTestId('utility-text').fill(input);
+    await page.getByTestId('utility-run').click();
+    await expect(page.getByTestId('text-pdf-result')).toBeVisible({ timeout: 20000 });
+    const pdfEvent = page.waitForEvent('download');
+    await page.getByTestId('utility-pdf-download').click();
+    const pdfBytes = await readFile(await (await pdfEvent).path());
+    const pdf = await PDFDocument.load(pdfBytes);
+    expect(pdf.getPageCount()).toBe(1);
+
+    await page.goto(prefix + '/pdf-to-txt/');
+    await page.getByTestId('utility-file-input').setInputFiles({
+      name: 'markdown-break.pdf', mimeType: 'application/pdf', buffer: pdfBytes,
+    });
+    await expect(page.getByTestId('utility-file-summary')).toBeVisible();
+    const textEvent = page.waitForEvent('download');
+    await page.getByTestId('utility-run').click();
+    const text = (await readFile(await (await textEvent).path())).toString('utf8');
+    expect(text).toMatch(/Line A\s+Line B/);
+    expect(text).not.toContain('Line ALine B');
+    expect(text).toContain('Code: A<br>B');
+  }
+});

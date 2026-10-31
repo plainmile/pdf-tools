@@ -381,12 +381,27 @@ test('Markdown parser preserves generics, placeholders and comparisons without s
   assert.equal(stripMarkdownInline(literal), literal);
   assert.equal(
     stripMarkdownInline('HTML: <strong>bold</strong>, <span class="note">visible</span>, <br/> and <!-- secret -->text'),
-    'HTML: bold, visible,  and text',
+    'HTML: bold, visible, \n and text',
   );
   const blocks = parseTextBlocks('# Types: List<T>\nArgument: <username>\nCheck: a<b && c>d', true);
   assert.equal(blocks[0].text, 'Types: List<T>');
   assert.equal(blocks[1].text, 'Argument: <username>');
   assert.equal(blocks[2].text, 'Check: a<b && c>d');
+});
+
+test('Markdown HTML break markers remain real text separators, including bilingual conversion', () => {
+  assert.equal(stripMarkdownInline('First<br>Second'), 'First\nSecond');
+  assert.equal(stripMarkdownInline('First<BR />Second'), 'First\nSecond');
+  assert.equal(stripMarkdownInline('First<br/>Second'), 'First\nSecond');
+  const tick = String.fromCharCode(96);
+  assert.equal(stripMarkdownInline('Use ' + tick + '<br>' + tick + ' and \\<br\\> literally'),
+    'Use <br> and <br> literally');
+  assert.deepEqual(
+    parseTextBlocks('第一行<br>第二行', true).map(block => block.text),
+    ['第一行\n第二行'],
+  );
+  const code = parseTextBlocks(tick.repeat(3) + '\n<br>\n' + tick.repeat(3), true);
+  assert.equal(code[0].text, '<br>');
 });
 
 test('Markdown inline-code markers remain bounded with saturated private-use Unicode', () => {
