@@ -389,6 +389,15 @@ test('Markdown parser preserves generics, placeholders and comparisons without s
   assert.equal(blocks[2].text, 'Check: a<b && c>d');
 });
 
+test('HTML block and table cell boundaries stay readable in Markdown PDF text', () => {
+  assert.equal(stripMarkdownInline('<p>First</p><p>Second</p>'), 'First\nSecond\n');
+  assert.equal(stripMarkdownInline('<div>中文</div><div>下一段</div>'), '中文\n下一段\n');
+  assert.equal(stripMarkdownInline('<h2>Title</h2><p>Body</p>'), 'Title\nBody\n');
+  assert.equal(stripMarkdownInline('<tr><td>10</td><td>20</td></tr>'), '10 20 \n');
+  assert.equal(stripMarkdownInline('<strong>one</strong><em>two</em>'), 'onetwo');
+  assert.equal(stripMarkdownInline('<Widget>one</Widget><p>two</p>'), '<Widget>one</Widget>two\n');
+});
+
 test('Markdown HTML break markers remain real text separators, including bilingual conversion', () => {
   assert.equal(stripMarkdownInline('First<br>Second'), 'First\nSecond');
   assert.equal(stripMarkdownInline('First<BR />Second'), 'First\nSecond');
