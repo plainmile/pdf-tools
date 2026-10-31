@@ -88,61 +88,100 @@ export function jpegPdfPlacement(rect, orientation) {
 }
 
 /**
- * Strip common sensitive JPEG metadata without re-encoding the image pixels.
- * APP1 = EXIF/XMP (including possible GPS); APP13 = IPTC/Photoshop metadata;
- * COM = arbitrary comments. Keep APP0/JFIF, APP2 ICC, APP14 Adobe color data.
- * Stop at the first SOS to preserve the original encoded image bitstream.
+ * Remove common private JPEG APP1 (EXIF/XMP), APP13 (IPTC/Photoshop) and
+ * COM segments while preserving compressed image bytes, restart markers,
+ * APP2/ICC and other image headers. JPEG may contain MULTIPLE entropy-coded
+ * scans, with APP segments between them: stopping at the first SOS would
+ * accidentally embed a later GPS/XMP segment in the generated PDF.
  *
- * If headers cannot be parsed safely, FAIL CLOSED instead of embedding a
- * possibly sensitive uninspected APP1 into a shared PDF.
+ * Parse marker boundaries instead of searching raw compressed bytes (which
+ * can contain byte-stuffed FF 00 and restart FF D0-D7 sequences). Fail closed
+ * for malformed/truncated streams; omit trailing data after the first EOI.
+ * This is NOT a general PDF metadata scrubber.
  */
 export function stripJpegPrivateMetadata(bytes) {
+  const invalid = () => { throw new Error('JPEG metadata could not be safely removed.'); };
   if (!(bytes instanceof Uint8Array) || bytes.length < 4 ||
-      bytes[0] !== 0xff || bytes[1] !== 0xd8) {
-    throw new Error('JPEG metadata could not be safely removed.');
-  }
+    bytes[0] !== 0xff || bytes[1] !== 0xd8) invalid();
+
   const parts = [bytes.subarray(0, 2)];
   let at = 2;
-  let removed = false;
   let foundScan = false;
+  let foundEnd = false;
+  let changed = false;
+  let inScan = false;
+
   while (at < bytes.length) {
+    if (inScan) {
+      // Skip only actual entropy-coded bytes, FF 00 stuffing and restart
+      // markers. Any other FF marker finishes this scan and must be parsed
+      // as its own length-bounded segment, even when it is APP1/APP13/COM.
+      const scanStart = at;
+      let nextMarker = -1;
+      while (at < bytes.length) {
+        if (bytes[at] !== 0xff) { at++; continue; }
+        const candidate = at;
+        while (at < bytes.length && bytes[at] === 0xff) at++;
+        if (at >= bytes.length) invalid();
+        const marker = bytes[at];
+        if (marker === 0 || (marker >= 0xd0 && marker <= 0xd7)) {
+          at++; // Byte-stuffing and restart markers remain in the scan bytes.
+          continue;
+        }
+        nextMarker = candidate;
+        break;
+      }
+      if (nextMarker < 0) invalid();
+      parts.push(bytes.subarray(scanStart, nextMarker));
+      at = nextMarker;
+      inScan = false;
+    }
+
+    if (bytes[at] !== 0xff) invalid();
     const markerStart = at;
-    if (bytes[at] !== 0xff) break;
     while (at < bytes.length && bytes[at] === 0xff) at++;
-    if (at >= bytes.length) break;
+    if (at >= bytes.length) invalid();
     const marker = bytes[at++];
-    if (marker === 0xda) {
-      // A scan can contain escaped 0xff bytes and additional progressive scans.
-      // Never rewrite entropy-coded data or trailing markers.
-      parts.push(bytes.subarray(markerStart));
-      foundScan = true;
+    if (marker === 0 || marker === 0xd8 ||
+      (marker >= 0xd0 && marker <= 0xd7)) invalid();
+    if (marker === 0xd9) {
+      parts.push(bytes.subarray(markerStart, at));
+      foundEnd = true;
       break;
     }
-    if (marker === 0xd9) break;
-    if (marker === 0x01 || marker === 0xd8 ||
-        (marker >= 0xd0 && marker <= 0xd7)) {
+    if (marker === 0x01) { // TEM marker has no length/payload.
       parts.push(bytes.subarray(markerStart, at));
       continue;
     }
-    if (at + 1 >= bytes.length) break;
+
+    // JPEG length includes its own two bytes, not the marker. Validate
+    // against the current input before touching any marker/payload bytes.
+    if (at + 2 > bytes.length) invalid();
     const size = (bytes[at] << 8) | bytes[at + 1];
-    if (size < 2 || size > bytes.length - at) break;
+    if (size < 2 || size > bytes.length - at) invalid();
     const end = at + size;
     if (marker === 0xe1 || marker === 0xed || marker === 0xfe) {
-      removed = true;
+      changed = true;
     } else {
       parts.push(bytes.subarray(markerStart, end));
     }
+    if (marker === 0xda) {
+      foundScan = true;
+      inScan = true;
+    }
     at = end;
   }
-  if (!foundScan) throw new Error('JPEG metadata could not be safely removed.');
-  if (!removed) return bytes;
+  if (!foundScan || !foundEnd) invalid();
+  // Bytes after EOI can also carry private data. They are not part of the
+  // first JPEG image displayed by PDF readers; never embed them accidentally.
+  if (at !== bytes.length) changed = true;
+  if (!changed) return bytes;
   const length = parts.reduce((sum, part) => sum + part.length, 0);
-  const result = new Uint8Array(length);
+  const cleaned = new Uint8Array(length);
   let offset = 0;
   for (const part of parts) {
-    result.set(part, offset);
+    cleaned.set(part, offset);
     offset += part.length;
   }
-  return result;
+  return cleaned;
 }

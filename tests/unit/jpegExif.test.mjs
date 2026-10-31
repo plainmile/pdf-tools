@@ -98,3 +98,51 @@ test('reject malformed headers rather than embedding uninspected private EXIF me
   assert.throws(() => stripJpegPrivateMetadata(Uint8Array.from([0xff, 0xd8, 0xff, 0xe1, 0xff, 0xff, 0x47, 0x50, 0x53])), /safely removed/);
   assert.throws(() => stripJpegPrivateMetadata(Uint8Array.from([0xff, 0xd8, 0xff, 0xe1, 0, 5, 0x45, 0x58, 0x49])), /safely removed/);
 });
+
+test('progressive multi-scan JPEG strips EXIF/IPTC/comments between scans without changing image entropy', () => {
+  const segment = (marker, text) => {
+    const payload = new TextEncoder().encode(text);
+    const size = payload.length + 2;
+    return Uint8Array.from([0xff, marker, size >>> 8, size & 0xff, ...payload]);
+  };
+  const firstScan = Uint8Array.from([
+    0xff, 0xda, 0, 2, 0x12, 0xff, 0x00, 0x34, 0xff, 0xd0, 0x56,
+  ]);
+  const secondScan = Uint8Array.from([
+    0xff, 0xda, 0, 2, 0x78, 0xff, 0x00, 0x9a, 0xff, 0xd9,
+  ]);
+  const icc = segment(0xe2, 'ICC safe profile');
+  const huffman = segment(0xc4, 'Huffman marker survives');
+  const exif = segment(0xe1, 'Private GPS location after first SOS');
+  const xmp = segment(0xe1, 'Private XMP after the second scan');
+  const iptc = segment(0xed, 'Private IPTC name between scans');
+  const comment = segment(0xfe, 'Private JPEG comment after scan');
+  const original = Uint8Array.from([
+    0xff, 0xd8, ...segment(0xe1, 'GPS before first scan'), ...icc,
+    ...firstScan, ...exif, ...huffman, ...iptc, ...comment, ...secondScan,
+  ]);
+  const expected = Uint8Array.from([
+    0xff, 0xd8, ...icc, ...firstScan, ...huffman, ...secondScan,
+  ]);
+  const cleaned = stripJpegPrivateMetadata(original);
+  assert.deepEqual(cleaned, expected);
+  assert.equal(stripJpegPrivateMetadata(cleaned), cleaned);
+  assert.ok(!new TextDecoder().decode(cleaned).includes('Private'));
+  // A late metadata segment must never survive just because it follows SOS.
+  const trailingMetadata = Uint8Array.from([...expected, ...xmp]);
+  assert.deepEqual(stripJpegPrivateMetadata(trailingMetadata), expected);
+});
+
+test('JPEG privacy stripper does not misread marker-looking bytes inside a length-bounded segment', () => {
+  const iccWithMarkerBytes = Uint8Array.from([0xff, 0xe2, 0, 6, 0xff, 0xe1, 0xff, 0xed]);
+  const original = Uint8Array.from([
+    0xff, 0xd8, ...iccWithMarkerBytes, 0xff, 0xda, 0, 2,
+    0x31, 0xff, 0x00, 0xe1, 0x32, 0xff, 0xd7, 0x33, 0xff, 0xd9,
+  ]);
+  assert.equal(stripJpegPrivateMetadata(original), original);
+  assert.throws(() => stripJpegPrivateMetadata(original.subarray(0, -2)), /safely removed/);
+  // A malformed scan marker with no complete length must fail closed.
+  assert.throws(() => stripJpegPrivateMetadata(Uint8Array.from([
+    0xff, 0xd8, 0xff, 0xda, 0, 2, 0x11, 0xff, 0xe1, 0, 99,
+  ])), /safely removed/);
+});
