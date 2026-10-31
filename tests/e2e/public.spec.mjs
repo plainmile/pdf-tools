@@ -55,6 +55,22 @@ test('literal Markdown symbol guidance is crawlable and truthful in both languag
   }
 });
 
+test('Markdown break semantics are documented in readable bilingual HTML before hydration', async ({ request }) => {
+  for (const [path, question] of [
+    ['/markdown-to-pdf/', 'What happens to pasted HTML line breaks?'],
+    ['/zh/markdown-to-pdf/', '粘贴的 HTML 换行符会如何处理？'],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(question);
+    expect(html).toContain('rel="canonical"');
+    expect(html).toContain('hreflang="en"');
+    expect(html).toContain('hreflang="zh-CN"');
+    expect(html).not.toContain('"@type":"FAQPage"');
+  }
+});
+
 test('real task descriptions are the prerendered bilingual headings, not vague marketing copy', async ({ request }) => {
   for (const [path, heading] of [
     ['/', 'Merge, split, convert and organize PDFs'],
