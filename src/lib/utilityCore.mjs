@@ -471,6 +471,14 @@ export function parseTextBlocks(source, markdown = false) {
 const PLAIN_MARKDOWN_HTML_TAGS = new Set(
   'a abbr article aside b blockquote br code del div em h1 h2 h3 h4 h5 h6 hr i img input li ol p pre s script section small span strong style table tbody td th thead tr u ul'.split(' '),
 );
+// Plain-text PDF output cannot render full HTML structure, but discarding
+// closing block/cell tags must not fuse unrelated words or values. Preserve
+// only readable separators; inline styling tags remain truly inline.
+const MARKDOWN_HTML_BLOCK_END_TAGS = new Set(
+  'p div li blockquote h1 h2 h3 h4 h5 h6 tr'.split(' '),
+);
+const MARKDOWN_HTML_CELL_END_TAGS = new Set('td th'.split(' '));
+
 // Show Markdown link destinations as plain PDF text. We don't create PDF link
 // annotations or fetch remote images, but must not silently lose URL data.
 // A bounded label match keeps malformed book-length input inexpensive;
@@ -606,13 +614,19 @@ function stripKnownMarkdownHtml(source, breakSeparator = '\n') {
     MARKDOWN_HTML_TAG_AT.lastIndex = start;
     const match = MARKDOWN_HTML_TAG_AT.exec(source);
     if (match) {
-      if (PLAIN_MARKDOWN_HTML_TAGS.has(match[1].toLowerCase())) {
+      const tag = match[1].toLowerCase();
+      if (PLAIN_MARKDOWN_HTML_TAGS.has(tag)) {
         parts.push(source.slice(cursor, start));
-        // An inline HTML <br> is a semantic separator, not merely a tag.
-        // Removing it outright joins unrelated words ("First<br>Second"
-        // became "FirstSecond") and corrupts a Markdown-to-PDF export.
-        // Preserve only this simple break, not arbitrary HTML rendering.
-        if (match[1].toLowerCase() === 'br') parts.push(breakSeparator);
+        // A break, horizontal rule or closing block tag separates visible
+        // text. Without it, <p>One</p><p>Two</p> became "OneTwo".
+        // Close cells with spaces so <td>10</td><td>20</td> is not "1020".
+        // Do not interpret an inline <span>/<strong>/<code> as a paragraph.
+        if (tag === 'br' || tag === 'hr' ||
+            (source[start + 1] === '/' && MARKDOWN_HTML_BLOCK_END_TAGS.has(tag))) {
+          parts.push(breakSeparator);
+        } else if (source[start + 1] === '/' && MARKDOWN_HTML_CELL_END_TAGS.has(tag)) {
+          parts.push(' ');
+        }
         cursor = MARKDOWN_HTML_TAG_AT.lastIndex;
       }
       // Unknown HTML-like tags are literal technical text. Skip the whole
