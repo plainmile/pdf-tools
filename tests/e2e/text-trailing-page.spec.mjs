@@ -89,7 +89,7 @@ test('bilingual Markdown to PDF preserves escaped symbols in the actual download
 
 test('HTML break markers in pasted Markdown never join words in real bilingual PDF output', async ({ page }) => {
   const tick = String.fromCharCode(96);
-  const input = 'Line A<br>Line B\nCode: ' + tick + 'A<br>B' + tick;
+  const input = '**Line A<br>Line B**\nCode: ' + tick + 'A<br>B' + tick;
   for (const prefix of ['', '/zh']) {
     await page.goto(prefix + '/markdown-to-pdf/');
     await page.getByTestId('utility-text').fill(input);
@@ -111,6 +111,8 @@ test('HTML break markers in pasted Markdown never join words in real bilingual P
     const text = (await readFile(await (await textEvent).path())).toString('utf8');
     expect(text).toMatch(/Line A\s+Line B/);
     expect(text).not.toContain('Line ALine B');
+    expect(text).not.toContain('**Line A');
+    expect(text).not.toContain('Line B**');
     expect(text).toContain('Code: A<br>B');
   }
 });
