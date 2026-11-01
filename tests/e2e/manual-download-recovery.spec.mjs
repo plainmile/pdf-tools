@@ -59,7 +59,7 @@ test('Chinese TXT PDF survives a rejected manual browser download and retries th
   }
 
   const result = await downloadBytes(page, 'utility-pdf-download');
-  expect(result.name).toMatch(/\\.pdf$/);
+  expect(result.name).toMatch(/\.pdf$/);
   const pdf = await PDFDocument.load(result.bytes);
   expect(pdf.getPageCount()).toBe(1);
   const resources = pdf.context.lookup(pdf.getPage(0).node.Resources(), PDFDict);
@@ -95,7 +95,7 @@ test('English PDF-to-TXT manual save error does not lose the already extracted f
     await restoreBrowserDownloads(page);
   }
   const retry = await downloadBytes(page, 'complete-text-download');
-  expect(retry.name).toMatch(/\\.txt$/);
+  expect(retry.name).toMatch(/\.txt$/);
   expect(retry.bytes.toString('utf8')).toContain('LOCAL PDF DOWNLOAD RETRY');
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
