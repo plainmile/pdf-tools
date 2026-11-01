@@ -45,7 +45,8 @@ test('Blob downloads keep the anchor until a later browser task and release thei
       assert.equal(anchor.download, '测试.pdf');
       assert.equal(anchor.style.display, 'none');
       assert.equal(anchor.removed, false, 'removing synchronously may race WebKit navigation');
-      assert.deepEqual(scheduled.map(task => task.delay), [1000, 60000]);
+      assert.deepEqual(scheduled.map(task => task.delay), [15000, 60000],
+        'retain the anchor through delayed browser download dispatch');
       scheduled[0].callback();
       assert.equal(anchor.removed, true);
       assert.deepEqual(revoked, []);
