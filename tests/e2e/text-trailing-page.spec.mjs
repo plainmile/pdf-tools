@@ -116,3 +116,39 @@ test('HTML break markers in pasted Markdown never join words in real bilingual P
     expect(text).toContain('Code: A<br>B');
   }
 });
+
+test('consecutive HTML breaks retain a real blank row in downloaded Markdown PDFs', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/markdown-to-pdf/');
+  await page.getByTestId('utility-text').fill(
+    'SingleTop<br>SingleBottom\nDoubleTop<br><br>DoubleBottom');
+  await page.getByTestId('utility-run').click();
+  await expect(page.getByTestId('text-pdf-result')).toBeVisible({ timeout: 20000 });
+  const event = page.waitForEvent('download');
+  await page.getByTestId('utility-pdf-download').click();
+  const bytes = await readFile(await (await event).path());
+  expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+
+  // Verify the actual text baselines, not just parser strings or UI labels:
+  // one <br> advances one line, while <br><br> leaves a blank line between.
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = import.meta.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+  const task = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true });
+  try {
+    const doc = await task.promise;
+    const text = await (await doc.getPage(1)).getTextContent();
+    const baseline = (label) => {
+      const item = text.items.find(candidate => candidate.str === label);
+      expect(item, 'PDF must contain ' + label).toBeTruthy();
+      return item.transform[5];
+    };
+    const regular = baseline('SingleTop') - baseline('SingleBottom');
+    const spaced = baseline('DoubleTop') - baseline('DoubleBottom');
+    expect(regular).toBeGreaterThan(10);
+    expect(spaced).toBeGreaterThan(regular * 1.7);
+    expect(spaced).toBeLessThan(regular * 2.3);
+  } finally {
+    await task.destroy();
+  }
+});
+
