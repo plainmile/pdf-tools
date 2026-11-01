@@ -12,7 +12,7 @@ const COPY = {
     privacy: 'No files are uploaded. Processing may use significant device memory on large documents.', clear: 'Clear', loadingFile: 'Opening file locally…', cancelLoad: 'Cancel opening', fileLoadCancelled: 'File opening cancelled. Your previous file and unsaved work were kept.', replaceConfirmTitle: 'Replace the current file?', replaceConfirmHint: 'Opening {name} may discard an undownloaded PDF, a JPG/PNG/ZIP/TXT/MD automatic download not yet verified, or edited text. Verify or download your current work first, or cancel this replacement.', replaceKeep: 'Keep current work', replaceAccept: 'Replace file', clearConfirmTitle: 'Discard unsaved conversion?', clearConfirmHint: 'Some work has not been safely saved. This may include a JPG/PNG/ZIP/TXT/MD download retry, a generated PDF or edited text. Clearing now removes the in-tab copy.', clearKeep: 'Keep my work', clearConfirm: 'Discard and clear',
     pageRange: 'Pages (blank selects all if ≤60)', imageRangeInvalid: 'Enter valid pages from 1 to {pages} (for example 1-3, 5). Each range must go forward.', imageRangeTooMany: 'Select at most 60 pages per conversion. Use the page batches for a longer PDF.', rangeQuickHint: 'Example: 1-3, 5. Up to 60 images per batch; use Next pages for longer PDFs.', rangeMore: 'More page-range and ZIP details', rangeHint: 'Example: 301- or 301-360. A trailing dash selects through the final PDF page (still at most 60 images per batch). Long PDFs start with pages 1-60; use Next pages for later batches. Repeated or overlapping page numbers are exported only once. For custom orders like 3,1, ZIP entries get order-001, order-002 prefixes so extracted files stay in your chosen order.', imageType: 'Image format', quality: 'Render resolution',
     low: 'Smaller (72 DPI)', medium: 'Balanced (108 DPI)', high: 'Sharper (144 DPI)', print: 'Print quality (220 DPI)', printHint: 'Best for printing. Large pages may be rejected to protect your device memory.',
-    download: 'Download result', downloadAgain: 'Download again', textPdfRetryHint: 'If the PDF is missing from Downloads, click Download PDF again. No need to regenerate it.', imageDownloadStarted: 'Automatic image download started.', imageDownloadFallback: 'Check the JPG, PNG or ZIP in Downloads. If absent, use Download again without converting. If saved, use I saved the file to stop leave warnings.', textAutoDownloadFallback: 'Check Downloads for the TXT or Markdown file. If it was blocked, use Download again; if saved, confirm below.', confirmSaved: 'I saved the file', imageResultStale: 'Previous result: this file was generated with earlier image settings. Download again still gets that file. Run conversion to apply the current settings.', compressionMethod: 'Compression method', compressionLevel: 'Compression level', compressionStructure: 'Keep selectable text (try document optimization)', compressionRaster: 'Smaller images (convert pages to JPEG)', compressionLow: 'Smaller size (lossier)', compressionMid: 'Balanced', compressionHigh: 'Clearer (larger)',
+    download: 'Download result', downloadAgain: 'Download again', downloadFailed: 'The browser could not start this download. Check download permissions and click the same button again. Your finished file is still available here.', textPdfRetryHint: 'If the PDF is missing from Downloads, click Download PDF again. No need to regenerate it.', imageDownloadStarted: 'Automatic image download started.', imageDownloadFallback: 'Check the JPG, PNG or ZIP in Downloads. If absent, use Download again without converting. If saved, use I saved the file to stop leave warnings.', textAutoDownloadFallback: 'Check Downloads for the TXT or Markdown file. If it was blocked, use Download again; if saved, confirm below.', confirmSaved: 'I saved the file', imageResultStale: 'Previous result: this file was generated with earlier image settings. Download again still gets that file. Run conversion to apply the current settings.', compressionMethod: 'Compression method', compressionLevel: 'Compression level', compressionStructure: 'Keep selectable text (try document optimization)', compressionRaster: 'Smaller images (convert pages to JPEG)', compressionLow: 'Smaller size (lossier)', compressionMid: 'Balanced', compressionHigh: 'Clearer (larger)',
     structureWarning: 'Tries smaller PDF object streams without turning text into images. Results may not shrink. PDF bytes are rewritten, so digital signatures become invalid and complex forms, links, bookmarks or attachments must be checked. Keep your original.', structureReady: 'The optimized PDF is smaller. Text remains selectable; compare important links and form fields with your original.', structureNoSaving: 'Rewriting the document did not make it smaller. No download is offered; keep the original or explicitly choose image-based compression.', compressionWarning: 'This method converts every PDF page into a JPEG image. Text stops being searchable or selectable. Forms, annotations, hyperlinks and signatures are not preserved. Keep the original and inspect the output.',
     original: 'Original', result: 'Result', saved: 'Saved', increased: 'Size increase', unchanged: 'No change', noSaving: 'No size reduction. This file was not downloaded; try a lower resolution or keep the original.',
     compressionReady: 'The output is smaller. Check text sharpness before using it.', compressionResultStale: 'This is the previous result, made with different compression settings. You can still download it, or run again with the new setting.', compressionRetryKept: 'The new attempt did not reduce file size. The numbers and download below still belong to your previous successful result.', previewCompressed: 'Preview compressed page 1', hidePreview: 'Hide preview',
@@ -39,7 +39,7 @@ const COPY = {
     privacy: '文件不上传服务器。大文件可能消耗较多设备内存。', clear: '清空', loadingFile: '正在本机读取文件…', cancelLoad: '取消读取', fileLoadCancelled: '已取消读取文件，原文件和未保存的内容均已保留。', replaceConfirmTitle: '确定替换当前文件？', replaceConfirmHint: '打开 {name} 可能丢弃尚未下载的 PDF、尚未确认保存的 JPG/PNG/ZIP/TXT/MD 自动下载结果或文字修改。请先检查或下载当前内容，也可以取消替换。', replaceKeep: '保留当前工作', replaceAccept: '确认替换文件', clearConfirmTitle: '确定丢弃未保存的转换结果？', clearConfirmHint: 'JPG/PNG/ZIP/TXT/MD 补救下载副本、生成的 PDF 结果或编辑后的文字可能尚未妥善保存。清空将从当前标签页删除这些内容。', clearKeep: '继续编辑', clearConfirm: '丢弃并清空',
     pageRange: '选择页码（总页数不超过 60 时可留空）', imageRangeInvalid: '请输入 1 至 {pages} 范围内的页码（例如 1-3, 5），每段范围不能反向。', imageRangeTooMany: '每次最多选择 60 页，请使用页码批次分批导出。', rangeQuickHint: '例如：1-3, 5。每批最多导出 60 张图片；长文档可点“下一批”。', rangeMore: '查看更多页码与 ZIP 说明', rangeHint: '例如 301- 或 301-360。页码末尾的短横线表示一直选到 PDF 最后一页，但每批仍最多 60 张图片。长 PDF 默认选前 60 页，可用“下一批”继续。重复或重叠页码只导出一次。若输入 3,1 等自定义顺序，ZIP 内图片文件名前会加上 order-001、order-002 前缀，解压排序后仍保持指定顺序。', imageType: '图片格式', quality: '渲染清晰度',
     low: '更小（72 DPI）', medium: '平衡（108 DPI）', high: '高清（144 DPI）', print: '打印高清（220 DPI）', printHint: '适合打印。超大页面可能因设备内存安全限制而无法转换。',
-    download: '下载结果', downloadAgain: '再次下载', textPdfRetryHint: '若下载列表里没有 PDF，请再次点击上方“下载 PDF”，无需重新生成。', imageDownloadStarted: '已发起图片自动下载。', imageDownloadFallback: '请检查“下载”文件夹内是否已有 JPG、PNG 或 ZIP。未出现请点“再次下载”；已保存可点“我已保存文件”取消离开提醒。', textAutoDownloadFallback: '请检查“下载”文件夹是否已有 TXT 或 Markdown。如被拦截请点“再次下载”；已保存可点下方确认按钮。', confirmSaved: '我已保存文件', imageResultStale: '这是旧设置生成的结果：再次下载仍会获得上方所列的旧文件。如需应用当前图片格式、清晰度或页码范围，请重新转换。', compressionMethod: '压缩方式', compressionLevel: '图片化压缩强度', compressionStructure: '保留可搜索文字（尝试优化文档结构）', compressionRaster: '图片化压缩（将页面转为 JPEG）', compressionLow: '更小体积（画质较低）', compressionMid: '平衡', compressionHigh: '画质较清晰（体积较大）',
+    download: '下载结果', downloadAgain: '再次下载', downloadFailed: '浏览器未能开始下载。请检查浏览器下载权限后再次点击同一按钮；已生成的文件仍保留在本页。', textPdfRetryHint: '若下载列表里没有 PDF，请再次点击上方“下载 PDF”，无需重新生成。', imageDownloadStarted: '已发起图片自动下载。', imageDownloadFallback: '请检查“下载”文件夹内是否已有 JPG、PNG 或 ZIP。未出现请点“再次下载”；已保存可点“我已保存文件”取消离开提醒。', textAutoDownloadFallback: '请检查“下载”文件夹是否已有 TXT 或 Markdown。如被拦截请点“再次下载”；已保存可点下方确认按钮。', confirmSaved: '我已保存文件', imageResultStale: '这是旧设置生成的结果：再次下载仍会获得上方所列的旧文件。如需应用当前图片格式、清晰度或页码范围，请重新转换。', compressionMethod: '压缩方式', compressionLevel: '图片化压缩强度', compressionStructure: '保留可搜索文字（尝试优化文档结构）', compressionRaster: '图片化压缩（将页面转为 JPEG）', compressionLow: '更小体积（画质较低）', compressionMid: '平衡', compressionHigh: '画质较清晰（体积较大）',
     structureWarning: '此模式尝试重新组织 PDF 对象，不会主动把文字图片化；不一定能缩小文件。文件会被重写，数字签名将失效，复杂表单、链接、书签及附件需要重新核对。请保留原文件。', structureReady: '文档结构优化后文件确实变小，文字仍可搜索；请核对重要链接、表单和书签。', structureNoSaving: '文档结构优化未能让文件变小，因此不提供下载。请保留原文件，或主动选择图片化压缩。', compressionWarning: '此压缩方式会将 PDF 各页重新渲染为 JPEG 图片。输出将失去文本搜索和选中能力，也无法保留表单、注释、链接及数字签名。请保存原文件并检查输出画质。',
     original: '原文件', result: '输出文件', saved: '节省', increased: '体积增加', unchanged: '无变化', noSaving: '未缩小文件，因此没有自动下载。可尝试降低清晰度，或保留原文件。',
     compressionReady: '输出文件确实更小。请先核对文字清晰度。', compressionResultStale: '这是之前压缩设置生成的结果。您仍可下载，或按当前设置重新处理。', compressionRetryKept: '新一轮处理未能缩小文件。下方的大小比较和下载按钮仍对应上一次成功的压缩结果。', previewCompressed: '预览压缩后的首页', hidePreview: '收起预览',
@@ -434,6 +434,20 @@ export default function PdfUtility({ mode, locale = 'en' }) {
     // neither a new text draft nor undownloaded result remains to protect.
     setNotDownloaded(Boolean(isTextInput && outputFile.textRevision !== textRevision && sourceText.trim()));
   }
+  function downloadPrepared(outputFile) {
+    try {
+      // Manual export is a browser action, not a new conversion. If the
+      // browser rejects click(), retain both the generated bytes and the
+      // existing unsaved-work guard so the same button can be tried again.
+      save(outputFile);
+      setError('');
+    } catch (_error) {
+      // Unlike automatic downloads inside processFile(), React event handlers
+      // have no surrounding error boundary. Report the failure in the page
+      // rather than leaving users with only a console exception.
+      setError(t.downloadFailed);
+    }
+  }
   async function processFile() {
     if (operationRef.current || pendingReplacementRef.current) return;
     operationRef.current = true; // Prevent a second Run during the same event turn.
@@ -806,7 +820,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           <p className="utility-note"><strong>{output.name}</strong> · {formatBytes(output.bytes.length)}</p>
           <div className="utility-actions">
             <button type="button" className="button button-secondary" data-testid="image-download-again"
-              disabled={inputLocked} onClick={() => save(output)}>{t.downloadAgain} ↓</button>
+              disabled={inputLocked} onClick={() => downloadPrepared(output)}>{t.downloadAgain} ↓</button>
             {notDownloaded && <button type="button" className="button button-secondary button-small" data-testid="image-confirm-saved"
               disabled={inputLocked} onClick={() => setNotDownloaded(false)}>{t.confirmSaved}</button>}
           </div>
@@ -830,7 +844,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
           {showCompressionPreview && output.bytes && <div id="compression-preview-content" data-testid="compression-preview">
             <PdfFirstPagePreview bytes={output.bytes} pageCount={pdf.count} t={t} locale={locale} />
           </div>}
-          <button type="button" className="button button-primary" data-testid="compression-download" disabled={!output.stats.smaller || !output.bytes} onClick={() => save(output)}>{t.download} ↓</button>
+          <button type="button" className="button button-primary" data-testid="compression-download" disabled={!output.stats.smaller || !output.bytes} onClick={() => downloadPrepared(output)}>{t.download} ↓</button>
         </div>}
         {mode === 'add-page-numbers' && output?.bytes && <div className="utility-result" data-testid="numbered-pdf-result">
           {numberedResultStale && <p className="utility-note" role="status" data-testid="numbered-result-stale">{t.numberedResultStale}</p>}
@@ -859,13 +873,13 @@ export default function PdfUtility({ mode, locale = 'en' }) {
             <p className="utility-note" role="status" data-testid="number-preview-preparing">{t.previewPreparing}</p>}
           <PdfFirstPagePreview bytes={output.bytes} pageCount={output.pageCount}
             pageNumber={numberPreviewActualPage} t={t} locale={locale} suppressed={numberPreviewSuppressed} />
-          <button type="button" className="button button-primary" data-testid="numbered-pdf-download" onClick={() => save(output)}>{numberedResultStale ? t.numberedPreviousDownload : t.downloadPdf} ↓</button>
+          <button type="button" className="button button-primary" data-testid="numbered-pdf-download" onClick={() => downloadPrepared(output)}>{numberedResultStale ? t.numberedPreviousDownload : t.downloadPdf} ↓</button>
         </div>}
         {isTextInput && output?.bytes && <div className="utility-result" data-testid="text-pdf-result">
           {textResultStale && <p className="utility-note" role="status" data-testid="text-result-stale">{t.textResultStale}</p>}
           <PdfFirstPagePreview bytes={output.bytes} pageCount={output.pageCount} locale={locale} t={t} />
           <button type="button" className="button button-primary" data-testid="utility-pdf-download"
-            onClick={() => save(output)}>{textResultStale ? t.numberedPreviousDownload : t.downloadPdf} ↓</button>
+            onClick={() => downloadPrepared(output)}>{textResultStale ? t.numberedPreviousDownload : t.downloadPdf} ↓</button>
           <p className="utility-note" data-testid="text-pdf-retry-hint">{t.textPdfRetryHint}</p>
         </div>}
         {error && <div className="notice notice-error" role="alert">{error}</div>}
@@ -882,7 +896,7 @@ export default function PdfUtility({ mode, locale = 'en' }) {
             <p className="utility-note" data-testid="text-auto-download-hint">{t.textAutoDownloadFallback}</p>}
           <button type="button" className="button button-primary"
             data-testid={output.partialText ? 'partial-text-download' : output.suspectText ? 'suspect-text-download' : output.hasFormFields ? 'form-text-download' : 'complete-text-download'}
-            onClick={() => save(output)}>{output.partialText || output.suspectText || output.hasFormFields ? t.download : t.downloadAgain} ↓</button>
+            onClick={() => downloadPrepared(output)}>{output.partialText || output.suspectText || output.hasFormFields ? t.download : t.downloadAgain} ↓</button>
           {notDownloaded && !output.partialText && !output.suspectText && !output.hasFormFields &&
             <button type="button" className="button button-secondary button-small" data-testid="text-confirm-saved"
               disabled={inputLocked} onClick={() => setNotDownloaded(false)}>{t.confirmSaved}</button>}
