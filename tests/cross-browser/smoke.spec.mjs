@@ -84,6 +84,7 @@ test('browser-local Unicode text creates a downloadable PDF, not a blank output'
   // The retained in-browser result is the recovery path when Firefox or a
   // download manager suppresses the first save. It must remain clickable
   // without converting the source a second time or altering its PDF bytes.
+  await expect(page.locator('.notice-success')).toContainText('已向浏览器发起下载');
   const repeated = await downloadBytes(page, () => page.getByTestId('utility-pdf-download').click());
   expect(repeated.name).toBe(exported.name);
   expect(repeated.bytes.equals(exported.bytes)).toBe(true);
