@@ -506,10 +506,10 @@ export async function textToPdf(text, markdown = false, options = {}) {
       // breaks with no visible text on their outer side. Rendering them
       // could add entirely blank leading/trailing PDF pages.
       const firstParagraph = blockIndex === firstVisibleBlock
-        ? Math.max(0, paragraphs.findIndex(value => value !== '')) : 0;
+        ? Math.max(0, paragraphs.findIndex(value => Boolean(value.trim()))) : 0;
       let lastParagraph = paragraphs.length - 1;
       if (blockIndex === lastVisibleBlock) {
-        while (lastParagraph >= firstParagraph && paragraphs[lastParagraph] === '') lastParagraph--;
+        while (lastParagraph >= firstParagraph && !paragraphs[lastParagraph].trim()) lastParagraph--;
       }
       for (let paragraphIndex = firstParagraph; paragraphIndex <= lastParagraph; paragraphIndex++) {
         const para = paragraphs[paragraphIndex];
