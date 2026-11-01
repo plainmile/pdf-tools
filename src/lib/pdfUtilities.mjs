@@ -488,7 +488,21 @@ export async function textToPdf(text, markdown = false, options = {}) {
           return width;
         }
         : char => safeTextWidth(font, char, size);
-      for (const para of block.text.split('\n')) {
+      const paragraphs = block.text.split('\n');
+      for (let paragraphIndex = 0; paragraphIndex < paragraphs.length; paragraphIndex++) {
+        const para = paragraphs[paragraphIndex];
+        // Consecutive HTML <br> markers or adjacent HTML block endings can
+        // create intentional empty visual lines INSIDE one Markdown block.
+        // The line wrapper emits nothing for '', so explicitly advance one
+        // line here. Ignore outer empty fragments to avoid blank lead/trail
+        // pages from pasted <br> sequences.
+        if (para === '') {
+          if (paragraphIndex > 0 && paragraphIndex < paragraphs.length - 1) {
+            if (y - lineHeight < margin) await newPage();
+            y -= lineHeight;
+          }
+          continue;
+        }
         // Ordinary prose wraps at word boundaries; code preserves spacing.
         // Oversized tokens and CJK still wrap by individual character.
         for (const row of wrapTextLines(para, bodyWidth - 4, measureChar,
