@@ -1530,6 +1530,23 @@ test('failed generated-PDF previews can retry without losing the undownloaded PD
   }
 });
 
+test('Markdown HTML block tags preserve separate words in an actual exported PDF', async ({ page }) => {
+  await page.goto('/markdown-to-pdf/');
+  await page.getByTestId('utility-text').fill(
+    '<p>First paragraph</p><p>Second paragraph</p>\n<tr><td>12</td><td>34</td></tr>');
+  const generated = await generateTextPdfAndDownload(page);
+  expect((await PDFDocument.load(generated.bytes)).getPageCount()).toBe(1);
+  await page.goto('/pdf-to-txt/');
+  await upload(page, generated.bytes);
+  const extracted = await getDownload(page, () => page.getByTestId('utility-run').click());
+  const plain = extracted.bytes.toString('utf8');
+  expect(plain).toContain('First paragraph');
+  expect(plain).toContain('Second paragraph');
+  expect(plain).toContain('12 34');
+  expect(plain).not.toContain('paragraphSecond');
+  expect(plain).not.toContain('1234');
+});
+
 test('Markdown technical comparisons survive an actual PDF download and TXT round-trip', async ({ page }) => {
   await page.goto('/markdown-to-pdf/');
   await page.getByTestId('utility-text').fill('Logic: a < 3 && b > 2\nBounds: x <= 40 && y >= 8\n**Safe** <strong>HTML</strong> text');
