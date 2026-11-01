@@ -86,13 +86,20 @@ test('English PDF-to-TXT manual save error does not lose the already extracted f
   await page.getByTestId('utility-run').click();
   expect((await readFile(await (await first).path())).toString('utf8')).toContain('LOCAL PDF DOWNLOAD RETRY');
   await expect(page.getByTestId('complete-text-result')).toBeVisible();
+  // A successful automatic download may deliberately leave its original Blob
+  // anchor briefly attached for Firefox/WebKit download handoff. The blocked
+  // *manual* retry must not create any ADDITIONAL orphan anchor.
+  const autoDownloadUrls = new Set(await page.locator('a[download][href^="blob:"]')
+    .evaluateAll(anchors => anchors.map(anchor => anchor.href)));
 
   await rejectBrowserDownloads(page);
   try {
     await page.getByTestId('complete-text-download').click();
     await expect(page.getByRole('alert')).toContainText('The browser could not start this download');
     await expect(page.getByTestId('complete-text-result')).toBeVisible();
-    await expect(page.locator('a[download][href^="blob:"]')).toHaveCount(0);
+    const afterBlockedRetry = await page.locator('a[download][href^="blob:"]')
+      .evaluateAll(anchors => anchors.map(anchor => anchor.href));
+    expect(afterBlockedRetry.filter(url => !autoDownloadUrls.has(url))).toEqual([]);
   } finally {
     await restoreBrowserDownloads(page);
   }
