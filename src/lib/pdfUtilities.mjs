@@ -380,16 +380,24 @@ export async function textToPdf(text, markdown = false, options = {}) {
   // document edge. Those should not consume whole PDF pages before/after the
   // first/last real content. Keep interior gaps and whitespace INSIDE fenced
   // Markdown code blocks; outer blank Markdown and HTML-break blocks are disposable.
-  // A standalone HTML <br> becomes a paragraph with only newline text.
-  // Preserve it between real paragraphs, but trim it at document edges.
+  // Strip visually empty paragraphs at document edges, including HTML
+  // <br> lines with whitespace and tags with no visible text. Never strip
+  // fenced-code whitespace (kind === 'code'), and retain interior breaks.
   const isOuterGap = block => block?.kind === 'gap' ||
-    (block?.kind === 'paragraph' && /^\n+$/.test(block.text));
+    (block?.kind === 'paragraph' && !block.text.trim());
   while (isOuterGap(blocks.at(-1))) blocks.pop();
   const firstContent = blocks.findIndex(block => !isOuterGap(block));
   // One splice, not repeated shift(), so a 5 MiB input full of leading
   // newlines remains linear instead of quadratic.
   if (firstContent > 0) blocks.splice(0, firstContent);
   if (!blocks.some(b => b.text.trim())) throw new Error('Enter some text first.');
+  // A run of inline HTML <br> tags can be embedded at the start/end of
+  // the first/last real paragraph (unlike standalone <br> source lines).
+  // Skip only those outer fragments, not deliberate breaks between content.
+  // Locate meaningful blocks once so large pasted documents stay linear.
+  const firstVisibleBlock = blocks.findIndex(block => Boolean(block.text.trim()));
+  let lastVisibleBlock = blocks.length - 1;
+  while (lastVisibleBlock >= 0 && !blocks[lastVisibleBlock].text.trim()) lastVisibleBlock--;
   // TXT/Markdown output is a new document, not a metadata scrubber.
   const doc = await abortableWait(PDFDocument.create({ updateMetadata: false }), options.signal);
   const regular = await abortableWait(doc.embedFont(StandardFonts.Helvetica), options.signal);
@@ -467,7 +475,8 @@ export async function textToPdf(text, markdown = false, options = {}) {
     await newPage();
     let processedCharacters = 0;
     let nextYield = 4096;
-    for (const block of blocks) {
+    for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
+      const block = blocks[blockIndex];
       checkCancelled(options.signal);
       const size = block.size;
       const lineHeight = size * 1.55;
@@ -494,7 +503,16 @@ export async function textToPdf(text, markdown = false, options = {}) {
         : char => safeTextWidth(font, char, size);
       const paragraphs = block.text.split('\n');
       const standaloneBreaks = /^\n+$/.test(block.text);
-      for (let paragraphIndex = 0; paragraphIndex < paragraphs.length; paragraphIndex++) {
+      // The original first/last paragraph may contain hundreds of HTML
+      // breaks with no visible text on their outer side. Rendering them
+      // could add entirely blank leading/trailing PDF pages.
+      const firstParagraph = blockIndex === firstVisibleBlock
+        ? Math.max(0, paragraphs.findIndex(value => Boolean(value.trim()))) : 0;
+      let lastParagraph = paragraphs.length - 1;
+      if (blockIndex === lastVisibleBlock) {
+        while (lastParagraph >= firstParagraph && !paragraphs[lastParagraph].trim()) lastParagraph--;
+      }
+      for (let paragraphIndex = firstParagraph; paragraphIndex <= lastParagraph; paragraphIndex++) {
         const para = paragraphs[paragraphIndex];
         // Consecutive HTML <br> markers or adjacent HTML block endings can
         // create intentional empty visual lines INSIDE one Markdown block.

@@ -161,3 +161,34 @@ test('consecutive HTML breaks retain a real blank row in downloaded Markdown PDF
   }
 });
 
+for (const prefix of ['', '/zh']) {
+  test('inline HTML breaks at both document edges do not add blank PDF pages ' + (prefix || 'en'), async ({ page }) => {
+    test.setTimeout(60000);
+    await page.goto(prefix + '/markdown-to-pdf/');
+    // Unlike standalone <br> source lines, these are inside a *single*
+    // Markdown paragraph. They used to consume pages before/after the text.
+    const breaks = '<br> \t<br>'.repeat(70); // Both empty and whitespace-only edge rows.
+    const standalone = Array(90).fill('  <br>').join('\n');
+    await page.getByTestId('utility-text').fill(
+      standalone + '\n' + breaks + 'First item<br><br>Last item' + breaks + '\n' + standalone);
+    await page.getByTestId('utility-run').click();
+    await expect(page.getByTestId('text-pdf-result')).toBeVisible({ timeout: 20000 });
+    const event = page.waitForEvent('download');
+    await page.getByTestId('utility-pdf-download').click();
+    const bytes = await readFile(await (await event).path());
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+
+    // Inspect actual exported PDF text; checking the generated preview UI
+    // alone would miss unwanted blank pages or lost body content.
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = import.meta.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+    const task = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true });
+    try {
+      const document = await task.promise;
+      const text = await (await document.getPage(1)).getTextContent();
+      expect(text.items.some(item => item.str === 'First item')).toBe(true);
+      expect(text.items.some(item => item.str === 'Last item')).toBe(true);
+    } finally { await task.destroy(); }
+  });
+}
+
