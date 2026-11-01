@@ -11,12 +11,13 @@ export function saveDownload(bytesOrBlob, filename, mime = 'application/pdf') {
     document.body.appendChild(anchor);
     anchor.click();
   } finally {
-    // Some WebKit versions finish resolving a Blob download AFTER click()
-    // returns. Removing the anchor synchronously can race that navigation.
-    // Keep it attached, but hidden, for a short grace period. If click()
-    // throws, the same cleanup still runs; the Blob URL remains valid long
-    // enough for slower mobile downloads before it is revoked.
-    setTimeout(() => anchor?.remove(), 1_000);
+    // The browser may resolve a blob: download asynchronously after click()
+    // returns. Firefox/WebKit can otherwise silently miss a generated-file
+    // download while its preview and button remain visible. Keep the hidden
+    // anchor attached for longer on slow or busy devices; still revoke the
+    // object URL promptly enough to avoid leaking large PDF/ZIP blobs.
+    // This is a race mitigation, not confirmation that a download reached disk.
+    setTimeout(() => anchor?.remove(), 15_000);
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 }
