@@ -379,9 +379,13 @@ export async function textToPdf(text, markdown = false, options = {}) {
   // Pasted TXT/Markdown may contain hundreds of empty lines at either
   // document edge. Those should not consume whole PDF pages before/after the
   // first/last real content. Keep interior gaps and whitespace INSIDE fenced
-  // Markdown code blocks; only block.kind === 'gap' is disposable.
-  while (blocks.at(-1)?.kind === 'gap') blocks.pop();
-  const firstContent = blocks.findIndex(block => block.kind !== 'gap');
+  // Markdown code blocks; outer blank Markdown and HTML-break blocks are disposable.
+  // A standalone HTML <br> becomes a paragraph with only newline text.
+  // Preserve it between real paragraphs, but trim it at document edges.
+  const isOuterGap = block => block?.kind === 'gap' ||
+    (block?.kind === 'paragraph' && /^\n+$/.test(block.text));
+  while (isOuterGap(blocks.at(-1))) blocks.pop();
+  const firstContent = blocks.findIndex(block => !isOuterGap(block));
   // One splice, not repeated shift(), so a 5 MiB input full of leading
   // newlines remains linear instead of quadratic.
   if (firstContent > 0) blocks.splice(0, firstContent);
@@ -488,7 +492,23 @@ export async function textToPdf(text, markdown = false, options = {}) {
           return width;
         }
         : char => safeTextWidth(font, char, size);
-      for (const para of block.text.split('\n')) {
+      const paragraphs = block.text.split('\n');
+      const standaloneBreaks = /^\n+$/.test(block.text);
+      for (let paragraphIndex = 0; paragraphIndex < paragraphs.length; paragraphIndex++) {
+        const para = paragraphs[paragraphIndex];
+        // Consecutive HTML <br> markers or adjacent HTML block endings can
+        // create intentional empty visual lines INSIDE one Markdown block.
+        // The line wrapper emits nothing for '', so explicitly advance one
+        // line here. Ignore outer empty fragments to avoid blank lead/trail
+        // pages from pasted <br> sequences.
+        if (para === '') {
+          if ((paragraphIndex > 0 && paragraphIndex < paragraphs.length - 1) ||
+              (standaloneBreaks && paragraphIndex < paragraphs.length - 1)) {
+            if (y - lineHeight < margin) await newPage();
+            y -= lineHeight;
+          }
+          continue;
+        }
         // Ordinary prose wraps at word boundaries; code preserves spacing.
         // Oversized tokens and CJK still wrap by individual character.
         for (const row of wrapTextLines(para, bodyWidth - 4, measureChar,

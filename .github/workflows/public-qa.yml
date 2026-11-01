@@ -41,7 +41,7 @@ jobs:
               cp /work/playwright.config.mjs /tmp/live-tests/
               cd /tmp/live-tests
               npm init -y >/dev/null
-              npm install --no-audit --no-fund @playwright/test@1.55.0 pdf-lib@1.17.1 jszip@3.10.1
+              npm install --no-audit --no-fund @playwright/test@1.55.0 pdf-lib@1.17.1 jszip@3.10.1 pdfjs-dist@6.3.289
               npx playwright test --reporter=list || {
                 cp -r test-results /artifacts/ || true
                 exit 1
