@@ -168,8 +168,9 @@ for (const prefix of ['', '/zh']) {
     // Unlike standalone <br> source lines, these are inside a *single*
     // Markdown paragraph. They used to consume pages before/after the text.
     const breaks = '<br> \t<br>'.repeat(70); // Both empty and whitespace-only edge rows.
+    const standalone = Array(90).fill('  <br>').join('\n');
     await page.getByTestId('utility-text').fill(
-      breaks + 'First item<br><br>Last item' + breaks);
+      standalone + '\n' + breaks + 'First item<br><br>Last item' + breaks + '\n' + standalone);
     await page.getByTestId('utility-run').click();
     await expect(page.getByTestId('text-pdf-result')).toBeVisible({ timeout: 20000 });
     const event = page.waitForEvent('download');
