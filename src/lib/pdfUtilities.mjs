@@ -380,10 +380,11 @@ export async function textToPdf(text, markdown = false, options = {}) {
   // document edge. Those should not consume whole PDF pages before/after the
   // first/last real content. Keep interior gaps and whitespace INSIDE fenced
   // Markdown code blocks; outer blank Markdown and HTML-break blocks are disposable.
-  // A standalone HTML <br> becomes a paragraph with only newline text.
-  // Preserve it between real paragraphs, but trim it at document edges.
+  // Strip visually empty paragraphs at document edges, including HTML
+  // <br> lines with whitespace and tags with no visible text. Never strip
+  // fenced-code whitespace (kind === 'code'), and retain interior breaks.
   const isOuterGap = block => block?.kind === 'gap' ||
-    (block?.kind === 'paragraph' && /^\n+$/.test(block.text));
+    (block?.kind === 'paragraph' && !block.text.trim());
   while (isOuterGap(blocks.at(-1))) blocks.pop();
   const firstContent = blocks.findIndex(block => !isOuterGap(block));
   // One splice, not repeated shift(), so a 5 MiB input full of leading
