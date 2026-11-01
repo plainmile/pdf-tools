@@ -4,7 +4,9 @@ import { readFile } from 'node:fs/promises';
 
 async function fixturePdf() {
   const pdf = await PDFDocument.create();
-  pdf.addPage([350, 450]).drawText('LOCAL PDF DOWNLOAD RETRY', { x: 25, y: 375 });
+  // Keep the entire sentence inside the page. pdf-lib's default 24 pt text
+  // would cross the right margin and produce a clipped PDF fixture.
+  pdf.addPage([350, 450]).drawText('LOCAL PDF DOWNLOAD RETRY', { x: 25, y: 375, size: 12 });
   return Buffer.from(await pdf.save());
 }
 
