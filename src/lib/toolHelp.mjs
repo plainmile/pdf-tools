@@ -73,6 +73,7 @@ export const toolHelp = {
       ['Can I turn a book-length TXT file into PDF?', 'You can import up to 5 MiB of UTF-8 or BOM-marked UTF-16 text. Output is limited to 1,000 total pages, including at most 300 image-based pages requiring unsupported glyphs.'],
       ['Will Chinese text be searchable in the output?', 'Pages with Chinese or other unsupported characters are rendered as images, so those pages are not searchable. Pages containing only supported characters remain selectable, even in the same document.'],
       ['Will pasted blank lines create empty first or last PDF pages?', 'No. Empty lines surrounding the content are skipped; blank lines between paragraphs remain for spacing.'],
+      ['What if Download PDF does not start?', 'Check the browser Downloads list and click Download PDF again. If the browser directly rejects the download, the page shows an error. The generated PDF stays in this tab and does not need to be converted again.'],
     ],
     'markdown-to-pdf': [
       ['What Markdown is supported?', 'Basic headings, paragraphs, lists, block quotes and code blocks. Remote images, HTML and complex tables are not rendered.'],
@@ -82,6 +83,7 @@ export const toolHelp = {
       ['What happens to pasted HTML line breaks?', 'A simple <br> marker is treated as a line break so adjacent words do not merge in the PDF. Full HTML, CSS, tables and remote images are not rendered. To display the tag literally, put it in inline or fenced code, or escape the angle brackets.'],
       ['How do I keep literal Markdown stars, underscores or brackets?', 'Put a backslash before the symbol, for example \\*literal\\* or \\[label]. These print as normal characters instead of formatting or links. Inside inline code and fenced code blocks, backslashes are kept literally. This is basic Markdown text conversion, not a full typesetting engine.'],
       ['Is this a full Word-style layout engine?', 'No. It is a lightweight browser-only converter. Review the downloaded layout, especially for long documents and Chinese text.'],
+      ['What if the generated PDF will not download?', 'Check Downloads, then use the same Download PDF button again. A direct browser rejection shows an error but keeps the already generated PDF available in this tab; no second conversion is needed.'],
     ],
     'add-page-numbers': [
       ['Can I number a 320-page PDF starting at 201?', 'Yes. Set 201 as the starting number; the first page displays 201 and page 320 displays 520.'],
@@ -170,6 +172,7 @@ export const toolHelp = {
       ['可以将长篇 TXT 电子书转换成 PDF 吗？', '支持 UTF-8 或带 BOM 的 UTF-16 文本，文件最多 5 MiB。输出总计最多 1000 页，其中需要特殊字体的图片化页面最多 300 页。'],
       ['中文转换后的 PDF 能搜索吗？', '目前中文文字通过浏览器字体绘制为图片页面，因此不能直接搜索或选择其中的文字。'],
       ['粘贴内容前后有很多空行，会多出空白 PDF 页吗？', '不会。正文开头与末尾的纯空行会被跳过，正文段落之间的空行仍用于分隔。'],
+      ['点击“下载 PDF”后没有文件怎么办？', '请先检查浏览器的下载列表，再点击同一个“下载 PDF”按钮。若浏览器直接拒绝下载，页面会显示错误；已经生成的 PDF 仍保留在当前标签页，无需重新转换。'],
     ],
     'markdown-to-pdf': [
       ['支持哪些 Markdown 语法？', '支持基本标题、段落、列表、引用及代码块；暂不渲染远程图片、HTML 和复杂表格。'],
@@ -179,6 +182,7 @@ export const toolHelp = {
       ['粘贴的 HTML 换行符会如何处理？', '简单的 <br> 标记会作为换行处理，避免生成 PDF 时把相邻文字拼在一起。不会渲染完整 HTML、CSS、复杂表格或远程图片。若需要原样显示标签，请使用行内代码、代码围栏，或转义尖括号。'],
       ['如何在 PDF 里保留 Markdown 星号、下划线和方括号？', '在符号前面加反斜杠，例如 \\*原样\\* 或 \\[标题]，导出后会保留这些符号，而不是错误地解析为强调或链接。在行内代码或代码围栏内，反斜杠会按原文字保留；仍不支持复杂 Markdown 排版。'],
       ['可以完全替代 Word 排版吗？', '不能。这是轻量级本地转换工具，较长内容或中文文档导出后应检查分页与排版。'],
+      ['生成的 PDF 无法下载怎么办？', '先检查浏览器下载列表，再点击原来的“下载 PDF”按钮。浏览器直接拒绝下载时会显示错误信息，当前标签页仍保留已生成的 PDF，不需要再次转换。'],
     ],
     'add-page-numbers': [
       ['320 页 PDF 能从第 201 页开始编号吗？', '可以。设置起始页码 201，第一页显示 201，最后一页显示 520。'],
