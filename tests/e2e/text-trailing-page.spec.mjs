@@ -167,7 +167,7 @@ for (const prefix of ['', '/zh']) {
     await page.goto(prefix + '/markdown-to-pdf/');
     // Unlike standalone <br> source lines, these are inside a *single*
     // Markdown paragraph. They used to consume pages before/after the text.
-    const breaks = '<br>'.repeat(140);
+    const breaks = '<br> \t<br>'.repeat(70); // Both empty and whitespace-only edge rows.
     await page.getByTestId('utility-text').fill(
       breaks + 'First item<br><br>Last item' + breaks);
     await page.getByTestId('utility-run').click();
