@@ -44,13 +44,22 @@ test('Blob downloads keep the anchor until a later browser task and release thei
       assert.equal(anchor.href, 'blob:test-document');
       assert.equal(anchor.download, '测试.pdf');
       assert.equal(anchor.style.display, 'none');
-      assert.equal(anchor.removed, false, 'removing synchronously may race WebKit navigation');
-      assert.deepEqual(scheduled.map(task => task.delay), [1000, 60000]);
-      scheduled[0].callback();
-      assert.equal(anchor.removed, true);
-      assert.deepEqual(revoked, []);
-      scheduled[1].callback();
-      assert.deepEqual(revoked, ['blob:test-document']);
+      if (clickThrows) {
+        // A synchronous browser error means there is no asynchronous download
+        // to protect: remove the anchor and revoke immediately.
+        assert.equal(anchor.removed, true);
+        assert.deepEqual(scheduled, []);
+        assert.deepEqual(revoked, ['blob:test-document']);
+      } else {
+        assert.equal(anchor.removed, false, 'removing too early may race Firefox/WebKit');
+        assert.deepEqual(scheduled.map(task => task.delay), [15000, 60000],
+          'retain the anchor through delayed browser download dispatch');
+        scheduled[0].callback();
+        assert.equal(anchor.removed, true);
+        assert.deepEqual(revoked, []);
+        scheduled[1].callback();
+        assert.deepEqual(revoked, ['blob:test-document']);
+      }
     }
   } finally {
     if (hadDocument) globalThis.document = previousDocument;

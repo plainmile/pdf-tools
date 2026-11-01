@@ -81,6 +81,14 @@ test('browser-local Unicode text creates a downloadable PDF, not a blank output'
   await expect(page.getByTestId('text-pdf-result')).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('.notice-success')).toContainText('图片', { timeout: 30_000 });
   const exported = await downloadBytes(page, () => page.getByTestId('utility-pdf-download').click());
+  // The retained in-browser result is the recovery path when Firefox or a
+  // download manager suppresses the first save. It must remain clickable
+  // without converting the source a second time or altering its PDF bytes.
+  await expect(page.getByTestId('text-pdf-retry-hint')).toContainText('无需重新生成');
+  await expect(page.locator('.notice-success')).toContainText('无法选择和搜索文字');
+  const repeated = await downloadBytes(page, () => page.getByTestId('utility-pdf-download').click());
+  expect(repeated.name).toBe(exported.name);
+  expect(repeated.bytes.equals(exported.bytes)).toBe(true);
   const doc = await PDFDocument.load(exported.bytes);
   expect(doc.getPageCount()).toBe(1);
   // Unicode text in the built-in-font fallback must create a raster image
