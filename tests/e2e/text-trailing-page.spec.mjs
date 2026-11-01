@@ -120,8 +120,13 @@ test('HTML break markers in pasted Markdown never join words in real bilingual P
 test('consecutive HTML breaks retain a real blank row in downloaded Markdown PDFs', async ({ page }) => {
   test.setTimeout(60000);
   await page.goto('/markdown-to-pdf/');
-  await page.getByTestId('utility-text').fill(
-    'SingleTop<br>SingleBottom\nDoubleTop<br><br>DoubleBottom');
+  await page.getByTestId('utility-text').fill([
+    ...Array(100).fill('<br>'),
+    'SingleTop<br>SingleBottom',
+    'DoubleTop<br><br>DoubleBottom',
+    'StandaloneTop', '<br>', 'StandaloneBottom',
+    ...Array(100).fill('<br>'),
+  ].join('\n'));
   await page.getByTestId('utility-run').click();
   await expect(page.getByTestId('text-pdf-result')).toBeVisible({ timeout: 20000 });
   const event = page.waitForEvent('download');
@@ -147,6 +152,10 @@ test('consecutive HTML breaks retain a real blank row in downloaded Markdown PDF
     expect(regular).toBeGreaterThan(10);
     expect(spaced).toBeGreaterThan(regular * 1.7);
     expect(spaced).toBeLessThan(regular * 2.3);
+    // A source line consisting of only <br> must not disappear either.
+    const standalone = baseline('StandaloneTop') - baseline('StandaloneBottom');
+    expect(standalone).toBeGreaterThan(regular * 1.7);
+    expect(standalone).toBeLessThan(regular * 2.3);
   } finally {
     await task.destroy();
   }
